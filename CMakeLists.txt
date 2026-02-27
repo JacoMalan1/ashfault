@@ -18,14 +18,17 @@ target_include_directories(ashfault PRIVATE include)
 target_include_directories(ashfault PRIVATE vendor/glfw/include)
 target_include_directories(ashfault PRIVATE vendor/VulkanMemoryAllocator/include)
 target_include_directories(ashfault PRIVATE vendor/spdlog/include)
+target_include_directories(ashfault PUBLIC vendor/CLSTL/include)
 
 target_compile_options(ashfault PUBLIC -Wall -Wpedantic -Wno-nullability-extension -Wno-nullability-completeness)
 
 add_subdirectory(${PROJECT_SOURCE_DIR}/vendor/glfw)
 add_subdirectory(${PROJECT_SOURCE_DIR}/vendor/VulkanMemoryAllocator)
 add_subdirectory(${PROJECT_SOURCE_DIR}/vendor/spdlog)
+add_subdirectory(${PROJECT_SOURCE_DIR}/vendor/CLSTL)
 
 target_link_libraries(ashfault glfw)
 target_link_libraries(ashfault vulkan)
 target_link_libraries(ashfault GPUOpen::VulkanMemoryAllocator)
 target_link_libraries(ashfault spdlog::spdlog)
+target_link_libraries(ashfault clstl)

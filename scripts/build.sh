@@ -7,6 +7,8 @@ fi
 EXTRA_OPTS=''
 if [ "$1" == '-r' ]; then
   EXTRA_OPTS='-DCMAKE_BUILD_TYPE=Release'
+else
+  EXTRA_OPTS='-DCMAKE_BUILD_TYPE=Debug'
 fi
 
 mkdir build

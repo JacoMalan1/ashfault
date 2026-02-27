@@ -1,7 +1,7 @@
-#define GLFW_INCLUDE_NONE
+#include "spdlog/spdlog.h"
+#define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
 
-#include <memory>
 #include <ashfault/renderer.h>
 #include <stdexcept>
 
@@ -10,6 +10,8 @@ void error_callback(int error, const char *desc) {
 }
 
 int main() {
+  spdlog::set_level(spdlog::level::debug);
+
   glfwSetErrorCallback(error_callback);
 
   if (!glfwInit()) {
@@ -22,9 +24,10 @@ int main() {
     throw std::runtime_error("Failed to create GLFW window");
   }
 
-  auto renderer = std::make_shared<ashfault::Renderer>();
+  auto renderer = new ashfault::Renderer();
 
   renderer->init(window);
+  delete renderer;
 
   glfwTerminate();
 }
