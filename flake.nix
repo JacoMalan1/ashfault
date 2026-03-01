@@ -33,6 +33,8 @@
 		libxinerama
 		libxcursor
 		libxi
+		shaderc
+		spirv-tools
               ];
 
 	      env = {
