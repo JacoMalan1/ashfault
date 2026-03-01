@@ -8,9 +8,29 @@ if(CMAKE_EXPORT_COMPILE_COMMANDS)
       ${CMAKE_CXX_IMPLICIT_INCLUDE_DIRECTORIES})
 endif()
 
-set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD 17)
+set(SHADER_SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/shaders)
+set(SHADER_BINARY_DIR ${CMAKE_CURRENT_BINARY_DIR})
 
 file(GLOB SRC_FILES ${PROJECT_SOURCE_DIR}/src/*.cpp)
+file(GLOB SHADERS ${SHADER_SOURCE_DIR}/*.vert ${SHADER_SOURCE_DIR}/*.frag)
+
+add_custom_command(
+  COMMAND ${CMAKE_COMMAND} -E make_directory ${SHADER_BINARY_DIR}
+  OUTPUT ${SHADER_BINARY_DIR}
+  COMMENT "Creating ${SHADER_BINARY_DIR}")
+
+foreach(source IN LISTS SHADERS)
+  get_filename_component(FILENAME ${source} NAME)
+  add_custom_command(
+    COMMAND "glslc" "-o" "${SHADER_BINARY_DIR}/${FILENAME}.spv" "${source}"
+    OUTPUT ${SHADER_BINARY_DIR}/${FILENAME}.spv
+    DEPENDS ${source} ${SHADER_BINARY_DIR}
+    COMMENT "Compiling ${FILENAME}")
+  list(APPEND SPV_SHADERS ${SHADER_BINARY_DIR}/${FILENAME}.spv)
+endforeach()
+
+add_custom_target(shaders ALL DEPENDS ${SPV_SHADERS})
 
 add_executable(ashfault src/main.cpp ${SRC_FILES})
 

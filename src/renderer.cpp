@@ -1,14 +1,17 @@
-#include <algorithm>
-#include <limits>
-#include <set>
+#include "ashfault/pipeline.h"
+#include "ashfault/shader.h"
 #define GLFW_INCLUDE_VULKAN
-#include "GLFW/glfw3.h"
+#include <GLFW/glfw3.h>
+
 #include <CLSTL/algorithm.h>
 #include <CLSTL/array.h>
 #include <CLSTL/vector.h>
+#include <algorithm>
 #include <ashfault/renderer.h>
 #include <cstdint>
 #include <cstring>
+#include <limits>
+#include <set>
 #include <spdlog/spdlog.h>
 #include <stdexcept>
 #include <vulkan/vulkan_core.h>
@@ -49,6 +52,10 @@ QueueSuitability Renderer::find_queue_families(VkPhysicalDevice device) {
                                          &present_support);
     if (present_support) {
       suitability.present_queue = i;
+    }
+
+    if (suitability.complete()) {
+      break;
     }
   }
 
@@ -218,19 +225,20 @@ void ashfault::Renderer::create_device() {
       queue_info.graphics_queue.value();
   graphics_queue_create_info.pQueuePriorities = &queue_prios;
 
-  VkDeviceQueueCreateInfo present_queue_create_info{};
-  present_queue_create_info.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
-  present_queue_create_info.queueCount = 1;
-  present_queue_create_info.pQueuePriorities = &queue_prios;
-  present_queue_create_info.queueFamilyIndex = queue_info.present_queue.value();
+  VkPhysicalDeviceVulkan12Features features_12{};
+  features_12.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES;
+  features_12.runtimeDescriptorArray = VK_TRUE;
 
-  clstl::array<VkDeviceQueueCreateInfo, 2> queue_create_info = {
-      graphics_queue_create_info, present_queue_create_info};
+  VkPhysicalDeviceVulkan13Features features_13{};
+  features_13.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_3_FEATURES;
+  features_13.dynamicRendering = VK_TRUE;
+  features_13.pNext = &features_12;
 
   VkDeviceCreateInfo device_info{};
   device_info.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
-  device_info.pQueueCreateInfos = queue_create_info.data();
-  device_info.queueCreateInfoCount = 2;
+  device_info.pNext = &features_13;
+  device_info.pQueueCreateInfos = &graphics_queue_create_info;
+  device_info.queueCreateInfoCount = 1;
   device_info.enabledExtensionCount = this->s_DeviceExtensions.size();
   device_info.ppEnabledExtensionNames = this->s_DeviceExtensions.data();
 
@@ -238,6 +246,11 @@ void ashfault::Renderer::create_device() {
       VK_SUCCESS) {
     throw std::runtime_error("Failed to create Vulkan device");
   }
+
+  vkGetDeviceQueue(this->m_Device, queue_info.graphics_queue.value(), 0,
+                   &this->m_GraphicsQueue);
+  vkGetDeviceQueue(this->m_Device, queue_info.present_queue.value(), 0,
+                   &this->m_PresentQueue);
 }
 
 void ashfault::Renderer::create_allocator() {
@@ -275,8 +288,10 @@ int present_mode_ranking(VkPresentModeKHR mode) {
     return 1;
   case VK_PRESENT_MODE_IMMEDIATE_KHR:
     return 2;
-  default:
+  case VK_PRESENT_MODE_FIFO_KHR:
     return 3;
+  default:
+    return 4;
   }
 }
 
@@ -285,7 +300,7 @@ Renderer::select_present_mode(const clstl::vector<VkPresentModeKHR> &formats) {
   auto preference_order = formats;
   clstl::sort(preference_order.begin(), preference_order.end(),
               [](VkPresentModeKHR a, VkPresentModeKHR b) {
-                return present_mode_ranking(a) > present_mode_ranking(b);
+                return present_mode_ranking(a) < present_mode_ranking(b);
               });
 
   return preference_order[0];
@@ -317,6 +332,8 @@ void ashfault::Renderer::setup_swapchain() {
       select_surface_format(swapchain_support.formats);
   VkPresentModeKHR swapchain_present_mode =
       select_present_mode(swapchain_support.present_modes);
+  spdlog::info("Selected present mode {}", (int)swapchain_present_mode);
+
   VkExtent2D swap_extent = choose_swap_extent(swapchain_support.capabilities);
 
   std::uint32_t image_count = swapchain_support.capabilities.minImageCount + 1;
@@ -349,12 +366,14 @@ void ashfault::Renderer::setup_swapchain() {
                           &swapchain_image_count, nullptr);
   this->m_SwapchainImages.resize(swapchain_image_count);
   vkGetSwapchainImagesKHR(this->m_Device, this->m_Swapchain,
-                          &swapchain_image_count, this->m_SwapchainImages.data());
+                          &swapchain_image_count,
+                          this->m_SwapchainImages.data());
 
   this->m_ImageViews.resize(swapchain_image_count);
   for (std::size_t i = 0; i < this->m_SwapchainImages.size(); i++) {
     VkImageViewCreateInfo create_info{};
     create_info.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+    create_info.format = swapchain_surface_format.format;
     create_info.image = this->m_SwapchainImages[i];
     create_info.viewType = VK_IMAGE_VIEW_TYPE_2D;
     create_info.components.r = VK_COMPONENT_SWIZZLE_IDENTITY;
@@ -372,6 +391,8 @@ void ashfault::Renderer::setup_swapchain() {
       throw std::runtime_error("Failed to create image views");
     }
   }
+
+  spdlog::info("Created swapchain");
 }
 
 void ashfault::Renderer::init(GLFWwindow *window) {
@@ -383,16 +404,37 @@ void ashfault::Renderer::init(GLFWwindow *window) {
   this->setup_swapchain();
 }
 
+clstl::shared_ptr<VulkanShader>
+Renderer::create_shader(const clstl::string &path) const {
+  return clstl::make_shared<VulkanShader>(this->m_Device, path);
+}
+
+GraphicsPipelineBuilder Renderer::create_graphics_pipeline() const {
+  clstl::array<std::uint32_t, 2> window_dims;
+  int width, height;
+  glfwGetFramebufferSize(this->m_Window, &width, &height);
+  window_dims[0] = width;
+  window_dims[1] = height;
+  return GraphicsPipelineBuilder(this->m_Device, this->m_SurfaceFormat.format,
+                                 std::move(window_dims));
+}
+
 Renderer::~Renderer() {
+  spdlog::info("Renderer shutting down...");
+
+  vkDeviceWaitIdle(this->m_Device);
+  vkQueueWaitIdle(this->m_GraphicsQueue);
+  vkQueueWaitIdle(this->m_PresentQueue);
+
   for (const auto &image_view : this->m_ImageViews) {
     vkDestroyImageView(this->m_Device, image_view, nullptr);
   }
 
   vkDestroySwapchainKHR(this->m_Device, this->m_Swapchain, nullptr);
 
-  vkDestroySurfaceKHR(this->m_Instance, this->m_Surface, nullptr);
   vmaDestroyAllocator(this->m_Allocator);
   vkDestroyDevice(this->m_Device, nullptr);
+  vkDestroySurfaceKHR(this->m_Instance, this->m_Surface, nullptr);
   vkDestroyInstance(this->m_Instance, nullptr);
 }
 

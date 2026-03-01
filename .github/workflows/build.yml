@@ -17,7 +17,7 @@ jobs:
       - name: Install Dependencies
         run: |
           sudo apt update
-          sudo apt install libxrandr-dev libxinerama-dev libxcursor-dev libxi-dev libxext-dev libwayland-dev libxkbcommon-dev libvulkan-dev mesa-common-dev
+          sudo apt install libxrandr-dev libxinerama-dev libxcursor-dev libxi-dev libxext-dev libwayland-dev libxkbcommon-dev libvulkan-dev mesa-common-dev glslc 
 
       - run: mkdir build
 

@@ -1,15 +1,22 @@
 #ifndef ASHFAULT_RENDERER_H
 #define ASHFAULT_RENDERER_H
-#include <vulkan/vulkan_core.h>
-#define GLFW_INCLUDE_VULKAN
 
-#include <vulkan/vulkan.h>
-#include <GLFW/glfw3.h>
+#include "ashfault/pipeline.h"
 #include <cstdint>
 #include <optional>
 #include <vk_mem_alloc.h>
 #include <vector>
 #include <CLSTL/vector.h>
+#include <CLSTL/string.h>
+#include <CLSTL/shared_ptr.h>
+#include <ashfault/shader.h>
+
+#define GLFW_INCLUDE_VULKAN
+#include <GLFW/glfw3.h>
+#include <vulkan/vulkan.h>
+#include <vulkan/vulkan_core.h>
+
+#define MAX_FRAMES_IN_FLIGHT 3
 
 namespace ashfault {
 struct QueueSuitability {
@@ -33,6 +40,8 @@ public:
   ~Renderer();
 
   void init(GLFWwindow *window);
+  clstl::shared_ptr<VulkanShader> create_shader(const clstl::string &path) const;
+  GraphicsPipelineBuilder create_graphics_pipeline() const;
 
 private:
   const std::vector<const char *> s_DeviceExtensions = {VK_KHR_SWAPCHAIN_EXTENSION_NAME};
@@ -49,12 +58,15 @@ private:
   VkExtent2D m_SwapExtent;
   clstl::vector<VkImage> m_SwapchainImages;
   clstl::vector<VkImageView> m_ImageViews;
+  VkQueue m_GraphicsQueue;
+  VkQueue m_PresentQueue;
 
   void create_instance();
   void create_surface();
   void create_device();
   void create_allocator();
   void setup_swapchain();
+  void setup_synchronization();
 
   VkSurfaceFormatKHR select_surface_format(const clstl::vector<VkSurfaceFormatKHR>&);
   VkPresentModeKHR select_present_mode(const clstl::vector<VkPresentModeKHR>&);
