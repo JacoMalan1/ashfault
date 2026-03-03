@@ -23,11 +23,13 @@ public:
   static const VkIndexType value = VK_INDEX_TYPE_UINT16;
 };
 
+#ifdef VK_INDEX_TYPE_UINT8
 /// @private
 template <> class index_type<std::uint8_t> {
 public:
   static const VkIndexType value = VK_INDEX_TYPE_UINT8;
 };
+#endif
 
 template <class T> class VulkanBuffer {
 public:
