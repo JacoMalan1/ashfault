@@ -1,4 +1,6 @@
 #include "CLSTL/algorithm.h"
+#include "ashfault/descriptor_set.h"
+#include "spdlog/spdlog.h"
 #include <CLSTL/array.h>
 #include <CLSTL/shared_ptr.h>
 #include <ashfault/pipeline.h>
@@ -11,6 +13,7 @@ GraphicsPipeline::GraphicsPipeline(VkDevice device, VkPipelineLayout layout,
     : m_Layout(layout), m_Pipeline(pipeline), m_Device(device) {}
 
 GraphicsPipeline::~GraphicsPipeline() {
+  vkDeviceWaitIdle(this->m_Device);
   vkDestroyPipeline(this->m_Device, this->m_Pipeline, nullptr);
   vkDestroyPipelineLayout(this->m_Device, this->m_Layout, nullptr);
 }
@@ -122,7 +125,7 @@ clstl::shared_ptr<GraphicsPipeline> GraphicsPipelineBuilder::build() {
 
   VkPipelineRasterizationStateCreateInfo rasterizer{};
   rasterizer.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
-  rasterizer.cullMode = VK_CULL_MODE_BACK_BIT;
+  rasterizer.cullMode = VK_CULL_MODE_NONE;
   rasterizer.polygonMode = VK_POLYGON_MODE_FILL;
   rasterizer.lineWidth = 1.0f;
   rasterizer.depthBiasEnable = VK_FALSE;
@@ -204,5 +207,29 @@ GraphicsPipelineBuilder &GraphicsPipelineBuilder::fragment_shader(
     clstl::shared_ptr<VulkanShader> shader) {
   this->m_FragmentShader = shader;
   return *this;
+}
+
+VkPipeline GraphicsPipeline::handle() const {
+  return this->m_Pipeline;
+}
+
+GraphicsPipelineBuilder &GraphicsPipelineBuilder::descriptor_sets(
+      const clstl::vector<clstl::shared_ptr<VulkanDescriptorSet>> &dsets) {
+  clstl::for_each(dsets.begin(), dsets.end(), [&](clstl::shared_ptr<VulkanDescriptorSet> set) {
+    this->m_DescriptorSets.push_back(set);
+  });
+  return *this;
+}
+
+GraphicsPipelineBuilder::~GraphicsPipelineBuilder() {
+  spdlog::trace("Destroy graphics pipeline builder");
+}
+
+const VkPipelineLayout &GraphicsPipeline::layout() const {
+  return this->m_Layout;
+}
+
+VkPipelineLayout &GraphicsPipeline::layout() {
+  return this->m_Layout;
 }
 } // namespace ashfault

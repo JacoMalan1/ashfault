@@ -13,9 +13,18 @@ class VulkanDescriptorPool;
 
 class VulkanDescriptorSetBuilder {
 public:
-  void add_binding(VkDescriptorType type, VkShaderStageFlags stage_flags,
+  explicit VulkanDescriptorSetBuilder(VkDevice device);
+
+  /// @brief Adds a binding to the descriptor set being built.
+  ///
+  /// @param type The type of binding to add.
+  /// @param stage_flags The shader stages that will use this binding.
+  /// @param descriptor_count How many descriptors to create.
+  /// @param binding The binding index.
+  VulkanDescriptorSetBuilder &add_binding(VkDescriptorType type, VkShaderStageFlags stage_flags,
                    std::uint32_t descriptor_count, std::uint32_t binding);
 
+  /// @brief Builds the descriptor set and creates a descriptor pool.
   std::pair<clstl::vector<clstl::shared_ptr<VulkanDescriptorSet>>,
             clstl::shared_ptr<VulkanDescriptorPool>>
   build();
@@ -29,10 +38,12 @@ class VulkanDescriptorSet {
 public:
   VulkanDescriptorSet(VkDevice device, VkDescriptorSet descriptor_set,
                       VkDescriptorSetLayout layout);
-  static VulkanDescriptorSetBuilder builder();
 
   VkDescriptorSetLayout &layout();
   const VkDescriptorSetLayout &layout() const;
+
+  const VkDescriptorSet &handle() const;
+  VkDescriptorSet &handle();
 
   VulkanDescriptorSet(const VulkanDescriptorSet &) = delete;
   VulkanDescriptorSet &operator=(const VulkanDescriptorSet &) = delete;

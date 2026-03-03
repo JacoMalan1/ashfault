@@ -17,6 +17,7 @@ class GraphicsPipelineBuilder {
 public:
   GraphicsPipelineBuilder(VkDevice device, VkFormat swapchain_image_format,
                           clstl::array<std::uint32_t, 2> window_dims);
+  ~GraphicsPipelineBuilder();
 
   GraphicsPipelineBuilder &
   vertex_shader(clstl::shared_ptr<VulkanShader> shader);
@@ -51,6 +52,10 @@ public:
   GraphicsPipeline(const GraphicsPipeline &) = delete;
   GraphicsPipeline &operator=(const GraphicsPipeline &) = delete;
   ~GraphicsPipeline();
+
+  VkPipeline handle() const;
+  const VkPipelineLayout &layout() const;
+  VkPipelineLayout &layout();
 
 private:
   VkPipelineLayout m_Layout;

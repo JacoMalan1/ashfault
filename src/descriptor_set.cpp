@@ -2,9 +2,14 @@
 #include <stdexcept>
 #include <utility>
 #include <vulkan/vulkan_core.h>
+#include <spdlog/spdlog.h>
 
 namespace ashfault {
-void VulkanDescriptorSetBuilder::add_binding(VkDescriptorType type,
+VulkanDescriptorSetBuilder::VulkanDescriptorSetBuilder(VkDevice device) : m_Device(device) {
+
+}
+
+VulkanDescriptorSetBuilder &VulkanDescriptorSetBuilder::add_binding(VkDescriptorType type,
                                              VkShaderStageFlags stage_flags,
                                              std::uint32_t descriptor_count,
                                              std::uint32_t binding) {
@@ -14,6 +19,7 @@ void VulkanDescriptorSetBuilder::add_binding(VkDescriptorType type,
   el.stageFlags = stage_flags;
   el.descriptorType = type;
   this->m_Bindings.push_back(el);
+  return *this;
 }
 
 std::pair<clstl::vector<clstl::shared_ptr<VulkanDescriptorSet>>,
@@ -53,6 +59,7 @@ VulkanDescriptorSetBuilder::build() {
   pool_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
   pool_info.pPoolSizes = pool_sizes.data();
   pool_info.poolSizeCount = pool_sizes.size();
+  pool_info.maxSets = 1;
 
   VkDescriptorPool pool;
   if (vkCreateDescriptorPool(this->m_Device, &pool_info, nullptr, &pool) !=
@@ -103,6 +110,8 @@ VulkanDescriptorSet::VulkanDescriptorSet(VkDevice device,
     : m_Device(device), m_DescriptorSet(descriptor_set), m_Layout(layout) {}
 
 VulkanDescriptorSet::~VulkanDescriptorSet() {
+  spdlog::trace("Destroying descriptor set");
+  vkDeviceWaitIdle(this->m_Device);
   vkDestroyDescriptorSetLayout(this->m_Device, this->m_Layout, nullptr);
 }
 
@@ -112,5 +121,13 @@ VkDescriptorSetLayout &VulkanDescriptorSet::layout() {
 
 const VkDescriptorSetLayout &VulkanDescriptorSet::layout() const {
   return this->m_Layout;
+}
+
+const VkDescriptorSet &VulkanDescriptorSet::handle() const {
+  return this->m_DescriptorSet;
+}
+
+VkDescriptorSet &VulkanDescriptorSet::handle() {
+  return this->m_DescriptorSet;
 }
 } // namespace ashfault

@@ -1,3 +1,5 @@
+#include "ashfault/descriptor_set.h"
+#include "ashfault/frame.h"
 #include "ashfault/pipeline.h"
 #include "ashfault/shader.h"
 #define GLFW_INCLUDE_VULKAN
@@ -211,6 +213,7 @@ void ashfault::Renderer::create_instance() {
 
 void ashfault::Renderer::create_device() {
   auto [physical_device, queue_info] = choose_physical_device().value();
+  this->m_QueueFamilies = queue_info;
   this->m_PhysicalDevice = physical_device;
   VkPhysicalDeviceProperties props;
   vkGetPhysicalDeviceProperties(physical_device, &props);
@@ -337,6 +340,7 @@ void ashfault::Renderer::setup_swapchain() {
   VkExtent2D swap_extent = choose_swap_extent(swapchain_support.capabilities);
 
   std::uint32_t image_count = swapchain_support.capabilities.minImageCount + 1;
+  spdlog::debug("Swapchain image count: {}", image_count);
   VkSwapchainCreateInfoKHR swapchain_info{};
   swapchain_info.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
   swapchain_info.surface = this->m_Surface;
@@ -395,13 +399,214 @@ void ashfault::Renderer::setup_swapchain() {
   spdlog::info("Created swapchain");
 }
 
+void Renderer::setup_synchronization() {
+  this->m_ImageAvailableSemaphores.resize(MAX_FRAMES_IN_FLIGHT);
+  this->m_RenderFinishedSemaphores.resize(MAX_FRAMES_IN_FLIGHT);
+  this->m_InFlightFences.resize(MAX_FRAMES_IN_FLIGHT);
+
+  VkSemaphoreCreateInfo semaphore_info{};
+  semaphore_info.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
+  VkFenceCreateInfo fence_info{};
+  fence_info.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
+  fence_info.flags = VK_FENCE_CREATE_SIGNALED_BIT;
+
+  for (std::uint32_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
+    if (vkCreateSemaphore(this->m_Device, &semaphore_info, nullptr,
+                          &this->m_ImageAvailableSemaphores[i]) != VK_SUCCESS ||
+        vkCreateSemaphore(this->m_Device, &semaphore_info, nullptr,
+                          &this->m_RenderFinishedSemaphores[i]) != VK_SUCCESS ||
+        vkCreateFence(this->m_Device, &fence_info, nullptr,
+                      &this->m_InFlightFences[i]) != VK_SUCCESS) {
+      throw std::runtime_error("Failed to setup synchronization");
+    }
+  }
+}
+
+void Renderer::setup_command_buffers() {
+  VkCommandPoolCreateInfo pool_info{};
+  pool_info.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
+  pool_info.queueFamilyIndex = this->m_QueueFamilies.graphics_queue.value();
+  pool_info.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
+
+  if (vkCreateCommandPool(this->m_Device, &pool_info, nullptr,
+                          &this->m_CommandPool) != VK_SUCCESS) {
+    throw std::runtime_error("Failed to create command pool");
+  }
+
+  VkCommandBufferAllocateInfo alloc_info{};
+  alloc_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+  alloc_info.commandBufferCount = MAX_FRAMES_IN_FLIGHT;
+  alloc_info.commandPool = this->m_CommandPool;
+  alloc_info.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+
+  this->m_CommandBuffers.resize(MAX_FRAMES_IN_FLIGHT);
+  if (vkAllocateCommandBuffers(this->m_Device, &alloc_info,
+                               this->m_CommandBuffers.data()) != VK_SUCCESS) {
+    throw std::runtime_error("Failed to allocate command buffers");
+  }
+}
+
+void Renderer::command_buffer(std::function<void(VkCommandBuffer)> op) {
+  VkCommandBufferAllocateInfo alloc_info{};
+  alloc_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+  alloc_info.commandBufferCount = 1;
+  alloc_info.commandPool = this->m_CommandPool;
+  alloc_info.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+
+  VkCommandBuffer cmd;
+  if (vkAllocateCommandBuffers(this->m_Device, &alloc_info, &cmd) !=
+      VK_SUCCESS) {
+    throw std::runtime_error("Failed to allocate command buffer");
+  }
+
+  VkCommandBufferBeginInfo begin_info{};
+  begin_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+  begin_info.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+
+  vkResetCommandBuffer(cmd, 0);
+  vkBeginCommandBuffer(cmd, &begin_info);
+  op(cmd);
+  vkEndCommandBuffer(cmd);
+
+  VkSubmitInfo submit_info{};
+  submit_info.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+  submit_info.commandBufferCount = 1;
+  submit_info.pCommandBuffers = &cmd;
+
+  vkQueueSubmit(this->m_GraphicsQueue, 1, &submit_info, VK_NULL_HANDLE);
+  vkQueueWaitIdle(this->m_GraphicsQueue);
+  vkFreeCommandBuffers(this->m_Device, this->m_CommandPool, 1, &cmd);
+}
+
+void Renderer::create_depth_buffers() {
+  VmaAllocationCreateInfo alloc_info{};
+  alloc_info.usage = VMA_MEMORY_USAGE_GPU_ONLY;
+  alloc_info.requiredFlags = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
+
+  auto [image, allocation] = this->create_image(
+      this->m_SwapExtent.width, this->m_SwapExtent.height, VK_FORMAT_D32_SFLOAT,
+      VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
+      alloc_info);
+  this->m_DepthImage = image;
+  this->m_DepthImageAllocation = allocation;
+  this->m_DepthImageView = this->create_image_view(image, VK_FORMAT_D32_SFLOAT,
+                                                   VK_IMAGE_ASPECT_DEPTH_BIT);
+}
+
+std::optional<Frame> Renderer::start_frame() {
+  vkWaitForFences(this->m_Device, 1,
+                  &this->m_InFlightFences[this->m_CurrentFrame], VK_TRUE,
+                  std::numeric_limits<std::uint64_t>::max());
+
+  std::uint32_t image_i;
+  VkResult result = vkAcquireNextImageKHR(
+      this->m_Device, this->m_Swapchain,
+      std::numeric_limits<std::uint64_t>::max(),
+      this->m_ImageAvailableSemaphores[this->m_CurrentFrame], VK_NULL_HANDLE,
+      &image_i);
+
+  if (result == VK_ERROR_OUT_OF_DATE_KHR) {
+    this->m_Resized = true;
+    this->recreate_swapchain();
+  }
+
+  vkResetFences(this->m_Device, 1,
+                &this->m_InFlightFences[this->m_CurrentFrame]);
+  vkResetCommandBuffer(this->m_CommandBuffers[this->m_CurrentFrame], 0);
+  VkCommandBuffer cmd = this->m_CommandBuffers[this->m_CurrentFrame];
+
+  VkCommandBufferBeginInfo cmd_begin{};
+  cmd_begin.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+  vkBeginCommandBuffer(cmd, &cmd_begin);
+
+  VkRenderingAttachmentInfo color_attachment{};
+  color_attachment.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
+  color_attachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+  color_attachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+  color_attachment.imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+  color_attachment.imageView = this->m_ImageViews[image_i];
+  color_attachment.clearValue.color = {{0.0f, 0.0f, 0.0f, 1.0f}};
+
+  VkRenderingAttachmentInfo depth_attachment{};
+  depth_attachment.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
+  depth_attachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+  depth_attachment.storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+  depth_attachment.imageLayout = VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL;
+  depth_attachment.imageView = this->m_DepthImageView;
+  depth_attachment.clearValue.depthStencil = {1.0f, 0};
+
+  VkRenderingInfo rendering_info{};
+  rendering_info.sType = VK_STRUCTURE_TYPE_RENDERING_INFO;
+  rendering_info.pColorAttachments = &color_attachment;
+  rendering_info.pDepthAttachment = &depth_attachment;
+  rendering_info.colorAttachmentCount = 1;
+  rendering_info.layerCount = 1;
+  rendering_info.viewMask = 0;
+  rendering_info.renderArea.offset.x = 0;
+  rendering_info.renderArea.offset.y = 0;
+  rendering_info.renderArea.extent = this->m_SwapExtent;
+
+  VkImageMemoryBarrier image_barrier{};
+  image_barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+  image_barrier.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+  image_barrier.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+  image_barrier.newLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+  image_barrier.image = this->m_SwapchainImages[image_i];
+  image_barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+  image_barrier.subresourceRange.baseArrayLayer = 0;
+  image_barrier.subresourceRange.layerCount = 1;
+  image_barrier.subresourceRange.baseMipLevel = 0;
+  image_barrier.subresourceRange.levelCount = 1;
+
+  vkCmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
+                       VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, 0, 0,
+                       nullptr, 0, nullptr, 1, &image_barrier);
+  vkCmdBeginRendering(cmd, &rendering_info);
+  int width, height;
+  glfwGetFramebufferSize(this->m_Window, &width, &height);
+  VkViewport viewport{};
+  viewport.x = 0;
+  viewport.y = 0;
+  viewport.width = static_cast<float>(width);
+  viewport.height = static_cast<float>(height);
+  viewport.minDepth = 0.0f;
+  viewport.maxDepth = 1.0f;
+  vkCmdSetViewport(cmd, 0, 1, &viewport);
+
+  VkRect2D scissor{};
+  scissor.extent.width = static_cast<std::uint32_t>(width);
+  scissor.extent.height = static_cast<std::uint32_t>(height);
+  scissor.offset.x = 0;
+  scissor.offset.y = 0;
+  vkCmdSetScissor(cmd, 0, 1, &scissor);
+
+  return Frame(this->m_Device, cmd, this->m_GraphicsQueue, this->m_PresentQueue,
+               this->m_Swapchain, this->m_SwapchainImages[image_i], image_i,
+               &this->m_CurrentFrame,
+               this->m_ImageAvailableSemaphores[this->m_CurrentFrame],
+               this->m_RenderFinishedSemaphores[image_i],
+               this->m_InFlightFences[this->m_CurrentFrame], this);
+}
+
 void ashfault::Renderer::init(GLFWwindow *window) {
   this->m_Window = window;
+  glfwSetWindowUserPointer(this->m_Window, this);
+  glfwSetFramebufferSizeCallback(this->m_Window, [](GLFWwindow *window, int width, int height) {
+    Renderer *renderer = reinterpret_cast<Renderer *>(glfwGetWindowUserPointer(window));
+    if (renderer)
+      renderer->m_Resized = true;
+  });
+
+  this->m_Resized = false;
+  this->m_CurrentFrame = 0;
   this->create_instance();
   this->create_surface();
   this->create_device();
   this->create_allocator();
   this->setup_swapchain();
+  this->setup_synchronization();
+  this->setup_command_buffers();
+  this->create_depth_buffers();
 }
 
 clstl::shared_ptr<VulkanShader>
@@ -419,18 +624,133 @@ GraphicsPipelineBuilder Renderer::create_graphics_pipeline() const {
                                  std::move(window_dims));
 }
 
-Renderer::~Renderer() {
-  spdlog::info("Renderer shutting down...");
+std::pair<VkImage, VmaAllocation>
+Renderer::create_image(uint32_t width, uint32_t height, VkFormat format,
+                       VkImageTiling tiling, VkImageUsageFlags usage,
+                       VmaAllocationCreateInfo allocation_info) {
+  VkImageCreateInfo image_info{};
+  image_info.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+  image_info.imageType = VK_IMAGE_TYPE_2D;
+  image_info.format = format;
+  image_info.usage = usage;
+  image_info.tiling = tiling;
+  image_info.extent.width = width;
+  image_info.extent.height = height;
+  image_info.extent.depth = 1;
+  image_info.arrayLayers = 1;
+  image_info.mipLevels = 1;
+  image_info.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+  image_info.samples = VK_SAMPLE_COUNT_1_BIT;
+  image_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+
+  VkImage image;
+  VmaAllocation allocation;
+  if (vmaCreateImage(this->m_Allocator, &image_info, &allocation_info, &image,
+                     &allocation, nullptr) != VK_SUCCESS) {
+    throw std::runtime_error("Failed to create image");
+  }
+
+  return std::make_pair(image, allocation);
+}
+
+VkImageView Renderer::create_image_view(VkImage image, VkFormat format,
+                                        VkImageAspectFlags imageAspect) {
+  VkImageViewCreateInfo create_info{};
+  create_info.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+  create_info.format = format;
+  create_info.image = image;
+  create_info.viewType = VK_IMAGE_VIEW_TYPE_2D;
+  create_info.subresourceRange.aspectMask = imageAspect;
+  create_info.subresourceRange.baseArrayLayer = 0;
+  create_info.subresourceRange.layerCount = 1;
+  create_info.subresourceRange.baseMipLevel = 0;
+  create_info.subresourceRange.levelCount = 1;
+
+  VkImageView view;
+  if (vkCreateImageView(this->m_Device, &create_info, nullptr, &view) !=
+      VK_SUCCESS) {
+    throw std::runtime_error("Failed to create image view");
+  }
+
+  return view;
+}
+
+std::pair<VkBuffer, VmaAllocation>
+Renderer::create_buffer(std::size_t size, VkBufferUsageFlags usage,
+                        VmaAllocationCreateInfo alloc_info) {
+  VkBufferCreateInfo create_info{};
+  create_info.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+  create_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+  create_info.size = size;
+  create_info.usage = usage;
+
+  VkBuffer buffer;
+  VmaAllocation allocation;
+  if (vmaCreateBuffer(this->m_Allocator, &create_info, &alloc_info, &buffer,
+                      &allocation, nullptr) != VK_SUCCESS) {
+    throw std::runtime_error("Failed to create buffer");
+  }
+
+  return std::make_pair(buffer, allocation);
+}
+
+void Renderer::copy_buffer(VkBuffer dst, VkBuffer src, std::size_t size) {
+  VkBufferCopy region{};
+  region.size = size;
+  region.srcOffset = 0;
+  region.dstOffset = 0;
+
+  this->command_buffer(
+      [&](VkCommandBuffer cmd) { vkCmdCopyBuffer(cmd, src, dst, 1, &region); });
+}
+
+void Renderer::recreate_swapchain() {
+  spdlog::warn("Rebuilding swapchain");
+  int width = 0, height = 0;
+  glfwGetFramebufferSize(this->m_Window, &width, &height);
+  while (width == 0 || height == 0) {
+    glfwGetFramebufferSize(this->m_Window, &width, &height);
+    glfwWaitEvents();
+  }
 
   vkDeviceWaitIdle(this->m_Device);
-  vkQueueWaitIdle(this->m_GraphicsQueue);
-  vkQueueWaitIdle(this->m_PresentQueue);
+  this->cleanup_swapchain();
+  this->setup_swapchain();
+  this->create_depth_buffers();
+}
 
+void Renderer::cleanup_swapchain() {
   for (const auto &image_view : this->m_ImageViews) {
     vkDestroyImageView(this->m_Device, image_view, nullptr);
   }
 
   vkDestroySwapchainKHR(this->m_Device, this->m_Swapchain, nullptr);
+  vkDestroyImageView(this->m_Device, this->m_DepthImageView, nullptr);
+  vmaDestroyImage(this->m_Allocator, this->m_DepthImage,
+                  this->m_DepthImageAllocation);
+}
+
+Renderer::~Renderer() {
+  spdlog::info("Renderer shutting down...");
+  glfwSetWindowUserPointer(this->m_Window, nullptr);
+  glfwSetFramebufferSizeCallback(this->m_Window, nullptr);
+
+  vkDeviceWaitIdle(this->m_Device);
+  vkQueueWaitIdle(this->m_GraphicsQueue);
+  vkQueueWaitIdle(this->m_PresentQueue);
+
+  this->cleanup_swapchain();
+
+  vkFreeCommandBuffers(this->m_Device, this->m_CommandPool,
+                       this->m_CommandBuffers.size(),
+                       this->m_CommandBuffers.data());
+  vkDestroyCommandPool(this->m_Device, this->m_CommandPool, nullptr);
+
+  for (std::size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
+    vkDestroySemaphore(this->m_Device, this->m_ImageAvailableSemaphores[i], nullptr);
+    vkDestroySemaphore(this->m_Device, this->m_RenderFinishedSemaphores[i], nullptr);
+    vkDestroyFence(this->m_Device, this->m_InFlightFences[i], nullptr);
+  }
 
   vmaDestroyAllocator(this->m_Allocator);
   vkDestroyDevice(this->m_Device, nullptr);
@@ -440,5 +760,17 @@ Renderer::~Renderer() {
 
 bool QueueSuitability::complete() const {
   return this->present_queue.has_value() && this->graphics_queue.has_value();
+}
+
+VulkanDescriptorSetBuilder Renderer::create_descriptor_sets() const {
+  return VulkanDescriptorSetBuilder(this->m_Device);
+}
+
+VkDevice Renderer::device() {
+  return this->m_Device;
+}
+
+VmaAllocator Renderer::allocator() {
+  return this->m_Allocator;
 }
 } // namespace ashfault
