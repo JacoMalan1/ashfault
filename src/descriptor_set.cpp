@@ -110,7 +110,6 @@ VulkanDescriptorSet::VulkanDescriptorSet(VkDevice device,
     : m_Device(device), m_DescriptorSet(descriptor_set), m_Layout(layout) {}
 
 VulkanDescriptorSet::~VulkanDescriptorSet() {
-  spdlog::trace("Destroying descriptor set");
   vkDeviceWaitIdle(this->m_Device);
   vkDestroyDescriptorSetLayout(this->m_Device, this->m_Layout, nullptr);
 }

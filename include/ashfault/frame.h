@@ -50,7 +50,7 @@ public:
 
 private:
   Frame(VkDevice device, VkCommandBuffer cmd, VkQueue submit_queue,
-        VkQueue present_queue, VkSwapchainKHR swapchain, VkImage image,
+        VkQueue present_queue, VkSwapchainKHR swapchain, VkImage image, VkImage color_image,
         std::uint32_t image_i, std::uint32_t *current_frame,
         VkSemaphore image_available, VkSemaphore render_finished,
         VkFence in_flight, Renderer *renderer);
@@ -58,6 +58,7 @@ private:
   VkDevice m_Device;
   VkCommandBuffer m_CommandBuffer;
   VkImage m_Image;
+  VkImage m_ColorImage;
   VkSemaphore m_ImageAvailable, m_RenderFinished;
   VkFence m_InFlight;
   VkQueue m_SubmitQueue, m_PresentQueue;

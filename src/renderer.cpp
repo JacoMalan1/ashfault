@@ -1,3 +1,4 @@
+#include "ashfault/buffer.hpp"
 #include "ashfault/descriptor_set.h"
 #include "ashfault/frame.h"
 #include "ashfault/pipeline.h"
@@ -219,6 +220,19 @@ void ashfault::Renderer::create_device() {
   vkGetPhysicalDeviceProperties(physical_device, &props);
   spdlog::info("Picked physical device: {}", props.deviceName);
 
+  VkSampleCountFlags counts = props.limits.framebufferColorSampleCounts &
+                              props.limits.framebufferDepthSampleCounts;
+
+  VkSampleCountFlagBits msaa_samples = VK_SAMPLE_COUNT_1_BIT;
+  if (counts & VK_SAMPLE_COUNT_8_BIT)
+    msaa_samples = VK_SAMPLE_COUNT_8_BIT;
+  else if (counts & VK_SAMPLE_COUNT_4_BIT)
+    msaa_samples = VK_SAMPLE_COUNT_4_BIT;
+  else if (counts & VK_SAMPLE_COUNT_2_BIT)
+    msaa_samples = VK_SAMPLE_COUNT_2_BIT;
+  this->m_MsaaSamples = msaa_samples;
+  spdlog::info("MSAA Samples: {}", (int)msaa_samples);
+
   float queue_prios = 1.0f;
 
   VkDeviceQueueCreateInfo graphics_queue_create_info{};
@@ -400,7 +414,8 @@ void ashfault::Renderer::setup_swapchain() {
 }
 
 void Renderer::setup_synchronization() {
-  std::size_t image_count = std::max<std::size_t>(this->m_SwapchainImages.size(), MAX_FRAMES_IN_FLIGHT);
+  std::size_t image_count = std::max<std::size_t>(
+      this->m_SwapchainImages.size(), MAX_FRAMES_IN_FLIGHT);
 
   this->m_ImageAvailableSemaphores.resize(image_count);
   this->m_RenderFinishedSemaphores.resize(image_count);
@@ -480,15 +495,33 @@ void Renderer::command_buffer(std::function<void(VkCommandBuffer)> op) {
   vkFreeCommandBuffers(this->m_Device, this->m_CommandPool, 1, &cmd);
 }
 
+void Renderer::create_color_resources() {
+  VmaAllocationCreateInfo alloc_info{};
+  alloc_info.usage = VMA_MEMORY_USAGE_GPU_ONLY;
+  alloc_info.requiredFlags = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
+
+  auto [image, allocation] = this->create_image(
+      this->m_SwapExtent.width, this->m_SwapExtent.height, this->m_MsaaSamples,
+      this->m_SurfaceFormat.format, VK_IMAGE_TILING_OPTIMAL,
+      VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT |
+          VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
+      alloc_info);
+
+  this->m_ColorImage = image;
+  this->m_ColorImageAllocation = allocation;
+  this->m_ColorImageView = this->create_image_view(
+      image, this->m_SurfaceFormat.format, VK_IMAGE_ASPECT_COLOR_BIT);
+}
+
 void Renderer::create_depth_buffers() {
   VmaAllocationCreateInfo alloc_info{};
   alloc_info.usage = VMA_MEMORY_USAGE_GPU_ONLY;
   alloc_info.requiredFlags = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
 
   auto [image, allocation] = this->create_image(
-      this->m_SwapExtent.width, this->m_SwapExtent.height, VK_FORMAT_D32_SFLOAT,
-      VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
-      alloc_info);
+      this->m_SwapExtent.width, this->m_SwapExtent.height, this->m_MsaaSamples,
+      VK_FORMAT_D32_SFLOAT, VK_IMAGE_TILING_OPTIMAL,
+      VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT, alloc_info);
   this->m_DepthImage = image;
   this->m_DepthImageAllocation = allocation;
   this->m_DepthImageView = this->create_image_view(image, VK_FORMAT_D32_SFLOAT,
@@ -526,8 +559,12 @@ std::optional<Frame> Renderer::start_frame() {
   color_attachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
   color_attachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
   color_attachment.imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-  color_attachment.imageView = this->m_ImageViews[image_i];
+  color_attachment.imageView = this->m_ColorImageView;
   color_attachment.clearValue.color = {{0.0f, 0.0f, 0.0f, 1.0f}};
+  color_attachment.resolveImageView = this->m_ImageViews[image_i];
+  color_attachment.resolveImageLayout =
+      VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+  color_attachment.resolveMode = VK_RESOLVE_MODE_AVERAGE_BIT;
 
   VkRenderingAttachmentInfo depth_attachment{};
   depth_attachment.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
@@ -560,9 +597,42 @@ std::optional<Frame> Renderer::start_frame() {
   image_barrier.subresourceRange.baseMipLevel = 0;
   image_barrier.subresourceRange.levelCount = 1;
 
+  VkImageMemoryBarrier color_image_barrier{};
+  color_image_barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+  color_image_barrier.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+  color_image_barrier.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+  color_image_barrier.newLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+  color_image_barrier.image = this->m_ColorImage;
+  color_image_barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+  color_image_barrier.subresourceRange.baseArrayLayer = 0;
+  color_image_barrier.subresourceRange.layerCount = 1;
+  color_image_barrier.subresourceRange.baseMipLevel = 0;
+  color_image_barrier.subresourceRange.levelCount = 1;
+
+  VkImageMemoryBarrier depth_barrier{};
+  depth_barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+  depth_barrier.dstAccessMask = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT |
+                                VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+  depth_barrier.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+  depth_barrier.newLayout = VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL;
+  depth_barrier.image = this->m_DepthImage;
+  depth_barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
+  depth_barrier.subresourceRange.baseArrayLayer = 0;
+  depth_barrier.subresourceRange.layerCount = 1;
+  depth_barrier.subresourceRange.baseMipLevel = 0;
+  depth_barrier.subresourceRange.levelCount = 1;
+
+  clstl::array<VkImageMemoryBarrier, 2> color_barriers = {color_image_barrier,
+                                                          image_barrier};
+
   vkCmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
                        VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, 0, 0,
-                       nullptr, 0, nullptr, 1, &image_barrier);
+                       nullptr, 0, nullptr, color_barriers.size(),
+                       color_barriers.data());
+  vkCmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
+                       VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT, 0, 0,
+                       nullptr, 0, nullptr, 1, &depth_barrier);
+
   vkCmdBeginRendering(cmd, &rendering_info);
   int width, height;
   glfwGetFramebufferSize(this->m_Window, &width, &height);
@@ -583,8 +653,8 @@ std::optional<Frame> Renderer::start_frame() {
   vkCmdSetScissor(cmd, 0, 1, &scissor);
 
   return Frame(this->m_Device, cmd, this->m_GraphicsQueue, this->m_PresentQueue,
-               this->m_Swapchain, this->m_SwapchainImages[image_i], image_i,
-               &this->m_CurrentFrame,
+               this->m_Swapchain, this->m_SwapchainImages[image_i],
+               this->m_ColorImage, image_i, &this->m_CurrentFrame,
                this->m_ImageAvailableSemaphores[this->m_CurrentFrame],
                this->m_RenderFinishedSemaphores[image_i],
                this->m_InFlightFences[this->m_CurrentFrame], this);
@@ -593,11 +663,13 @@ std::optional<Frame> Renderer::start_frame() {
 void ashfault::Renderer::init(GLFWwindow *window) {
   this->m_Window = window;
   glfwSetWindowUserPointer(this->m_Window, this);
-  glfwSetFramebufferSizeCallback(this->m_Window, [](GLFWwindow *window, int width, int height) {
-    Renderer *renderer = reinterpret_cast<Renderer *>(glfwGetWindowUserPointer(window));
-    if (renderer)
-      renderer->m_Resized = true;
-  });
+  glfwSetFramebufferSizeCallback(
+      this->m_Window, [](GLFWwindow *window, int width, int height) {
+        Renderer *renderer =
+            reinterpret_cast<Renderer *>(glfwGetWindowUserPointer(window));
+        if (renderer)
+          renderer->m_Resized = true;
+      });
 
   this->m_Resized = false;
   this->m_CurrentFrame = 0;
@@ -608,6 +680,7 @@ void ashfault::Renderer::init(GLFWwindow *window) {
   this->setup_swapchain();
   this->setup_synchronization();
   this->setup_command_buffers();
+  this->create_color_resources();
   this->create_depth_buffers();
 }
 
@@ -623,11 +696,12 @@ GraphicsPipelineBuilder Renderer::create_graphics_pipeline() const {
   window_dims[0] = width;
   window_dims[1] = height;
   return GraphicsPipelineBuilder(this->m_Device, this->m_SurfaceFormat.format,
-                                 std::move(window_dims));
+                                 std::move(window_dims), this->m_MsaaSamples);
 }
 
 std::pair<VkImage, VmaAllocation>
-Renderer::create_image(uint32_t width, uint32_t height, VkFormat format,
+Renderer::create_image(uint32_t width, uint32_t height,
+                       VkSampleCountFlagBits samples, VkFormat format,
                        VkImageTiling tiling, VkImageUsageFlags usage,
                        VmaAllocationCreateInfo allocation_info) {
   VkImageCreateInfo image_info{};
@@ -642,7 +716,7 @@ Renderer::create_image(uint32_t width, uint32_t height, VkFormat format,
   image_info.arrayLayers = 1;
   image_info.mipLevels = 1;
   image_info.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-  image_info.samples = VK_SAMPLE_COUNT_1_BIT;
+  image_info.samples = samples;
   image_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 
   VkImage image;
@@ -718,6 +792,7 @@ void Renderer::recreate_swapchain() {
   vkDeviceWaitIdle(this->m_Device);
   this->cleanup_swapchain();
   this->setup_swapchain();
+  this->create_color_resources();
   this->create_depth_buffers();
 }
 
@@ -728,8 +803,11 @@ void Renderer::cleanup_swapchain() {
 
   vkDestroySwapchainKHR(this->m_Device, this->m_Swapchain, nullptr);
   vkDestroyImageView(this->m_Device, this->m_DepthImageView, nullptr);
+  vkDestroyImageView(this->m_Device, this->m_ColorImageView, nullptr);
   vmaDestroyImage(this->m_Allocator, this->m_DepthImage,
                   this->m_DepthImageAllocation);
+  vmaDestroyImage(this->m_Allocator, this->m_ColorImage,
+                  this->m_ColorImageAllocation);
 }
 
 Renderer::~Renderer() {
@@ -749,8 +827,10 @@ Renderer::~Renderer() {
   vkDestroyCommandPool(this->m_Device, this->m_CommandPool, nullptr);
 
   for (std::size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
-    vkDestroySemaphore(this->m_Device, this->m_ImageAvailableSemaphores[i], nullptr);
-    vkDestroySemaphore(this->m_Device, this->m_RenderFinishedSemaphores[i], nullptr);
+    vkDestroySemaphore(this->m_Device, this->m_ImageAvailableSemaphores[i],
+                       nullptr);
+    vkDestroySemaphore(this->m_Device, this->m_RenderFinishedSemaphores[i],
+                       nullptr);
     vkDestroyFence(this->m_Device, this->m_InFlightFences[i], nullptr);
   }
 
@@ -768,11 +848,7 @@ VulkanDescriptorSetBuilder Renderer::create_descriptor_sets() const {
   return VulkanDescriptorSetBuilder(this->m_Device);
 }
 
-VkDevice Renderer::device() {
-  return this->m_Device;
-}
+VkDevice Renderer::device() { return this->m_Device; }
 
-VmaAllocator Renderer::allocator() {
-  return this->m_Allocator;
-}
+VmaAllocator Renderer::allocator() { return this->m_Allocator; }
 } // namespace ashfault
