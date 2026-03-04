@@ -400,9 +400,11 @@ void ashfault::Renderer::setup_swapchain() {
 }
 
 void Renderer::setup_synchronization() {
-  this->m_ImageAvailableSemaphores.resize(MAX_FRAMES_IN_FLIGHT);
-  this->m_RenderFinishedSemaphores.resize(MAX_FRAMES_IN_FLIGHT);
-  this->m_InFlightFences.resize(MAX_FRAMES_IN_FLIGHT);
+  std::size_t image_count = std::max<std::size_t>(this->m_SwapchainImages.size(), MAX_FRAMES_IN_FLIGHT);
+
+  this->m_ImageAvailableSemaphores.resize(image_count);
+  this->m_RenderFinishedSemaphores.resize(image_count);
+  this->m_InFlightFences.resize(image_count);
 
   VkSemaphoreCreateInfo semaphore_info{};
   semaphore_info.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
@@ -410,7 +412,7 @@ void Renderer::setup_synchronization() {
   fence_info.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
   fence_info.flags = VK_FENCE_CREATE_SIGNALED_BIT;
 
-  for (std::uint32_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
+  for (std::uint32_t i = 0; i < image_count; i++) {
     if (vkCreateSemaphore(this->m_Device, &semaphore_info, nullptr,
                           &this->m_ImageAvailableSemaphores[i]) != VK_SUCCESS ||
         vkCreateSemaphore(this->m_Device, &semaphore_info, nullptr,
