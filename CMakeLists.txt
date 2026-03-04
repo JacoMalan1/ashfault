@@ -12,7 +12,8 @@ set(CMAKE_CXX_STANDARD 17)
 set(SHADER_SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/shaders)
 set(SHADER_BINARY_DIR ${CMAKE_CURRENT_BINARY_DIR})
 
-file(GLOB SRC_FILES ${PROJECT_SOURCE_DIR}/src/*.cpp)
+file(GLOB LIB_SRC_FILES ${PROJECT_SOURCE_DIR}/src/*.cpp)
+list(REMOVE_ITEM LIB_SRC_FILES ${PROJECT_SOURCE_DIR}/src/main.cpp)
 file(GLOB SHADERS ${SHADER_SOURCE_DIR}/*.vert ${SHADER_SOURCE_DIR}/*.frag)
 
 find_package(Doxygen)
@@ -49,14 +50,16 @@ endforeach()
 
 add_custom_target(shaders ALL DEPENDS ${SPV_SHADERS})
 
-add_executable(ashfault src/main.cpp ${SRC_FILES})
+add_library(ashfault ${LIB_SRC_FILES})
+add_executable(program ${PROJECT_SOURCE_DIR}/src/main.cpp)
 
-target_include_directories(ashfault PRIVATE include)
-target_include_directories(ashfault PRIVATE vendor/glfw/include)
-target_include_directories(ashfault PRIVATE vendor/VulkanMemoryAllocator/include)
-target_include_directories(ashfault PRIVATE vendor/spdlog/include)
-target_include_directories(ashfault PRIVATE vendor/glm)
-target_include_directories(ashfault PUBLIC vendor/CLSTL/include)
+include_directories(include)
+include_directories(vendor/glfw/include)
+include_directories(vendor/VulkanMemoryAllocator/include)
+include_directories(vendor/spdlog/include)
+include_directories(vendor/glm)
+include_directories(vendor/CLSTL/include)
+include_directories(vendor/tinyobjloader)
 
 target_compile_options(ashfault PUBLIC -Wall -Wpedantic -Wno-nullability-extension -Wno-nullability-completeness)
 
@@ -65,6 +68,7 @@ add_subdirectory(${PROJECT_SOURCE_DIR}/vendor/VulkanMemoryAllocator)
 add_subdirectory(${PROJECT_SOURCE_DIR}/vendor/spdlog)
 add_subdirectory(${PROJECT_SOURCE_DIR}/vendor/CLSTL)
 add_subdirectory(${PROJECT_SOURCE_DIR}/vendor/glm)
+add_subdirectory(${PROJECT_SOURCE_DIR}/vendor/tinyobjloader)
 
 target_link_libraries(ashfault glfw)
 target_link_libraries(ashfault vulkan)
@@ -72,3 +76,8 @@ target_link_libraries(ashfault GPUOpen::VulkanMemoryAllocator)
 target_link_libraries(ashfault spdlog::spdlog)
 target_link_libraries(ashfault clstl)
 target_link_libraries(ashfault glm::glm)
+
+target_link_libraries(program tinyobjloader)
+target_link_libraries(program ashfault)
+
+configure_file(assets/models/monkey.obj monkey.obj COPYONLY)

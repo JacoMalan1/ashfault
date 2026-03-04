@@ -13,5 +13,5 @@ fi
 
 mkdir build
 cd build
-cmake .. -DCMAKE_C_COMPILER=$(which clang) -DCMAKE_CXX_COMPILER=$(which clang++) ${EXTRA_OPTS}
+cmake .. -DCMAKE_C_COMPILER=$(which clang) -DCMAKE_CXX_COMPILER=$(which clang++) -DCMAKE_POLICY_VERSION_MINIMUM=3.5 ${EXTRA_OPTS}
 make
