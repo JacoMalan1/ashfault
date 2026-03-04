@@ -9,7 +9,7 @@
 namespace ashfault {
 VulkanShader::VulkanShader(VkDevice device, const clstl::string &path)
     : m_Module(VK_NULL_HANDLE), m_Device(device) {
-  std::ifstream fs(path.c_str());
+  std::ifstream fs(path.c_str(), std::ios_base::binary | std::ios_base::in);
 
   if (!fs.is_open()) {
     throw std::runtime_error("Failed to read shader module");

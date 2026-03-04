@@ -83,7 +83,7 @@ public:
   /// @param allocation_info Information about how to create the image's
   /// underlying memory store.
   std::pair<VkImage, VmaAllocation>
-  create_image(uint32_t width, uint32_t height, VkFormat format,
+  create_image(uint32_t width, uint32_t height, VkSampleCountFlagBits samples, VkFormat format,
                VkImageTiling tiling, VkImageUsageFlags usage,
                VmaAllocationCreateInfo allocation_info);
 
@@ -221,10 +221,15 @@ private:
   clstl::vector<VkCommandBuffer> m_CommandBuffers;
   QueueSuitability m_QueueFamilies;
   VkCommandPool m_CommandPool;
+  VkSampleCountFlagBits m_MsaaSamples;
 
   VkImage m_DepthImage;
   VmaAllocation m_DepthImageAllocation;
   VkImageView m_DepthImageView;
+  VkImage m_ColorImage;
+  VmaAllocation m_ColorImageAllocation;
+  VkImageView m_ColorImageView;
+
   bool m_Resized;
 
   void create_instance();
@@ -235,6 +240,7 @@ private:
   void setup_synchronization();
   void setup_command_buffers();
   void create_depth_buffers();
+  void create_color_resources();
   void cleanup_swapchain();
 
   VkSurfaceFormatKHR

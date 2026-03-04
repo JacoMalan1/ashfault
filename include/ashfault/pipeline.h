@@ -16,8 +16,7 @@ class GraphicsPipeline;
 class GraphicsPipelineBuilder {
 public:
   GraphicsPipelineBuilder(VkDevice device, VkFormat swapchain_image_format,
-                          clstl::array<std::uint32_t, 2> window_dims);
-  ~GraphicsPipelineBuilder();
+                          clstl::array<std::uint32_t, 2> window_dims, VkSampleCountFlagBits msaaSamples);
 
   GraphicsPipelineBuilder &
   vertex_shader(clstl::shared_ptr<VulkanShader> shader);
@@ -41,6 +40,7 @@ private:
   std::uint32_t m_VertexStride;
   VkDevice m_Device;
   VkFormat m_ImageFormat;
+  VkSampleCountFlagBits m_MsaaSamples;
   clstl::array<std::uint32_t, 2> m_WindowDims;
 };
 

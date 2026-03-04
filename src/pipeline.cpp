@@ -1,6 +1,5 @@
 #include "CLSTL/algorithm.h"
 #include "ashfault/descriptor_set.h"
-#include "spdlog/spdlog.h"
 #include <CLSTL/array.h>
 #include <CLSTL/shared_ptr.h>
 #include <ashfault/pipeline.h>
@@ -20,10 +19,10 @@ GraphicsPipeline::~GraphicsPipeline() {
 
 GraphicsPipelineBuilder::GraphicsPipelineBuilder(
     VkDevice device, VkFormat swapchain_image_format,
-    clstl::array<std::uint32_t, 2> window_dims)
+    clstl::array<std::uint32_t, 2> window_dims, VkSampleCountFlagBits msaa_samples)
     : m_VertexShader(), m_FragmentShader(), m_DescriptorSets(),
       m_Device(device), m_ImageFormat(swapchain_image_format),
-      m_WindowDims(std::move(window_dims)) {}
+      m_MsaaSamples(msaa_samples), m_WindowDims(std::move(window_dims)) {}
 
 clstl::shared_ptr<GraphicsPipeline> GraphicsPipelineBuilder::build() {
   clstl::vector<VkDescriptorSetLayout> dset_layouts;
@@ -91,7 +90,7 @@ clstl::shared_ptr<GraphicsPipeline> GraphicsPipelineBuilder::build() {
   VkPipelineMultisampleStateCreateInfo multisample_info{};
   multisample_info.sType =
       VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
-  multisample_info.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
+  multisample_info.rasterizationSamples = this->m_MsaaSamples;
   multisample_info.sampleShadingEnable = VK_FALSE;
 
   VkPipelineDepthStencilStateCreateInfo depth_stencil_info{};
@@ -220,10 +219,6 @@ GraphicsPipelineBuilder &GraphicsPipelineBuilder::descriptor_sets(
     this->m_DescriptorSets.push_back(set);
   });
   return *this;
-}
-
-GraphicsPipelineBuilder::~GraphicsPipelineBuilder() {
-  spdlog::trace("Destroy graphics pipeline builder");
 }
 
 const VkPipelineLayout &GraphicsPipeline::layout() const {

@@ -44,7 +44,7 @@ int main() {
 
     glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
     GLFWwindow *window =
-        glfwCreateWindow(800, 600, "Hello World!", nullptr, nullptr);
+        glfwCreateWindow(1280, 720, "Hello World!", nullptr, nullptr);
     if (!window) {
       throw std::runtime_error("Failed to create GLFW window");
     }
@@ -124,8 +124,8 @@ int main() {
       vmaMapMemory(renderer->allocator(), alloc,
                    reinterpret_cast<void **>(&mapping));
       UBO proj{};
-      proj.proj_mat = glm::perspectiveFovLH(glm::half_pi<float>(), 800.0f,
-                                            600.0f, 0.0001f, 100.0f);
+      proj.proj_mat = glm::perspectiveFovLH(glm::half_pi<float>(), 1280.0f,
+                                            720.0f, 0.0001f, 100.0f);
       proj.model_mat = mod;
       proj.view_mat = view;
       *mapping = proj;
@@ -167,14 +167,14 @@ int main() {
           frame.value().submit();
         }
 
-        angle += 0.001f; 
+        angle += 0.007f; 
         mod = glm::rotate(glm::identity<glm::mat4>(), angle, glm::vec3(0.0f, 1.0f, 0.0f));
 	view = glm::translate(glm::identity<glm::mat4>(), glm::vec3(0.0f, 0.0f, 3.0f));
 	view = glm::rotate(view, glm::pi<float>(), glm::vec3(0.0f, 0.0f, 1.0f));
 
         vkDeviceWaitIdle(renderer->device());
-        proj.proj_mat = glm::perspectiveFovLH(glm::half_pi<float>(), 800.0f,
-                                              600.0f, 0.0001f, 100.0f);
+        proj.proj_mat = glm::perspectiveFovLH(glm::half_pi<float>(), 1280.0f,
+                                              720.0f, 0.0001f, 100.0f);
 	proj.view_mat = view;
 	proj.model_mat = mod;
 
