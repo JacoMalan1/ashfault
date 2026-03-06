@@ -3,6 +3,9 @@
 #include "ashfault/frame.h"
 #include "ashfault/pipeline.h"
 #include "ashfault/shader.h"
+#include "imgui.h"
+#include "imgui_impl_glfw.h"
+#include "imgui_impl_vulkan.h"
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
 
@@ -543,6 +546,7 @@ std::optional<Frame> Renderer::start_frame() {
   if (result == VK_ERROR_OUT_OF_DATE_KHR) {
     this->m_Resized = true;
     this->recreate_swapchain();
+    return {};
   }
 
   vkResetFences(this->m_Device, 1,
@@ -561,7 +565,7 @@ std::optional<Frame> Renderer::start_frame() {
   color_attachment.imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
   color_attachment.imageView = this->m_ColorImageView;
   color_attachment.clearValue.color = {{0.0f, 0.0f, 0.0f, 1.0f}};
-  color_attachment.resolveImageView = this->m_ImageViews[image_i];
+  color_attachment.resolveImageView = this->m_ViewportImageViews[image_i];
   color_attachment.resolveImageLayout =
       VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
   color_attachment.resolveMode = VK_RESOLVE_MODE_AVERAGE_BIT;
@@ -609,6 +613,19 @@ std::optional<Frame> Renderer::start_frame() {
   color_image_barrier.subresourceRange.baseMipLevel = 0;
   color_image_barrier.subresourceRange.levelCount = 1;
 
+  VkImageMemoryBarrier viewport_image_barrier{};
+  viewport_image_barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+  viewport_image_barrier.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+  viewport_image_barrier.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+  viewport_image_barrier.newLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+  viewport_image_barrier.image = this->m_ViewportImages[image_i].first;
+  viewport_image_barrier.subresourceRange.aspectMask =
+      VK_IMAGE_ASPECT_COLOR_BIT;
+  viewport_image_barrier.subresourceRange.baseArrayLayer = 0;
+  viewport_image_barrier.subresourceRange.layerCount = 1;
+  viewport_image_barrier.subresourceRange.baseMipLevel = 0;
+  viewport_image_barrier.subresourceRange.levelCount = 1;
+
   VkImageMemoryBarrier depth_barrier{};
   depth_barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
   depth_barrier.dstAccessMask = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT |
@@ -622,8 +639,8 @@ std::optional<Frame> Renderer::start_frame() {
   depth_barrier.subresourceRange.baseMipLevel = 0;
   depth_barrier.subresourceRange.levelCount = 1;
 
-  clstl::array<VkImageMemoryBarrier, 2> color_barriers = {color_image_barrier,
-                                                          image_barrier};
+  clstl::array<VkImageMemoryBarrier, 3> color_barriers = {
+      color_image_barrier, image_barrier, viewport_image_barrier};
 
   vkCmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
                        VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, 0, 0,
@@ -660,7 +677,83 @@ std::optional<Frame> Renderer::start_frame() {
                this->m_InFlightFences[this->m_CurrentFrame], this);
 }
 
+void Renderer::setup_imgui() {
+  IMGUI_CHECKVERSION();
+
+  ImGui::CreateContext();
+  ImGuiIO &io = ImGui::GetIO();
+  io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
+  io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;
+  io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
+
+  VkPipelineRenderingCreateInfo rendering_info{};
+  rendering_info.sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO;
+  rendering_info.colorAttachmentCount = 1;
+  rendering_info.pColorAttachmentFormats = &this->m_SurfaceFormat.format;
+  rendering_info.depthAttachmentFormat = VK_FORMAT_D32_SFLOAT;
+
+  ImGui_ImplGlfw_InitForVulkan(this->m_Window, true);
+  ImGui_ImplVulkan_InitInfo init_info = {};
+  init_info.Instance = this->m_Instance;
+  init_info.PhysicalDevice = this->m_PhysicalDevice;
+  init_info.Device = this->m_Device;
+  init_info.QueueFamily = this->m_QueueFamilies.graphics_queue.value();
+  init_info.Queue = this->m_GraphicsQueue;
+  init_info.DescriptorPoolSize =
+      IMGUI_IMPL_VULKAN_MINIMUM_IMAGE_SAMPLER_POOL_SIZE;
+  init_info.MinImageCount = this->m_SwapchainImages.size();
+  init_info.ImageCount = this->m_SwapchainImages.size();
+  init_info.PipelineInfoMain.PipelineRenderingCreateInfo = rendering_info;
+  init_info.PipelineInfoMain.MSAASamples = VK_SAMPLE_COUNT_1_BIT;
+  init_info.UseDynamicRendering = true;
+  ImGui_ImplVulkan_Init(&init_info);
+
+  VkSamplerCreateInfo sampler_info{};
+  sampler_info.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
+  sampler_info.addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+  sampler_info.addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+  sampler_info.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+  sampler_info.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
+  sampler_info.minFilter = VK_FILTER_LINEAR;
+  sampler_info.magFilter = VK_FILTER_LINEAR;
+  vkCreateSampler(this->m_Device, &sampler_info, nullptr,
+                  &this->m_ImGuiViewportSampler);
+
+  this->m_ViewportImageViews.resize(this->m_SwapchainImages.size());
+  this->m_ViewportImages.resize(this->m_SwapchainImages.size());
+  this->m_ImGuiViewportTextures.resize(this->m_SwapchainImages.size());
+  VmaAllocationCreateInfo alloc_info{};
+  alloc_info.requiredFlags = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
+  alloc_info.usage = VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE;
+
+  for (std::size_t i = 0; i < this->m_SwapchainImages.size(); i++) {
+    this->m_ViewportImages[i] = this->create_image(
+        this->m_SwapExtent.width, this->m_SwapExtent.height,
+        VK_SAMPLE_COUNT_1_BIT, this->m_SurfaceFormat.format,
+        VK_IMAGE_TILING_OPTIMAL,
+        VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
+        alloc_info);
+    this->m_ViewportImageViews[i] = this->create_image_view(
+        this->m_ViewportImages[i].first, this->m_SurfaceFormat.format,
+        VK_IMAGE_ASPECT_COLOR_BIT);
+    this->m_ImGuiViewportTextures[i] = ImGui_ImplVulkan_AddTexture(
+        this->m_ImGuiViewportSampler, this->m_ViewportImageViews[i],
+        VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+  }
+
+  VkCommandBufferAllocateInfo cmd_alloc_info{};
+  cmd_alloc_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+  cmd_alloc_info.commandBufferCount = this->m_SwapchainImages.size();
+  cmd_alloc_info.commandPool = this->m_CommandPool;
+  cmd_alloc_info.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+  this->m_ImGuiCommandBuffers.resize(this->m_SwapchainImages.size());
+  VK_CHECK_RESULT(vkAllocateCommandBuffers(this->m_Device, &cmd_alloc_info,
+                                           this->m_ImGuiCommandBuffers.data()));
+}
+
 void ashfault::Renderer::init(GLFWwindow *window) {
+  this->m_ViewportSize[0] = 0;
+  this->m_ViewportSize[1] = 0;
   this->m_Window = window;
   glfwSetWindowUserPointer(this->m_Window, this);
   glfwSetFramebufferSizeCallback(
@@ -682,6 +775,7 @@ void ashfault::Renderer::init(GLFWwindow *window) {
   this->setup_command_buffers();
   this->create_color_resources();
   this->create_depth_buffers();
+  this->setup_imgui();
 }
 
 clstl::shared_ptr<VulkanShader>
@@ -794,6 +888,38 @@ void Renderer::recreate_swapchain() {
   this->setup_swapchain();
   this->create_color_resources();
   this->create_depth_buffers();
+
+  VmaAllocationCreateInfo alloc_info{};
+  alloc_info.requiredFlags = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
+  alloc_info.usage = VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE;
+
+  for (std::size_t i = 0; i < this->m_SwapchainImages.size(); i++) {
+    vkDestroyImageView(this->m_Device, this->m_ViewportImageViews[i], nullptr);
+    vmaDestroyImage(this->m_Allocator, this->m_ViewportImages[i].first,
+                    this->m_ViewportImages[i].second);
+    this->m_ViewportImages[i] = this->create_image(
+        this->m_SwapExtent.width, this->m_SwapExtent.height,
+        VK_SAMPLE_COUNT_1_BIT, this->m_SurfaceFormat.format,
+        VK_IMAGE_TILING_OPTIMAL,
+        VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
+        alloc_info);
+    this->m_ViewportImageViews[i] = this->create_image_view(
+        this->m_ViewportImages[i].first, this->m_SurfaceFormat.format,
+        VK_IMAGE_ASPECT_COLOR_BIT);
+    ImGui_ImplVulkan_RemoveTexture(this->m_ImGuiViewportTextures[i]);
+    this->m_ImGuiViewportTextures[i] = ImGui_ImplVulkan_AddTexture(
+        this->m_ImGuiViewportSampler, this->m_ViewportImageViews[i],
+        VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+  }
+
+  VkCommandBufferAllocateInfo cmd_alloc_info{};
+  cmd_alloc_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+  cmd_alloc_info.commandBufferCount = this->m_SwapchainImages.size();
+  cmd_alloc_info.commandPool = this->m_CommandPool;
+  cmd_alloc_info.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+  this->m_ImGuiCommandBuffers.resize(this->m_SwapchainImages.size());
+  VK_CHECK_RESULT(vkAllocateCommandBuffers(this->m_Device, &cmd_alloc_info,
+                                           this->m_ImGuiCommandBuffers.data()));
 }
 
 void Renderer::cleanup_swapchain() {
@@ -811,6 +937,10 @@ void Renderer::cleanup_swapchain() {
 }
 
 Renderer::~Renderer() {
+  ImGui_ImplVulkan_Shutdown();
+  ImGui_ImplGlfw_Shutdown();
+  ImGui::DestroyContext();
+
   spdlog::info("Renderer shutting down...");
   glfwSetWindowUserPointer(this->m_Window, nullptr);
   glfwSetFramebufferSizeCallback(this->m_Window, nullptr);
@@ -821,9 +951,18 @@ Renderer::~Renderer() {
 
   this->cleanup_swapchain();
 
+  for (std::size_t i = 0; i < this->m_SwapchainImages.size(); i++) {
+    vkDestroyImageView(this->m_Device, this->m_ViewportImageViews[i], nullptr);
+    vmaDestroyImage(this->m_Allocator, this->m_ViewportImages[i].first,
+                    this->m_ViewportImages[i].second);
+  }
+
   vkFreeCommandBuffers(this->m_Device, this->m_CommandPool,
                        this->m_CommandBuffers.size(),
                        this->m_CommandBuffers.data());
+  vkFreeCommandBuffers(this->m_Device, this->m_CommandPool,
+                       this->m_ImGuiCommandBuffers.size(),
+                       this->m_ImGuiCommandBuffers.data());
   vkDestroyCommandPool(this->m_Device, this->m_CommandPool, nullptr);
 
   for (std::size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
@@ -851,4 +990,8 @@ VulkanDescriptorSetBuilder Renderer::create_descriptor_sets() const {
 VkDevice Renderer::device() { return this->m_Device; }
 
 VmaAllocator Renderer::allocator() { return this->m_Allocator; }
+
+clstl::array<std::uint32_t, 2> Renderer::viewport_size() const {
+  return this->m_ViewportSize;
+}
 } // namespace ashfault

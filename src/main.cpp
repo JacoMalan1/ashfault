@@ -1,7 +1,8 @@
-#include "glm/ext/matrix_clip_space.hpp"
-#include "glm/ext/matrix_transform.hpp"
-#include "glm/ext/scalar_constants.hpp"
-#include "glm/gtc/constants.hpp"
+#include <glm/ext/matrix_clip_space.hpp>
+#include <glm/ext/matrix_transform.hpp>
+#include <glm/ext/scalar_constants.hpp>
+#include <glm/gtc/constants.hpp>
+#include <imgui.h>
 #define TINYOBJLOADER_IMPLEMENTATION
 
 #include "ashfault/descriptor_set.h"
@@ -71,12 +72,6 @@ int main() {
     descriptions.push_back(pos);
     descriptions.push_back(norm);
 
-    VmaAllocationCreateInfo alloc_info{};
-    alloc_info.usage = VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE;
-    alloc_info.requiredFlags = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
-                               VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
-    alloc_info.flags = VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT;
-
     tinyobj::attrib_t attrib;
     std::vector<tinyobj::shape_t> shapes;
     std::vector<tinyobj::material_t> materials;
@@ -108,43 +103,22 @@ int main() {
     spdlog::info("vertices[0]: x: {}, y: {}, z: {}", vertices[0].position.x,
                  vertices[0].position.y, vertices[0].position.z);
 
-    auto [buffer, alloc] = renderer->create_buffer(
-        sizeof(UBO), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, alloc_info);
     glm::mat4 mod = glm::scale(glm::identity<glm::mat4>(), glm::vec3(20.0f));
-    glm::mat4 view = glm::translate(glm::identity<glm::mat4>(), glm::vec3(0.0f, 0.0f, 3.0f));
+    glm::mat4 view =
+        glm::translate(glm::identity<glm::mat4>(), glm::vec3(0.0f, 0.0f, 3.0f));
     view = glm::rotate(view, glm::pi<float>(), glm::vec3(0.0f, 0.0f, 1.0f));
-
+    UBO proj{};
+    proj.proj_mat = glm::perspectiveFovLH(glm::half_pi<float>(), 1280.0f, 720.0f, 0.001f, 100.0f);
+    proj.model_mat = mod;
+    proj.view_mat = view;
+    auto ubo_buffer = renderer->create_uniform_buffer(proj);
     {
       auto [dsets, pool] = renderer->create_descriptor_sets()
                                .add_binding(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
                                             VK_SHADER_STAGE_VERTEX_BIT, 1, 0)
                                .build();
 
-      UBO *mapping;
-      vmaMapMemory(renderer->allocator(), alloc,
-                   reinterpret_cast<void **>(&mapping));
-      UBO proj{};
-      proj.proj_mat = glm::perspectiveFovLH(glm::half_pi<float>(), 1280.0f,
-                                            720.0f, 0.0001f, 100.0f);
-      proj.model_mat = mod;
-      proj.view_mat = view;
-      *mapping = proj;
-      vmaUnmapMemory(renderer->allocator(), alloc);
-
-      VkDescriptorBufferInfo buffer_info{};
-      buffer_info.offset = 0;
-      buffer_info.buffer = buffer;
-      buffer_info.range = sizeof(UBO);
-
-      VkWriteDescriptorSet write{};
-      write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-      write.descriptorCount = 1;
-      write.dstBinding = 0;
-      write.pBufferInfo = &buffer_info;
-      write.dstSet = dsets[0]->handle();
-      write.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-
-      vkUpdateDescriptorSets(renderer->device(), 1, &write, 0, nullptr);
+      dsets[0]->update_uniform_buffer(ubo_buffer, 0);
       auto pipeline =
           renderer->create_graphics_pipeline()
               .vertex_shader(vshader)
@@ -157,6 +131,7 @@ int main() {
       spdlog::trace("Vertex count: {}", vertex_buffer->count());
 
       float angle = 0.0f;
+      spdlog::info("Start first frame");
       while (glfwWindowShouldClose(window) != GLFW_TRUE &&
              glfwGetKey(window, GLFW_KEY_ESCAPE) != GLFW_PRESS) {
         auto frame = renderer->start_frame();
@@ -164,44 +139,34 @@ int main() {
           frame.value().bind_pipeline(pipeline.get());
           frame.value().bind_descriptor_set(dsets[0].get(), pipeline.get());
           frame.value().draw(vertex_buffer.get());
+	  frame.value().draw_ui([]() {
+	    ImGui::Begin("Statistics");
+	    ImGui::Text("Frame Time: %d", 0);
+	    ImGui::End();
+	  });
           frame.value().submit();
         }
 
-        angle += 0.007f; 
-        mod = glm::rotate(glm::identity<glm::mat4>(), angle, glm::vec3(0.0f, 1.0f, 0.0f));
-	view = glm::translate(glm::identity<glm::mat4>(), glm::vec3(0.0f, 0.0f, 3.0f));
-	view = glm::rotate(view, glm::pi<float>(), glm::vec3(0.0f, 0.0f, 1.0f));
+	auto viewport_size = renderer->viewport_size();
+        angle += 0.007f;
+        mod = glm::rotate(glm::identity<glm::mat4>(), angle,
+                          glm::vec3(0.0f, 1.0f, 0.0f));
+        view = glm::translate(glm::identity<glm::mat4>(),
+                              glm::vec3(0.0f, 0.0f, 3.0f));
+        view = glm::rotate(view, glm::pi<float>(), glm::vec3(0.0f, 0.0f, 1.0f));
 
         vkDeviceWaitIdle(renderer->device());
-        proj.proj_mat = glm::perspectiveFovLH(glm::half_pi<float>(), 1280.0f,
-                                              720.0f, 0.0001f, 100.0f);
-	proj.view_mat = view;
-	proj.model_mat = mod;
-
-        vmaMapMemory(renderer->allocator(), alloc,
-                     reinterpret_cast<void **>(&mapping));
-        *mapping = proj;
-        vmaUnmapMemory(renderer->allocator(), alloc);
-
-        VkDescriptorBufferInfo buffer_info{};
-        buffer_info.offset = 0;
-        buffer_info.buffer = buffer;
-        buffer_info.range = sizeof(UBO);
-
-        VkWriteDescriptorSet write{};
-        write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-        write.descriptorCount = 1;
-        write.dstBinding = 0;
-        write.pBufferInfo = &buffer_info;
-        write.dstSet = dsets[0]->handle();
-        write.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-
-        vkUpdateDescriptorSets(renderer->device(), 1, &write, 0, nullptr);
+        proj.proj_mat = glm::perspectiveFovLH(glm::half_pi<float>(), static_cast<float>(viewport_size[0]),
+                                              static_cast<float>(viewport_size[1]), 0.0001f, 100.0f);
+        proj.view_mat = view;
+        proj.model_mat = mod;
+	auto new_buf = renderer->create_uniform_buffer(proj);
+	dsets[0]->update_uniform_buffer(new_buf, 0);
+	ubo_buffer = new_buf;
 
         glfwPollEvents();
       }
     }
-    vmaDestroyBuffer(renderer->allocator(), buffer, alloc);
   }
 
   glfwTerminate();
