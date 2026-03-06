@@ -1,8 +1,9 @@
 #ifndef ASHFAULT_FRAME_H
 #define ASHFAULT_FRAME_H
 
-#include "ashfault/buffer.hpp"
+#include <ashfault/buffer.hpp>
 #include <ashfault/pipeline.h>
+#include <functional>
 #include <type_traits>
 #include <vulkan/vulkan_core.h>
 
@@ -42,6 +43,8 @@ public:
     vkCmdDraw(this->m_CommandBuffer, vertices->count(), 1, 0, 0);
   }
 
+  void draw_ui(std::function<void(void)> func);
+
   /// @brief Ends the underlying command buffer and presents to the screen.
   ///
   /// @warning After this function has run, this frame object should not be used
@@ -65,6 +68,7 @@ private:
   VkSwapchainKHR m_Swapchain;
   Renderer *m_Renderer;
   std::uint32_t *m_CurrentFrame, m_ImageIndex;
+  std::vector<std::function<void(void)>> m_UiCallbacks;
 };
 } // namespace ashfault
 

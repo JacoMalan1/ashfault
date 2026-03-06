@@ -13,6 +13,9 @@ set(SHADER_SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/shaders)
 set(SHADER_BINARY_DIR ${CMAKE_CURRENT_BINARY_DIR})
 
 file(GLOB LIB_SRC_FILES ${PROJECT_SOURCE_DIR}/src/*.cpp)
+file(GLOB IMGUI_SRC_FILES ${PROJECT_SOURCE_DIR}/vendor/imgui/*.cpp)
+list(APPEND IMGUI_SRC_FILES ${PROJECT_SOURCE_DIR}/vendor/imgui/backends/imgui_impl_vulkan.cpp)
+list(APPEND IMGUI_SRC_FILES ${PROJECT_SOURCE_DIR}/vendor/imgui/backends/imgui_impl_glfw.cpp)
 list(REMOVE_ITEM LIB_SRC_FILES ${PROJECT_SOURCE_DIR}/src/main.cpp)
 file(GLOB SHADERS ${SHADER_SOURCE_DIR}/*.vert ${SHADER_SOURCE_DIR}/*.frag)
 
@@ -52,7 +55,7 @@ endforeach()
 
 add_custom_target(shaders ALL DEPENDS ${SPV_SHADERS})
 
-add_library(ashfault ${LIB_SRC_FILES})
+add_library(ashfault ${LIB_SRC_FILES} ${IMGUI_SRC_FILES})
 add_executable(program ${PROJECT_SOURCE_DIR}/src/main.cpp)
 
 include_directories(include)
@@ -63,6 +66,8 @@ include_directories(vendor/spdlog/include)
 include_directories(vendor/glm)
 include_directories(vendor/CLSTL/include)
 include_directories(vendor/tinyobjloader)
+include_directories(vendor/imgui)
+include_directories(vendor/imgui/backends)
 
 if(NOT(MSVC))
   target_compile_options(ashfault PUBLIC -Wall -Wpedantic -Wno-nullability-extension -Wno-nullability-completeness)

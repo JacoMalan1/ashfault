@@ -21,6 +21,10 @@
 #include <vulkan/vulkan_core.h>
 
 #define MAX_FRAMES_IN_FLIGHT 3
+#define VK_CHECK_RESULT(x)                                                     \
+  if (x != VK_SUCCESS) {                                                       \
+    throw std::runtime_error(std::string("Vulkan error"));                     \
+  }
 
 namespace ashfault {
 struct QueueSuitability {
@@ -83,8 +87,8 @@ public:
   /// @param allocation_info Information about how to create the image's
   /// underlying memory store.
   std::pair<VkImage, VmaAllocation>
-  create_image(uint32_t width, uint32_t height, VkSampleCountFlagBits samples, VkFormat format,
-               VkImageTiling tiling, VkImageUsageFlags usage,
+  create_image(uint32_t width, uint32_t height, VkSampleCountFlagBits samples,
+               VkFormat format, VkImageTiling tiling, VkImageUsageFlags usage,
                VmaAllocationCreateInfo allocation_info);
 
   /// @brief Creates a vulkan image view from the supplied image.
@@ -120,6 +124,40 @@ public:
 
   /// @brief Returns a handle to the GPU memory allocator.
   VmaAllocator allocator();
+
+  clstl::array<std::uint32_t, 2> viewport_size() const;
+
+  template <class T>
+  clstl::shared_ptr<VulkanBuffer<T>> create_uniform_buffer(const T &data) {
+    VmaAllocationCreateInfo alloc_info{};
+    alloc_info.usage = VMA_MEMORY_USAGE_AUTO;
+    alloc_info.requiredFlags = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
+                               VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
+    alloc_info.flags = VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT;
+
+    auto [staging_buffer, staging_alloc] =
+        this->create_buffer(sizeof(T),
+                            VK_BUFFER_USAGE_TRANSFER_SRC_BIT, alloc_info);
+
+    T *mapping;
+    vmaMapMemory(this->m_Allocator, staging_alloc,
+                 reinterpret_cast<void **>(&mapping));
+    std::memcpy(mapping, &data, sizeof(T));
+    vmaUnmapMemory(this->m_Allocator, staging_alloc);
+
+    alloc_info.usage = VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE;
+    alloc_info.requiredFlags = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
+
+    auto [buffer, allocation] = this->create_buffer(
+        sizeof(T),
+        VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+        alloc_info);
+
+    this->copy_buffer(buffer, staging_buffer, sizeof(T));
+    vmaDestroyBuffer(this->m_Allocator, staging_buffer, staging_alloc);
+
+    return clstl::make_shared<VulkanBuffer<T>>(this->m_Device, this->m_Allocator, buffer, allocation, 1);
+  }
 
   /// @brief Creates an index buffer.
   ///
@@ -223,12 +261,20 @@ private:
   VkCommandPool m_CommandPool;
   VkSampleCountFlagBits m_MsaaSamples;
 
+  clstl::vector<std::pair<VkImage, VmaAllocation>> m_ViewportImages;
+  clstl::vector<VkImageView> m_ViewportImageViews;
+  clstl::vector<VkDescriptorSet> m_ImGuiViewportTextures;
+  clstl::vector<VkCommandBuffer> m_ImGuiCommandBuffers;
+  VkSampler m_ImGuiViewportSampler;
+
   VkImage m_DepthImage;
   VmaAllocation m_DepthImageAllocation;
   VkImageView m_DepthImageView;
   VkImage m_ColorImage;
   VmaAllocation m_ColorImageAllocation;
   VkImageView m_ColorImageView;
+
+  clstl::array<std::uint32_t, 2> m_ViewportSize;
 
   bool m_Resized;
 
@@ -242,6 +288,7 @@ private:
   void create_depth_buffers();
   void create_color_resources();
   void cleanup_swapchain();
+  void setup_imgui();
 
   VkSurfaceFormatKHR
   select_surface_format(const clstl::vector<VkSurfaceFormatKHR> &);
