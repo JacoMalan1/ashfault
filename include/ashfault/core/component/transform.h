@@ -4,7 +4,7 @@
 #include <glm/glm.hpp>
 
 namespace ashfault {
-struct Transform {
+struct TransformComponent {
   glm::vec3 position, rotation, scale;
 };
 } // namespace ashfault

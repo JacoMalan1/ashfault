@@ -22,6 +22,7 @@ public:
   WindowDims current_size() const;
   clstl::vector<const char *> required_instance_extensions();
   void wait_events();
+  void poll_events();
   VkSurfaceKHR create_surface(VkInstance instance);
   GLFWwindow *handle();
   bool should_close();

@@ -4,8 +4,8 @@
 #include <ashfault/core/af_window.h>
 #include <ashfault/renderer/buffer.hpp>
 #include <ashfault/renderer/descriptor_set.h>
-#include <ashfault/renderer/frame.h>
 #include <ashfault/renderer/pipeline.h>
+#include <ashfault/renderer/frame.h>
 #include <CLSTL/shared_ptr.h>
 #include <CLSTL/string.h>
 #include <CLSTL/vector.h>
@@ -29,6 +29,7 @@
 
 namespace ashfault {
 class Swapchain;
+class Frame;
 
 struct QueueSuitability {
   std::optional<std::uint32_t> graphics_queue;
@@ -50,6 +51,9 @@ public:
   Renderer &operator=(const Renderer &) = delete;
   ~Renderer();
   friend class Frame;
+
+  Swapchain *swapchain();
+  clstl::vector<VkCommandBuffer> allocate_command_buffers(std::uint32_t count);
 
   /// @brief Initializes the renderer.
   void init(clstl::shared_ptr<Window> window);
@@ -252,11 +256,10 @@ private:
   VkExtent2D m_SwapExtent;
   VkQueue m_GraphicsQueue;
   VkQueue m_PresentQueue;
-  clstl::vector<VkSemaphore> m_ImageAvailableSemaphores;
-  clstl::vector<VkSemaphore> m_RenderFinishedSemaphores;
-  clstl::vector<VkFence> m_InFlightFences;
+  std::vector<VkSemaphore> m_ImageAvailableSemaphores;
+  std::vector<VkSemaphore> m_RenderFinishedSemaphores;
+  std::vector<VkFence> m_InFlightFences;
   std::uint32_t m_CurrentFrame;
-  clstl::vector<VkCommandBuffer> m_CommandBuffers;
   QueueSuitability m_QueueFamilies;
   VkCommandPool m_CommandPool;
   VkSampleCountFlagBits m_MsaaSamples;
@@ -264,7 +267,6 @@ private:
   clstl::vector<std::pair<VkImage, VmaAllocation>> m_ViewportImages;
   clstl::vector<VkImageView> m_ViewportImageViews;
   clstl::vector<VkDescriptorSet> m_ImGuiViewportTextures;
-  clstl::vector<VkCommandBuffer> m_ImGuiCommandBuffers;
   VkSampler m_ImGuiViewportSampler;
 
   VkImage m_DepthImage;

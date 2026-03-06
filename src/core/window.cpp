@@ -57,4 +57,8 @@ GLFWwindow *Window::handle() { return this->m_Handle; }
 bool Window::should_close() {
   return static_cast<bool>(glfwWindowShouldClose(this->m_Handle));
 }
+
+void Window::poll_events() {
+  glfwPollEvents();
+}
 } // namespace ashfault

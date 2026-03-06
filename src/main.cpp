@@ -1,2 +1,12 @@
+#include <CLSTL/shared_ptr.h>
+#include <CLSTL/unique_ptr.h>
+#include <ashfault/core/af_window.h>
+#include <ashfault/core/engine.h>
+#include <ashfault/application.h>
+
 int main() {
+  auto window = clstl::make_shared<ashfault::Window>(1280, 720, false);
+  auto engine = clstl::make_shared<ashfault::Engine>();
+  auto application = clstl::make_unique<ashfault::Application>(engine, window);
+  application->run();
 }

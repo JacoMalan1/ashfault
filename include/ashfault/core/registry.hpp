@@ -3,6 +3,7 @@
 
 #include <ashfault/core/entity.h>
 #include <CLSTL/shared_ptr.h>
+#include <memory>
 #include <optional>
 #include <typeindex>
 #include <unordered_map>
@@ -10,7 +11,7 @@
 namespace ashfault {
 template <typename C> class ComponentPool {
 public:
-  ComponentPool();
+  ComponentPool() {}
 
   void add(Entity entity, const C &component) {
     m_Components[entity.handle()] = component;
@@ -20,15 +21,15 @@ public:
     m_Components.emplace(entity.handle(), std::forward(args)...);
   }
 
-  std::optional<C &> get(Entity e) {
+  std::optional<C *> get(Entity e) {
     if (!m_Components.count(e.handle())) {
       return {};
     }
 
-    return m_Components[e.handle()];
+    return &m_Components[e.handle()];
   }
 
-  std::optional<const C &> get(Entity e) const {
+  std::optional<const C *> get(Entity e) const {
     if (!m_Components.count(e.handle())) {
       return {};
     }
@@ -45,7 +46,7 @@ public:
   template <typename C> ComponentPool<C> &get_pool() {
     std::type_index index(typeid(C));
     if (!m_ComponentPools.count(index)) {
-      m_ComponentPools[index] = clstl::make_shared<ComponentPool<C>>();
+      m_ComponentPools[index] = std::static_pointer_cast<void>(std::make_shared<ComponentPool<C>>());
     }
 
     return *std::static_pointer_cast<ComponentPool<C>>(m_ComponentPools[index]);
@@ -56,18 +57,12 @@ public:
     pool.add(e, component);
   }
 
-  template <typename C, typename... Args>
-  void add_component(Entity e, Args &&...args) {
-    ComponentPool<C> &pool = this->get_pool<C>();
-    pool.add(e, std::forward(args)...);
-  }
-
-  template <typename C> std::optional<C &> get_component(Entity e) {
+  template <typename C> std::optional<C *> get_component(Entity e) {
     ComponentPool<C> &pool = this->get_pool<C>();
     return pool.get(e);
   }
 
-  template <typename C> std::optional<const C &> get_component(Entity e) const {
+  template <typename C> std::optional<const C *> get_component(Entity e) const {
     ComponentPool<C> &pool = this->get_pool<C>();
     return pool.get(e);
   }

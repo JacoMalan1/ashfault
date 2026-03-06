@@ -154,7 +154,7 @@ Renderer::choose_physical_device() {
   clstl::for_each(devices.begin(), devices.end(), [](VkPhysicalDevice device) {
     VkPhysicalDeviceProperties props;
     vkGetPhysicalDeviceProperties(device, &props);
-    spdlog::info("Found physical device: {}", props.deviceName);
+    SPDLOG_INFO("Found physical device: {}", props.deviceName);
   });
 
   for (std::size_t i = 0; i < device_count; i++) {
@@ -186,7 +186,7 @@ void ashfault::Renderer::create_instance() {
     if (std::strcmp(layer_props[i].layerName, "VK_LAYER_KHRONOS_validation") ==
         0) {
       enabled_layers.push_back("VK_LAYER_KHRONOS_validation");
-      spdlog::info("Enabling validation layers");
+      SPDLOG_INFO("Enabling validation layers");
     }
   }
 
@@ -195,7 +195,7 @@ void ashfault::Renderer::create_instance() {
   enabled_extensions.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
   clstl::for_each(enabled_extensions.begin(), enabled_extensions.end(),
                   [](const char *name) {
-                    spdlog::debug("Required instance extension: {}", name);
+                    SPDLOG_DEBUG("Required instance extension: {}", name);
                   });
 
   VkInstanceCreateInfo instance_info{};
@@ -218,7 +218,7 @@ void ashfault::Renderer::create_device() {
   this->m_PhysicalDevice = physical_device;
   VkPhysicalDeviceProperties props;
   vkGetPhysicalDeviceProperties(physical_device, &props);
-  spdlog::info("Picked physical device: {}", props.deviceName);
+  SPDLOG_INFO("Picked physical device: {}", props.deviceName);
 
   VkSampleCountFlags counts = props.limits.framebufferColorSampleCounts &
                               props.limits.framebufferDepthSampleCounts;
@@ -231,7 +231,7 @@ void ashfault::Renderer::create_device() {
   else if (counts & VK_SAMPLE_COUNT_2_BIT)
     msaa_samples = VK_SAMPLE_COUNT_2_BIT;
   this->m_MsaaSamples = msaa_samples;
-  spdlog::info("MSAA Samples: {}", (int)msaa_samples);
+  SPDLOG_INFO("MSAA Samples: {}", (int)msaa_samples);
 
   float queue_prios = 1.0f;
 
@@ -344,7 +344,7 @@ void ashfault::Renderer::setup_swapchain() {
       select_surface_format(swapchain_support.formats);
   VkPresentModeKHR swapchain_present_mode =
       select_present_mode(swapchain_support.present_modes);
-  spdlog::info("Selected present mode {}", (int)swapchain_present_mode);
+  SPDLOG_INFO("Selected present mode {}", (int)swapchain_present_mode);
 
   VkExtent2D swap_extent = choose_swap_extent(swapchain_support.capabilities);
 
@@ -353,13 +353,13 @@ void ashfault::Renderer::setup_swapchain() {
       swapchain_surface_format, swapchain_present_mode, image_count,
       swap_extent, this->m_Surface, swapchain_support, this->m_Device);
 
-  spdlog::debug("Swapchain image count: {}", image_count);
+  SPDLOG_DEBUG("Swapchain image count: {}", image_count);
 
   this->m_SurfaceFormat = swapchain_surface_format;
   this->m_SwapExtent = swap_extent;
   this->m_PresentMode = swapchain_present_mode;
 
-  spdlog::info("Created swapchain");
+  SPDLOG_INFO("Created swapchain");
 }
 
 void Renderer::setup_synchronization() {
@@ -397,18 +397,6 @@ void Renderer::setup_command_buffers() {
   if (vkCreateCommandPool(this->m_Device, &pool_info, nullptr,
                           &this->m_CommandPool) != VK_SUCCESS) {
     throw std::runtime_error("Failed to create command pool");
-  }
-
-  VkCommandBufferAllocateInfo alloc_info{};
-  alloc_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
-  alloc_info.commandBufferCount = MAX_FRAMES_IN_FLIGHT;
-  alloc_info.commandPool = this->m_CommandPool;
-  alloc_info.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-
-  this->m_CommandBuffers.resize(MAX_FRAMES_IN_FLIGHT);
-  if (vkAllocateCommandBuffers(this->m_Device, &alloc_info,
-                               this->m_CommandBuffers.data()) != VK_SUCCESS) {
-    throw std::runtime_error("Failed to allocate command buffers");
   }
 }
 
@@ -481,7 +469,25 @@ std::optional<Frame> Renderer::start_frame() {
   vkWaitForFences(this->m_Device, 1,
                   &this->m_InFlightFences[this->m_CurrentFrame], VK_TRUE,
                   std::numeric_limits<std::uint64_t>::max());
-  return {};
+
+  auto result = this->m_Swapchain->acquire_image(this->m_ImageAvailableSemaphores[this->m_CurrentFrame]);
+  if (!result.has_value()) {
+    this->m_Resized = true;
+    this->recreate_swapchain();
+    return {};
+  }
+
+  FrameData data{};
+  data.swapchain = this->m_Swapchain;
+  data.current_frame = this->m_CurrentFrame++;
+  data.render_finished_semaphores = this->m_RenderFinishedSemaphores;
+  data.image_available_semaphores = this->m_ImageAvailableSemaphores;
+  data.in_flight_fences = this->m_InFlightFences;
+  data.image_index = result.value();
+  data.present_queue = this->m_PresentQueue;
+  data.graphics_queue = this->m_GraphicsQueue;
+
+  return Frame(data);
 }
 
 void Renderer::setup_imgui() {
@@ -547,15 +553,6 @@ void Renderer::setup_imgui() {
         this->m_ImGuiViewportSampler, this->m_ViewportImageViews[i],
         VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
   }
-
-  VkCommandBufferAllocateInfo cmd_alloc_info{};
-  cmd_alloc_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
-  cmd_alloc_info.commandBufferCount = this->m_Swapchain->image_count();
-  cmd_alloc_info.commandPool = this->m_CommandPool;
-  cmd_alloc_info.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-  this->m_ImGuiCommandBuffers.resize(this->m_Swapchain->image_count());
-  VK_CHECK_RESULT(vkAllocateCommandBuffers(this->m_Device, &cmd_alloc_info,
-                                           this->m_ImGuiCommandBuffers.data()));
 }
 
 void ashfault::Renderer::init(clstl::shared_ptr<Window> window) {
@@ -681,7 +678,7 @@ void Renderer::copy_buffer(VkBuffer dst, VkBuffer src, std::size_t size) {
 }
 
 void Renderer::recreate_swapchain() {
-  spdlog::warn("Rebuilding swapchain");
+  SPDLOG_WARN("Rebuilding swapchain");
   WindowDims dims = this->m_Window->current_size();
   while (dims.width == 0 || dims.height == 0) {
     dims = this->m_Window->current_size();
@@ -716,15 +713,6 @@ void Renderer::recreate_swapchain() {
         this->m_ImGuiViewportSampler, this->m_ViewportImageViews[i],
         VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
   }
-
-  VkCommandBufferAllocateInfo cmd_alloc_info{};
-  cmd_alloc_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
-  cmd_alloc_info.commandBufferCount = this->m_Swapchain->image_count();
-  cmd_alloc_info.commandPool = this->m_CommandPool;
-  cmd_alloc_info.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-  this->m_ImGuiCommandBuffers.resize(this->m_Swapchain->image_count());
-  VK_CHECK_RESULT(vkAllocateCommandBuffers(this->m_Device, &cmd_alloc_info,
-                                           this->m_ImGuiCommandBuffers.data()));
 }
 
 void Renderer::cleanup_swapchain() {
@@ -742,7 +730,7 @@ Renderer::~Renderer() {
   ImGui_ImplGlfw_Shutdown();
   ImGui::DestroyContext();
 
-  spdlog::info("Renderer shutting down...");
+  SPDLOG_INFO("Renderer shutting down...");
   // glfwSetWindowUserPointer(this->m_Window, nullptr);
   // glfwSetFramebufferSizeCallback(this->m_Window, nullptr);
 
@@ -758,12 +746,6 @@ Renderer::~Renderer() {
                     this->m_ViewportImages[i].second);
   }
 
-  vkFreeCommandBuffers(this->m_Device, this->m_CommandPool,
-                       this->m_CommandBuffers.size(),
-                       this->m_CommandBuffers.data());
-  vkFreeCommandBuffers(this->m_Device, this->m_CommandPool,
-                       this->m_ImGuiCommandBuffers.size(),
-                       this->m_ImGuiCommandBuffers.data());
   vkDestroyCommandPool(this->m_Device, this->m_CommandPool, nullptr);
 
   for (std::size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
@@ -794,5 +776,24 @@ VmaAllocator Renderer::allocator() { return this->m_Allocator; }
 
 clstl::array<std::uint32_t, 2> Renderer::viewport_size() const {
   return this->m_ViewportSize;
+}
+
+
+clstl::vector<VkCommandBuffer> Renderer::allocate_command_buffers(std::uint32_t count) {
+  clstl::vector<VkCommandBuffer> ret;
+  ret.resize(count);
+
+  VkCommandBufferAllocateInfo alloc_info{};
+  alloc_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+  alloc_info.commandBufferCount = count;
+  alloc_info.commandPool = this->m_CommandPool;
+  alloc_info.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+
+  VK_CHECK_RESULT(vkAllocateCommandBuffers(this->m_Device, &alloc_info, ret.data()));
+  return ret;
+}
+
+Swapchain *Renderer::swapchain() {
+  return this->m_Swapchain;
 }
 } // namespace ashfault
