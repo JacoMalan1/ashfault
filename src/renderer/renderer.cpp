@@ -1,19 +1,17 @@
-#include "ashfault/buffer.hpp"
-#include "ashfault/descriptor_set.h"
-#include "ashfault/frame.h"
-#include "ashfault/pipeline.h"
-#include "ashfault/shader.h"
-#include "imgui.h"
-#include "imgui_impl_glfw.h"
-#include "imgui_impl_vulkan.h"
-#define GLFW_INCLUDE_VULKAN
-#include <GLFW/glfw3.h>
-
+#include <ashfault/renderer/buffer.hpp>
+#include <ashfault/renderer/descriptor_set.h>
+#include <ashfault/renderer/frame.h>
+#include <ashfault/renderer/pipeline.h>
+#include <ashfault/renderer/shader.h>
+#include <ashfault/renderer/swapchain.h>
+#include <imgui.h>
+#include <imgui_impl_glfw.h>
+#include <imgui_impl_vulkan.h>
 #include <CLSTL/algorithm.h>
 #include <CLSTL/array.h>
 #include <CLSTL/vector.h>
 #include <algorithm>
-#include <ashfault/renderer.h>
+#include <ashfault/renderer/renderer.h>
 #include <cstdint>
 #include <cstring>
 #include <limits>
@@ -21,6 +19,10 @@
 #include <spdlog/spdlog.h>
 #include <stdexcept>
 #include <vulkan/vulkan_core.h>
+
+#define GLFW_INCLUDE_VULKAN
+#include <GLFW/glfw3.h>
+
 
 namespace ashfault {
 
@@ -188,13 +190,8 @@ void ashfault::Renderer::create_instance() {
     }
   }
 
-  std::uint32_t extension_count;
-  const char **required_extensions =
-      glfwGetRequiredInstanceExtensions(&extension_count);
-  clstl::vector<const char *> enabled_extensions;
-  enabled_extensions.resize(extension_count);
-  std::memcpy(enabled_extensions.data(), required_extensions,
-              sizeof(const char *) * extension_count);
+  clstl::vector<const char *> enabled_extensions =
+      this->m_Window->required_instance_extensions();
   enabled_extensions.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
   clstl::for_each(enabled_extensions.begin(), enabled_extensions.end(),
                   [](const char *name) {
@@ -284,10 +281,7 @@ void ashfault::Renderer::create_allocator() {
 }
 
 void ashfault::Renderer::create_surface() {
-  if (glfwCreateWindowSurface(this->m_Instance, this->m_Window, nullptr,
-                              &this->m_Surface) != VK_SUCCESS) {
-    throw std::runtime_error("Failed to create surface");
-  }
+  this->m_Surface = this->m_Window->create_surface(this->m_Instance);
 }
 
 VkSurfaceFormatKHR Renderer::select_surface_format(
@@ -332,10 +326,8 @@ VkExtent2D Renderer::choose_swap_extent(VkSurfaceCapabilitiesKHR capabilities) {
     return capabilities.currentExtent;
   }
 
-  int width, height;
-  glfwGetFramebufferSize(this->m_Window, &width, &height);
-  VkExtent2D extent = {static_cast<std::uint32_t>(width),
-                       static_cast<std::uint32_t>(height)};
+  WindowDims dims = this->m_Window->current_size();
+  VkExtent2D extent = {dims.width, dims.height};
 
   extent.width = std::clamp(extent.width, capabilities.minImageExtent.width,
                             capabilities.maxImageExtent.width);
@@ -357,68 +349,22 @@ void ashfault::Renderer::setup_swapchain() {
   VkExtent2D swap_extent = choose_swap_extent(swapchain_support.capabilities);
 
   std::uint32_t image_count = swapchain_support.capabilities.minImageCount + 1;
-  spdlog::debug("Swapchain image count: {}", image_count);
-  VkSwapchainCreateInfoKHR swapchain_info{};
-  swapchain_info.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
-  swapchain_info.surface = this->m_Surface;
-  swapchain_info.minImageCount = image_count;
-  swapchain_info.imageFormat = swapchain_surface_format.format;
-  swapchain_info.imageColorSpace = swapchain_surface_format.colorSpace;
-  swapchain_info.imageExtent = swap_extent;
-  swapchain_info.imageArrayLayers = 1;
-  swapchain_info.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
-  swapchain_info.preTransform = swapchain_support.capabilities.currentTransform;
-  swapchain_info.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
-  swapchain_info.presentMode = swapchain_present_mode;
-  swapchain_info.clipped = true;
-  swapchain_info.oldSwapchain = VK_NULL_HANDLE;
+  this->m_Swapchain = new Swapchain(
+      swapchain_surface_format, swapchain_present_mode, image_count,
+      swap_extent, this->m_Surface, swapchain_support, this->m_Device);
 
-  if (vkCreateSwapchainKHR(this->m_Device, &swapchain_info, nullptr,
-                           &this->m_Swapchain) != VK_SUCCESS) {
-    throw std::runtime_error("Failed to create swapchain");
-  }
+  spdlog::debug("Swapchain image count: {}", image_count);
 
   this->m_SurfaceFormat = swapchain_surface_format;
   this->m_SwapExtent = swap_extent;
   this->m_PresentMode = swapchain_present_mode;
-
-  std::uint32_t swapchain_image_count;
-  vkGetSwapchainImagesKHR(this->m_Device, this->m_Swapchain,
-                          &swapchain_image_count, nullptr);
-  this->m_SwapchainImages.resize(swapchain_image_count);
-  vkGetSwapchainImagesKHR(this->m_Device, this->m_Swapchain,
-                          &swapchain_image_count,
-                          this->m_SwapchainImages.data());
-
-  this->m_ImageViews.resize(swapchain_image_count);
-  for (std::size_t i = 0; i < this->m_SwapchainImages.size(); i++) {
-    VkImageViewCreateInfo create_info{};
-    create_info.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
-    create_info.format = swapchain_surface_format.format;
-    create_info.image = this->m_SwapchainImages[i];
-    create_info.viewType = VK_IMAGE_VIEW_TYPE_2D;
-    create_info.components.r = VK_COMPONENT_SWIZZLE_IDENTITY;
-    create_info.components.g = VK_COMPONENT_SWIZZLE_IDENTITY;
-    create_info.components.b = VK_COMPONENT_SWIZZLE_IDENTITY;
-    create_info.components.a = VK_COMPONENT_SWIZZLE_IDENTITY;
-    create_info.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-    create_info.subresourceRange.baseMipLevel = 0;
-    create_info.subresourceRange.levelCount = 1;
-    create_info.subresourceRange.baseArrayLayer = 0;
-    create_info.subresourceRange.layerCount = 1;
-
-    if (vkCreateImageView(this->m_Device, &create_info, nullptr,
-                          &this->m_ImageViews[i]) != VK_SUCCESS) {
-      throw std::runtime_error("Failed to create image views");
-    }
-  }
 
   spdlog::info("Created swapchain");
 }
 
 void Renderer::setup_synchronization() {
   std::size_t image_count = std::max<std::size_t>(
-      this->m_SwapchainImages.size(), MAX_FRAMES_IN_FLIGHT);
+      this->m_Swapchain->image_count(), MAX_FRAMES_IN_FLIGHT);
 
   this->m_ImageAvailableSemaphores.resize(image_count);
   this->m_RenderFinishedSemaphores.resize(image_count);
@@ -535,146 +481,7 @@ std::optional<Frame> Renderer::start_frame() {
   vkWaitForFences(this->m_Device, 1,
                   &this->m_InFlightFences[this->m_CurrentFrame], VK_TRUE,
                   std::numeric_limits<std::uint64_t>::max());
-
-  std::uint32_t image_i;
-  VkResult result = vkAcquireNextImageKHR(
-      this->m_Device, this->m_Swapchain,
-      std::numeric_limits<std::uint64_t>::max(),
-      this->m_ImageAvailableSemaphores[this->m_CurrentFrame], VK_NULL_HANDLE,
-      &image_i);
-
-  if (result == VK_ERROR_OUT_OF_DATE_KHR) {
-    this->m_Resized = true;
-    this->recreate_swapchain();
-    return {};
-  }
-
-  vkResetFences(this->m_Device, 1,
-                &this->m_InFlightFences[this->m_CurrentFrame]);
-  vkResetCommandBuffer(this->m_CommandBuffers[this->m_CurrentFrame], 0);
-  VkCommandBuffer cmd = this->m_CommandBuffers[this->m_CurrentFrame];
-
-  VkCommandBufferBeginInfo cmd_begin{};
-  cmd_begin.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-  vkBeginCommandBuffer(cmd, &cmd_begin);
-
-  VkRenderingAttachmentInfo color_attachment{};
-  color_attachment.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
-  color_attachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-  color_attachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
-  color_attachment.imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-  color_attachment.imageView = this->m_ColorImageView;
-  color_attachment.clearValue.color = {{0.0f, 0.0f, 0.0f, 1.0f}};
-  color_attachment.resolveImageView = this->m_ViewportImageViews[image_i];
-  color_attachment.resolveImageLayout =
-      VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-  color_attachment.resolveMode = VK_RESOLVE_MODE_AVERAGE_BIT;
-
-  VkRenderingAttachmentInfo depth_attachment{};
-  depth_attachment.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
-  depth_attachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-  depth_attachment.storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-  depth_attachment.imageLayout = VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL;
-  depth_attachment.imageView = this->m_DepthImageView;
-  depth_attachment.clearValue.depthStencil = {1.0f, 0};
-
-  VkRenderingInfo rendering_info{};
-  rendering_info.sType = VK_STRUCTURE_TYPE_RENDERING_INFO;
-  rendering_info.pColorAttachments = &color_attachment;
-  rendering_info.pDepthAttachment = &depth_attachment;
-  rendering_info.colorAttachmentCount = 1;
-  rendering_info.layerCount = 1;
-  rendering_info.viewMask = 0;
-  rendering_info.renderArea.offset.x = 0;
-  rendering_info.renderArea.offset.y = 0;
-  rendering_info.renderArea.extent = this->m_SwapExtent;
-
-  VkImageMemoryBarrier image_barrier{};
-  image_barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-  image_barrier.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
-  image_barrier.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-  image_barrier.newLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-  image_barrier.image = this->m_SwapchainImages[image_i];
-  image_barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-  image_barrier.subresourceRange.baseArrayLayer = 0;
-  image_barrier.subresourceRange.layerCount = 1;
-  image_barrier.subresourceRange.baseMipLevel = 0;
-  image_barrier.subresourceRange.levelCount = 1;
-
-  VkImageMemoryBarrier color_image_barrier{};
-  color_image_barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-  color_image_barrier.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
-  color_image_barrier.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-  color_image_barrier.newLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-  color_image_barrier.image = this->m_ColorImage;
-  color_image_barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-  color_image_barrier.subresourceRange.baseArrayLayer = 0;
-  color_image_barrier.subresourceRange.layerCount = 1;
-  color_image_barrier.subresourceRange.baseMipLevel = 0;
-  color_image_barrier.subresourceRange.levelCount = 1;
-
-  VkImageMemoryBarrier viewport_image_barrier{};
-  viewport_image_barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-  viewport_image_barrier.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
-  viewport_image_barrier.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-  viewport_image_barrier.newLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-  viewport_image_barrier.image = this->m_ViewportImages[image_i].first;
-  viewport_image_barrier.subresourceRange.aspectMask =
-      VK_IMAGE_ASPECT_COLOR_BIT;
-  viewport_image_barrier.subresourceRange.baseArrayLayer = 0;
-  viewport_image_barrier.subresourceRange.layerCount = 1;
-  viewport_image_barrier.subresourceRange.baseMipLevel = 0;
-  viewport_image_barrier.subresourceRange.levelCount = 1;
-
-  VkImageMemoryBarrier depth_barrier{};
-  depth_barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-  depth_barrier.dstAccessMask = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT |
-                                VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
-  depth_barrier.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-  depth_barrier.newLayout = VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL;
-  depth_barrier.image = this->m_DepthImage;
-  depth_barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
-  depth_barrier.subresourceRange.baseArrayLayer = 0;
-  depth_barrier.subresourceRange.layerCount = 1;
-  depth_barrier.subresourceRange.baseMipLevel = 0;
-  depth_barrier.subresourceRange.levelCount = 1;
-
-  clstl::array<VkImageMemoryBarrier, 3> color_barriers = {
-      color_image_barrier, image_barrier, viewport_image_barrier};
-
-  vkCmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
-                       VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, 0, 0,
-                       nullptr, 0, nullptr, color_barriers.size(),
-                       color_barriers.data());
-  vkCmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
-                       VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT, 0, 0,
-                       nullptr, 0, nullptr, 1, &depth_barrier);
-
-  vkCmdBeginRendering(cmd, &rendering_info);
-  int width, height;
-  glfwGetFramebufferSize(this->m_Window, &width, &height);
-  VkViewport viewport{};
-  viewport.x = 0;
-  viewport.y = 0;
-  viewport.width = static_cast<float>(width);
-  viewport.height = static_cast<float>(height);
-  viewport.minDepth = 0.0f;
-  viewport.maxDepth = 1.0f;
-  vkCmdSetViewport(cmd, 0, 1, &viewport);
-
-  VkRect2D scissor{};
-  scissor.extent.width = static_cast<std::uint32_t>(width);
-  scissor.extent.height = static_cast<std::uint32_t>(height);
-  scissor.offset.x = 0;
-  scissor.offset.y = 0;
-  vkCmdSetScissor(cmd, 0, 1, &scissor);
-
-  return Frame(this->m_Device, cmd, this->m_GraphicsQueue, this->m_PresentQueue,
-               this->m_Swapchain, this->m_SwapchainImages[image_i],
-               this->m_ColorImage, image_i, &this->m_CurrentFrame,
-               this->m_ImageAvailableSemaphores[this->m_CurrentFrame],
-               this->m_RenderFinishedSemaphores[image_i],
-               this->m_InFlightFences[this->m_CurrentFrame], this);
+  return {};
 }
 
 void Renderer::setup_imgui() {
@@ -692,7 +499,7 @@ void Renderer::setup_imgui() {
   rendering_info.pColorAttachmentFormats = &this->m_SurfaceFormat.format;
   rendering_info.depthAttachmentFormat = VK_FORMAT_D32_SFLOAT;
 
-  ImGui_ImplGlfw_InitForVulkan(this->m_Window, true);
+  ImGui_ImplGlfw_InitForVulkan(this->m_Window->handle(), true);
   ImGui_ImplVulkan_InitInfo init_info = {};
   init_info.Instance = this->m_Instance;
   init_info.PhysicalDevice = this->m_PhysicalDevice;
@@ -701,8 +508,8 @@ void Renderer::setup_imgui() {
   init_info.Queue = this->m_GraphicsQueue;
   init_info.DescriptorPoolSize =
       IMGUI_IMPL_VULKAN_MINIMUM_IMAGE_SAMPLER_POOL_SIZE;
-  init_info.MinImageCount = this->m_SwapchainImages.size();
-  init_info.ImageCount = this->m_SwapchainImages.size();
+  init_info.MinImageCount = this->m_Swapchain->image_count();
+  init_info.ImageCount = this->m_Swapchain->image_count();
   init_info.PipelineInfoMain.PipelineRenderingCreateInfo = rendering_info;
   init_info.PipelineInfoMain.MSAASamples = VK_SAMPLE_COUNT_1_BIT;
   init_info.UseDynamicRendering = true;
@@ -719,14 +526,14 @@ void Renderer::setup_imgui() {
   vkCreateSampler(this->m_Device, &sampler_info, nullptr,
                   &this->m_ImGuiViewportSampler);
 
-  this->m_ViewportImageViews.resize(this->m_SwapchainImages.size());
-  this->m_ViewportImages.resize(this->m_SwapchainImages.size());
-  this->m_ImGuiViewportTextures.resize(this->m_SwapchainImages.size());
+  this->m_ViewportImageViews.resize(this->m_Swapchain->image_count());
+  this->m_ViewportImages.resize(this->m_Swapchain->image_count());
+  this->m_ImGuiViewportTextures.resize(this->m_Swapchain->image_count());
   VmaAllocationCreateInfo alloc_info{};
   alloc_info.requiredFlags = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
   alloc_info.usage = VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE;
 
-  for (std::size_t i = 0; i < this->m_SwapchainImages.size(); i++) {
+  for (std::size_t i = 0; i < this->m_Swapchain->image_count(); i++) {
     this->m_ViewportImages[i] = this->create_image(
         this->m_SwapExtent.width, this->m_SwapExtent.height,
         VK_SAMPLE_COUNT_1_BIT, this->m_SurfaceFormat.format,
@@ -743,26 +550,26 @@ void Renderer::setup_imgui() {
 
   VkCommandBufferAllocateInfo cmd_alloc_info{};
   cmd_alloc_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
-  cmd_alloc_info.commandBufferCount = this->m_SwapchainImages.size();
+  cmd_alloc_info.commandBufferCount = this->m_Swapchain->image_count();
   cmd_alloc_info.commandPool = this->m_CommandPool;
   cmd_alloc_info.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-  this->m_ImGuiCommandBuffers.resize(this->m_SwapchainImages.size());
+  this->m_ImGuiCommandBuffers.resize(this->m_Swapchain->image_count());
   VK_CHECK_RESULT(vkAllocateCommandBuffers(this->m_Device, &cmd_alloc_info,
                                            this->m_ImGuiCommandBuffers.data()));
 }
 
-void ashfault::Renderer::init(GLFWwindow *window) {
+void ashfault::Renderer::init(clstl::shared_ptr<Window> window) {
   this->m_ViewportSize[0] = 0;
   this->m_ViewportSize[1] = 0;
   this->m_Window = window;
-  glfwSetWindowUserPointer(this->m_Window, this);
-  glfwSetFramebufferSizeCallback(
-      this->m_Window, [](GLFWwindow *window, int width, int height) {
-        Renderer *renderer =
-            reinterpret_cast<Renderer *>(glfwGetWindowUserPointer(window));
-        if (renderer)
-          renderer->m_Resized = true;
-      });
+  // glfwSetWindowUserPointer(this->m_Window, this);
+  // glfwSetFramebufferSizeCallback(
+  //     this->m_Window, [](GLFWwindow *window, int width, int height) {
+  //       Renderer *renderer =
+  //           reinterpret_cast<Renderer *>(glfwGetWindowUserPointer(window));
+  //       if (renderer)
+  //         renderer->m_Resized = true;
+  //     });
 
   this->m_Resized = false;
   this->m_CurrentFrame = 0;
@@ -785,10 +592,9 @@ Renderer::create_shader(const clstl::string &path) const {
 
 GraphicsPipelineBuilder Renderer::create_graphics_pipeline() const {
   clstl::array<std::uint32_t, 2> window_dims;
-  int width, height;
-  glfwGetFramebufferSize(this->m_Window, &width, &height);
-  window_dims[0] = width;
-  window_dims[1] = height;
+  WindowDims dims = this->m_Window->current_size();
+  window_dims[0] = dims.width;
+  window_dims[1] = dims.height;
   return GraphicsPipelineBuilder(this->m_Device, this->m_SurfaceFormat.format,
                                  std::move(window_dims), this->m_MsaaSamples);
 }
@@ -876,11 +682,10 @@ void Renderer::copy_buffer(VkBuffer dst, VkBuffer src, std::size_t size) {
 
 void Renderer::recreate_swapchain() {
   spdlog::warn("Rebuilding swapchain");
-  int width = 0, height = 0;
-  glfwGetFramebufferSize(this->m_Window, &width, &height);
-  while (width == 0 || height == 0) {
-    glfwGetFramebufferSize(this->m_Window, &width, &height);
-    glfwWaitEvents();
+  WindowDims dims = this->m_Window->current_size();
+  while (dims.width == 0 || dims.height == 0) {
+    dims = this->m_Window->current_size();
+    this->m_Window->wait_events();
   }
 
   vkDeviceWaitIdle(this->m_Device);
@@ -893,7 +698,7 @@ void Renderer::recreate_swapchain() {
   alloc_info.requiredFlags = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
   alloc_info.usage = VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE;
 
-  for (std::size_t i = 0; i < this->m_SwapchainImages.size(); i++) {
+  for (std::size_t i = 0; i < this->m_Swapchain->image_count(); i++) {
     vkDestroyImageView(this->m_Device, this->m_ViewportImageViews[i], nullptr);
     vmaDestroyImage(this->m_Allocator, this->m_ViewportImages[i].first,
                     this->m_ViewportImages[i].second);
@@ -914,20 +719,16 @@ void Renderer::recreate_swapchain() {
 
   VkCommandBufferAllocateInfo cmd_alloc_info{};
   cmd_alloc_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
-  cmd_alloc_info.commandBufferCount = this->m_SwapchainImages.size();
+  cmd_alloc_info.commandBufferCount = this->m_Swapchain->image_count();
   cmd_alloc_info.commandPool = this->m_CommandPool;
   cmd_alloc_info.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-  this->m_ImGuiCommandBuffers.resize(this->m_SwapchainImages.size());
+  this->m_ImGuiCommandBuffers.resize(this->m_Swapchain->image_count());
   VK_CHECK_RESULT(vkAllocateCommandBuffers(this->m_Device, &cmd_alloc_info,
                                            this->m_ImGuiCommandBuffers.data()));
 }
 
 void Renderer::cleanup_swapchain() {
-  for (const auto &image_view : this->m_ImageViews) {
-    vkDestroyImageView(this->m_Device, image_view, nullptr);
-  }
-
-  vkDestroySwapchainKHR(this->m_Device, this->m_Swapchain, nullptr);
+  this->m_Swapchain->cleanup();
   vkDestroyImageView(this->m_Device, this->m_DepthImageView, nullptr);
   vkDestroyImageView(this->m_Device, this->m_ColorImageView, nullptr);
   vmaDestroyImage(this->m_Allocator, this->m_DepthImage,
@@ -942,8 +743,8 @@ Renderer::~Renderer() {
   ImGui::DestroyContext();
 
   spdlog::info("Renderer shutting down...");
-  glfwSetWindowUserPointer(this->m_Window, nullptr);
-  glfwSetFramebufferSizeCallback(this->m_Window, nullptr);
+  // glfwSetWindowUserPointer(this->m_Window, nullptr);
+  // glfwSetFramebufferSizeCallback(this->m_Window, nullptr);
 
   vkDeviceWaitIdle(this->m_Device);
   vkQueueWaitIdle(this->m_GraphicsQueue);
@@ -951,7 +752,7 @@ Renderer::~Renderer() {
 
   this->cleanup_swapchain();
 
-  for (std::size_t i = 0; i < this->m_SwapchainImages.size(); i++) {
+  for (std::size_t i = 0; i < this->m_Swapchain->image_count(); i++) {
     vkDestroyImageView(this->m_Device, this->m_ViewportImageViews[i], nullptr);
     vmaDestroyImage(this->m_Allocator, this->m_ViewportImages[i].first,
                     this->m_ViewportImages[i].second);

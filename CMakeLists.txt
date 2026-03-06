@@ -12,11 +12,12 @@ set(CMAKE_CXX_STANDARD 17)
 set(SHADER_SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/shaders)
 set(SHADER_BINARY_DIR ${CMAKE_CURRENT_BINARY_DIR})
 
-file(GLOB LIB_SRC_FILES ${PROJECT_SOURCE_DIR}/src/*.cpp)
+file(GLOB LIB_SRC_FILES ${PROJECT_SOURCE_DIR}/src/**/*.cpp)
 file(GLOB IMGUI_SRC_FILES ${PROJECT_SOURCE_DIR}/vendor/imgui/*.cpp)
 list(APPEND IMGUI_SRC_FILES ${PROJECT_SOURCE_DIR}/vendor/imgui/backends/imgui_impl_vulkan.cpp)
 list(APPEND IMGUI_SRC_FILES ${PROJECT_SOURCE_DIR}/vendor/imgui/backends/imgui_impl_glfw.cpp)
 list(REMOVE_ITEM LIB_SRC_FILES ${PROJECT_SOURCE_DIR}/src/main.cpp)
+list(REMOVE_ITEM LIB_SRC_FILES ${PROJECT_SOURCE_DIR}/src/editor/editor.cpp)
 file(GLOB SHADERS ${SHADER_SOURCE_DIR}/*.vert ${SHADER_SOURCE_DIR}/*.frag)
 
 find_package(Doxygen)
@@ -57,6 +58,7 @@ add_custom_target(shaders ALL DEPENDS ${SPV_SHADERS})
 
 add_library(ashfault ${LIB_SRC_FILES} ${IMGUI_SRC_FILES})
 add_executable(program ${PROJECT_SOURCE_DIR}/src/main.cpp)
+add_executable(editor ${PROJECT_SOURCE_DIR}/src/editor.cpp)
 
 include_directories(include)
 include_directories(${Vulkan_INCLUDE_DIRS})
@@ -86,6 +88,8 @@ target_link_libraries(ashfault GPUOpen::VulkanMemoryAllocator)
 target_link_libraries(ashfault spdlog::spdlog)
 target_link_libraries(ashfault clstl)
 target_link_libraries(ashfault glm::glm)
+
+target_link_libraries(editor ashfault)
 
 target_link_libraries(program tinyobjloader)
 target_link_libraries(program ashfault)

@@ -1,14 +1,15 @@
 #ifndef ASHFAULT_RENDERER_H
 #define ASHFAULT_RENDERER_H
 
-#include "ashfault/buffer.hpp"
-#include "ashfault/descriptor_set.h"
-#include "ashfault/frame.h"
-#include "ashfault/pipeline.h"
+#include <ashfault/core/af_window.h>
+#include <ashfault/renderer/buffer.hpp>
+#include <ashfault/renderer/descriptor_set.h>
+#include <ashfault/renderer/frame.h>
+#include <ashfault/renderer/pipeline.h>
 #include <CLSTL/shared_ptr.h>
 #include <CLSTL/string.h>
 #include <CLSTL/vector.h>
-#include <ashfault/shader.h>
+#include <ashfault/renderer/shader.h>
 #include <cstdint>
 #include <cstring>
 #include <functional>
@@ -27,6 +28,8 @@
   }
 
 namespace ashfault {
+class Swapchain;
+
 struct QueueSuitability {
   std::optional<std::uint32_t> graphics_queue;
   std::optional<std::uint32_t> present_queue;
@@ -49,7 +52,7 @@ public:
   friend class Frame;
 
   /// @brief Initializes the renderer.
-  void init(GLFWwindow *window);
+  void init(clstl::shared_ptr<Window> window);
 
   /// @brief Creates a vulkan shader module object.
   /// @param path Path to the pre-compiled SPIR-V shader binary.
@@ -238,18 +241,15 @@ private:
   const std::vector<const char *> s_DeviceExtensions = {
       VK_KHR_SWAPCHAIN_EXTENSION_NAME};
 
-  GLFWwindow *m_Window;
+  clstl::shared_ptr<Window> m_Window;
   VkInstance m_Instance;
   VkPhysicalDevice m_PhysicalDevice;
   VkDevice m_Device;
   VmaAllocator m_Allocator;
   VkSurfaceKHR m_Surface;
-  VkSwapchainKHR m_Swapchain;
   VkSurfaceFormatKHR m_SurfaceFormat;
   VkPresentModeKHR m_PresentMode;
   VkExtent2D m_SwapExtent;
-  clstl::vector<VkImage> m_SwapchainImages;
-  clstl::vector<VkImageView> m_ImageViews;
   VkQueue m_GraphicsQueue;
   VkQueue m_PresentQueue;
   clstl::vector<VkSemaphore> m_ImageAvailableSemaphores;
@@ -275,6 +275,8 @@ private:
   VkImageView m_ColorImageView;
 
   clstl::array<std::uint32_t, 2> m_ViewportSize;
+
+  Swapchain *m_Swapchain;
 
   bool m_Resized;
 

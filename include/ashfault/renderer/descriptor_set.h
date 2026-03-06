@@ -2,7 +2,7 @@
 #define ASHFAULT_DESCRIPTOR_SET_H
 
 #include "CLSTL/vector.h"
-#include "ashfault/buffer.hpp"
+#include <ashfault/renderer/buffer.hpp>
 #include <CLSTL/shared_ptr.h>
 #include <cstdint>
 #include <vulkan/vulkan.h>

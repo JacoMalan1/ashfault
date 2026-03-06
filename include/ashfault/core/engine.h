@@ -2,7 +2,7 @@
 #define ASHFAULT_ENGINE_H
 
 #include <CLSTL/unique_ptr.h>
-#include <ashfault/renderer.h>
+#include <ashfault/renderer/renderer.h>
 
 namespace ashfault {
 class Engine {
@@ -15,7 +15,6 @@ public:
   void run();
 
 private:
-
   clstl::unique_ptr<Renderer> m_Renderer;
 };
 }

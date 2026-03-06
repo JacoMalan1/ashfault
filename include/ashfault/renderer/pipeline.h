@@ -4,8 +4,8 @@
 #include <CLSTL/array.h>
 #include <CLSTL/shared_ptr.h>
 #include <CLSTL/vector.h>
-#include <ashfault/descriptor_set.h>
-#include <ashfault/shader.h>
+#include <ashfault/renderer/descriptor_set.h>
+#include <ashfault/renderer/shader.h>
 #include <optional>
 #include <vulkan/vulkan.h>
 #include <vulkan/vulkan_core.h>

@@ -3,10 +3,17 @@
 
 #include <cstdint>
 
+namespace ashfault {
 class Entity {
+public:
+  using id_type = std::uint64_t;
+  friend class Scene;
+  id_type handle() const;
+
 private:
   Entity(std::uint64_t handle);
-  std::uint64_t m_Handle;
+  id_type m_Handle;
 };
+}
 
 #endif
