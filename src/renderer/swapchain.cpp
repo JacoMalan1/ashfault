@@ -102,4 +102,8 @@ void Swapchain::present(VkQueue queue, const clstl::vector<VkSemaphore> &wait_se
 VkImageView Swapchain::image_view(std::size_t index) {
   return this->m_ImageViews[index];
 }
+
+VkImage Swapchain::image(std::size_t index) {
+    return this->m_Images[index];
+}
 } // namespace ashfault

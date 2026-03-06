@@ -89,15 +89,15 @@ clstl::shared_ptr<GraphicsPipeline> GraphicsPipelineBuilder::build() {
   VkPipelineMultisampleStateCreateInfo multisample_info{};
   multisample_info.sType =
       VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
-  multisample_info.rasterizationSamples = this->m_MsaaSamples;
+  multisample_info.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
   multisample_info.sampleShadingEnable = VK_FALSE;
 
   VkPipelineDepthStencilStateCreateInfo depth_stencil_info{};
   depth_stencil_info.sType =
       VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
   depth_stencil_info.depthCompareOp = VK_COMPARE_OP_LESS;
-  depth_stencil_info.depthTestEnable = VK_TRUE;
-  depth_stencil_info.depthWriteEnable = VK_TRUE;
+  depth_stencil_info.depthTestEnable = VK_FALSE;
+  depth_stencil_info.depthWriteEnable = VK_FALSE;
   depth_stencil_info.depthBoundsTestEnable = VK_FALSE;
   depth_stencil_info.stencilTestEnable = VK_FALSE;
 
@@ -123,7 +123,7 @@ clstl::shared_ptr<GraphicsPipeline> GraphicsPipelineBuilder::build() {
 
   VkPipelineRasterizationStateCreateInfo rasterizer{};
   rasterizer.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
-  rasterizer.cullMode = VK_CULL_MODE_BACK_BIT;
+  rasterizer.cullMode = VK_CULL_MODE_NONE;
   rasterizer.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
   rasterizer.polygonMode = VK_POLYGON_MODE_FILL;
   rasterizer.lineWidth = 1.0f;

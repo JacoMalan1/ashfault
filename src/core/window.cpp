@@ -61,4 +61,13 @@ bool Window::should_close() {
 void Window::poll_events() {
   glfwPollEvents();
 }
+
+void Window::set_resize_callback(std::function<void(Window &, WindowDims)> callback) {
+    this->m_ResizeCallback = callback;
+    glfwSetWindowUserPointer(this->m_Handle, this);
+    glfwSetFramebufferSizeCallback(this->m_Handle, [](GLFWwindow* window, int, int) {
+        Window *window_ptr = reinterpret_cast<Window *>(glfwGetWindowUserPointer(window));
+        window_ptr->m_ResizeCallback.value()(*window_ptr, window_ptr->current_size());
+    });
+}
 } // namespace ashfault

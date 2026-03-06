@@ -456,7 +456,7 @@ void Renderer::create_depth_buffers() {
   alloc_info.requiredFlags = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
 
   auto [image, allocation] = this->create_image(
-      this->m_SwapExtent.width, this->m_SwapExtent.height, this->m_MsaaSamples,
+      this->m_SwapExtent.width, this->m_SwapExtent.height, VK_SAMPLE_COUNT_1_BIT,
       VK_FORMAT_D32_SFLOAT, VK_IMAGE_TILING_OPTIMAL,
       VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT, alloc_info);
   this->m_DepthImage = image;
@@ -477,15 +477,19 @@ std::optional<Frame> Renderer::start_frame() {
     return {};
   }
 
+  vkResetFences(this->m_Device, 1, &this->m_InFlightFences[this->m_CurrentFrame]);
+
   FrameData data{};
   data.swapchain = this->m_Swapchain;
-  data.current_frame = this->m_CurrentFrame++;
+  data.current_frame = this->m_CurrentFrame;
   data.render_finished_semaphores = this->m_RenderFinishedSemaphores;
   data.image_available_semaphores = this->m_ImageAvailableSemaphores;
   data.in_flight_fences = this->m_InFlightFences;
   data.image_index = result.value();
   data.present_queue = this->m_PresentQueue;
   data.graphics_queue = this->m_GraphicsQueue;
+
+  this->m_CurrentFrame = (this->m_CurrentFrame + 1) % MAX_FRAMES_IN_FLIGHT;
 
   return Frame(data);
 }
@@ -559,14 +563,11 @@ void ashfault::Renderer::init(clstl::shared_ptr<Window> window) {
   this->m_ViewportSize[0] = 0;
   this->m_ViewportSize[1] = 0;
   this->m_Window = window;
-  // glfwSetWindowUserPointer(this->m_Window, this);
-  // glfwSetFramebufferSizeCallback(
-  //     this->m_Window, [](GLFWwindow *window, int width, int height) {
-  //       Renderer *renderer =
-  //           reinterpret_cast<Renderer *>(glfwGetWindowUserPointer(window));
-  //       if (renderer)
-  //         renderer->m_Resized = true;
-  //     });
+
+  this->m_Window->set_resize_callback([&](Window& window, WindowDims) {
+      this->m_Resized = true;
+      this->recreate_swapchain();
+  });
 
   this->m_Resized = false;
   this->m_CurrentFrame = 0;
@@ -593,7 +594,7 @@ GraphicsPipelineBuilder Renderer::create_graphics_pipeline() const {
   window_dims[0] = dims.width;
   window_dims[1] = dims.height;
   return GraphicsPipelineBuilder(this->m_Device, this->m_SurfaceFormat.format,
-                                 std::move(window_dims), this->m_MsaaSamples);
+                                 std::move(window_dims), VK_SAMPLE_COUNT_1_BIT);
 }
 
 std::pair<VkImage, VmaAllocation>
@@ -729,10 +730,9 @@ Renderer::~Renderer() {
   ImGui_ImplVulkan_Shutdown();
   ImGui_ImplGlfw_Shutdown();
   ImGui::DestroyContext();
+  vkDestroySampler(this->m_Device, this->m_ImGuiViewportSampler, nullptr);
 
   SPDLOG_INFO("Renderer shutting down...");
-  // glfwSetWindowUserPointer(this->m_Window, nullptr);
-  // glfwSetFramebufferSizeCallback(this->m_Window, nullptr);
 
   vkDeviceWaitIdle(this->m_Device);
   vkQueueWaitIdle(this->m_GraphicsQueue);

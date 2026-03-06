@@ -22,7 +22,7 @@ void Frame::wait_and_present() {
   clstl::vector<VkSemaphore> wait_semaphores;
   wait_semaphores.push_back(
       this->m_FrameData
-          .render_finished_semaphores[this->m_FrameData.current_frame]);
+          .render_finished_semaphores[this->m_FrameData.image_index]);
   this->m_FrameData.swapchain->present(this->m_FrameData.present_queue,
                                        wait_semaphores,
                                        this->m_FrameData.image_index);
@@ -92,6 +92,7 @@ void Frame::insert_pipeline_barrier(VkCommandBuffer cmd, VkImage image,
   VkImageMemoryBarrier barrier{};
   barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
   barrier.subresourceRange.aspectMask = aspects;
+  barrier.image = image;
   barrier.subresourceRange.layerCount = 1;
   barrier.subresourceRange.levelCount = 1;
   barrier.subresourceRange.baseArrayLayer = 0;
@@ -146,5 +147,24 @@ void Frame::submit_all(VkFence fence) {
 
 std::uint32_t Frame::image_index() {
   return this->m_FrameData.image_index;
+}
+
+VkSemaphore Frame::render_finished_semaphore() {
+    return this->m_FrameData.render_finished_semaphores[this->m_FrameData.image_index];
+}
+VkSemaphore Frame::image_available_semaphore() {
+    return this->m_FrameData.image_available_semaphores[this->m_FrameData.current_frame];
+}
+
+VkFence Frame::in_flight_fence() {
+    return this->m_FrameData.in_flight_fences[this->m_FrameData.current_frame];
+}
+
+void Frame::set_viewport(VkCommandBuffer cmd, VkViewport viewport) {
+    vkCmdSetViewport(cmd, 0, 1, &viewport);
+}
+
+void Frame::set_scissor(VkCommandBuffer cmd, VkRect2D scissor) {
+    vkCmdSetScissor(cmd, 0, 1, &scissor);
 }
 } // namespace ashfault

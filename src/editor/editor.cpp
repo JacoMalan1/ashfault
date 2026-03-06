@@ -53,6 +53,23 @@ void Editor::run() {
       auto cmd = primary_cmd_buffers[frame->image_index()];
       auto image_i = frame->image_index();
       frame->begin_command_buffer(cmd);
+      VkViewport viewport{};
+      viewport.minDepth = 0.0f;
+      viewport.maxDepth = 1.0f;
+      viewport.width = m_Window->current_size().width;
+      viewport.height = m_Window->current_size().height;
+      viewport.x = 0;
+      viewport.y = 0;
+
+      VkRect2D scissor{};
+      scissor.extent.width = m_Window->current_size().width;
+      scissor.extent.height = m_Window->current_size().height;
+      scissor.offset.x = 0;
+      scissor.offset.y = 0;
+
+      frame->set_viewport(cmd, viewport);
+      frame->set_scissor(cmd, scissor);
+
       VulkanRenderingAttachments attachments;
       attachments.build_color_attachment()
           .clear_color(0.0f, 0.0f, 0.0f, 1.0f)
@@ -65,13 +82,17 @@ void Editor::run() {
       render_area.extent.height = dims.height;
       render_area.offset.x = 0;
       render_area.offset.y = 0;
+      frame->insert_pipeline_barrier(cmd, renderer.swapchain()->image(image_i), VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_ACCESS_NONE, VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT
+          , VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT);
       frame->begin_rendering(cmd, attachments, render_area);
       scene.record_command_buffers(cmd, *this->m_Engine, frame.value());
       frame->end_rendering(cmd);
+      frame->insert_pipeline_barrier(cmd, renderer.swapchain()->image(image_i), VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR, VK_ACCESS_COLOR_ATTACHMENT_READ_BIT, VK_ACCESS_NONE
+          , VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT);
       VkPipelineStageFlags wait_stages =
           VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-      frame->add_command_buffer_for_submit(&cmd, {}, {}, &wait_stages);
-      frame->submit_all(VK_NULL_HANDLE);
+      frame->add_command_buffer_for_submit(&cmd, {frame->render_finished_semaphore()}, {frame->image_available_semaphore()}, & wait_stages);
+      frame->submit_all(frame->in_flight_fence());
       frame->wait_and_present();
     }
 

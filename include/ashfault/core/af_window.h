@@ -3,6 +3,8 @@
 
 #include <CLSTL/vector.h>
 #include <cstdint>
+#include <functional>
+#include <optional>
 
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
@@ -27,8 +29,11 @@ public:
   GLFWwindow *handle();
   bool should_close();
 
+  void set_resize_callback(std::function<void(Window &, WindowDims)> callback);
+	  
 private:
   GLFWwindow *m_Handle;
+  std::optional<std::function<void(Window&, WindowDims)>> m_ResizeCallback;
 };
 } // namespace ashfault
 

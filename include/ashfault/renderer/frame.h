@@ -85,6 +85,12 @@ public:
   void submit_all(VkFence fence);
 
   void wait_and_present();
+  void set_viewport(VkCommandBuffer cmd, VkViewport viewport);
+  void set_scissor(VkCommandBuffer cmd, VkRect2D viewport);
+
+  VkSemaphore render_finished_semaphore();
+  VkSemaphore image_available_semaphore();
+  VkFence in_flight_fence();
 
 private:
   FrameData m_FrameData;

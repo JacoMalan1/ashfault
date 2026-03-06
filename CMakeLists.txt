@@ -13,6 +13,7 @@ set(SHADER_SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/shaders)
 set(SHADER_BINARY_DIR ${CMAKE_CURRENT_BINARY_DIR})
 
 file(GLOB_RECURSE LIB_SRC_FILES ${PROJECT_SOURCE_DIR}/src/*.cpp)
+file(GLOB_RECURSE LIB_HEADERS ${PROJECT_SOURCE_DIR}/include/*.h)
 file(GLOB IMGUI_SRC_FILES ${PROJECT_SOURCE_DIR}/vendor/imgui/*.cpp)
 list(APPEND IMGUI_SRC_FILES ${PROJECT_SOURCE_DIR}/vendor/imgui/backends/imgui_impl_vulkan.cpp)
 list(APPEND IMGUI_SRC_FILES ${PROJECT_SOURCE_DIR}/vendor/imgui/backends/imgui_impl_glfw.cpp)
@@ -56,7 +57,7 @@ endforeach()
 
 add_custom_target(shaders ALL DEPENDS ${SPV_SHADERS})
 
-add_library(ashfault ${LIB_SRC_FILES} ${IMGUI_SRC_FILES})
+add_library(ashfault ${LIB_SRC_FILES} ${IMGUI_SRC_FILES} ${LIB_HEADERS})
 add_executable(program ${PROJECT_SOURCE_DIR}/src/main.cpp)
 add_executable(editor ${PROJECT_SOURCE_DIR}/src/editor/main.cpp)
 

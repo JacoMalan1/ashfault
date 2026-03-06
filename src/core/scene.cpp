@@ -10,6 +10,7 @@ Scene::Scene() : m_NextEntityId(0), m_ComponentRegistry(), m_Entities() {}
 
 Entity Scene::create_entity() {
   Entity e(m_NextEntityId++);
+  this->m_Entities.push_back(e);
   return e;
 }
 
@@ -30,8 +31,10 @@ void Scene::record_command_buffers(VkCommandBuffer cmd, Engine &engine,
     if (mesh_component.has_value()) {
       frame.bind_graphics_pipeline(
           cmd, engine.pipeline_manager().get_graphics_pipeline("simple"));
+
+      VkDeviceSize offset = 0;
       vkCmdBindVertexBuffers(
-          cmd, 0, 1, &mesh_component.value()->vertex_buffer->handle(), nullptr);
+          cmd, 0, 1, &mesh_component.value()->vertex_buffer->handle(), &offset);
       vkCmdBindIndexBuffer(cmd, mesh_component.value()->index_buffer->handle(),
                            0, index_type<std::uint16_t>::value);
       vkCmdDrawIndexed(cmd, mesh_component.value()->index_buffer->count(), 1, 0,

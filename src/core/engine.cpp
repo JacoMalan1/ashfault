@@ -6,6 +6,7 @@
 #include <algorithm>
 #include <ashfault/core/engine.h>
 #include <vulkan/vulkan_core.h>
+#include <ashfault/core/scene.h>
 
 namespace ashfault {
 Engine::Engine()
@@ -44,7 +45,7 @@ void Engine::create_pipelines() {
   descriptions[0].location = 0;
 
   auto simple = m_Renderer->create_graphics_pipeline()
-      .input_attribute_descriptions(descriptions, 3 * sizeof(float))
+      .input_attribute_descriptions(descriptions, sizeof(Vertex))
       .vertex_shader(m_ShaderManager->get_vertex_shader("simple").value())
       .fragment_shader(m_ShaderManager->get_fragment_shader("simple").value())
       .build();
@@ -56,6 +57,7 @@ void Engine::setup_renderer(clstl::shared_ptr<Window> window) {
   SPDLOG_INFO("Starting Vulkan renderer");
   this->m_Renderer->init(window);
   this->register_shaders();
+  this->create_pipelines();
 }
 
 PipelineManager &Engine::pipeline_manager() {
