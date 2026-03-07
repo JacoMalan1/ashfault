@@ -2,11 +2,11 @@
 #define ASHFAULT_RENDERER_SWAPCHAIN_H
 
 #include <CLSTL/vector.h>
+#include <ashfault/renderer/renderer.h>
 #include <cstdint>
 #include <vk_mem_alloc.h>
 #include <vulkan/vulkan.h>
 #include <vulkan/vulkan_core.h>
-#include <ashfault/renderer/renderer.h>
 
 namespace ashfault {
 class Swapchain {
@@ -23,10 +23,13 @@ public:
 
   void cleanup();
 
-  void present(VkQueue queue, const clstl::vector<VkSemaphore> &wait_semaphores, std::uint32_t image_index);
+  void present(VkQueue queue, const clstl::vector<VkSemaphore> &wait_semaphores,
+               std::uint32_t image_index);
+  VkSurfaceFormatKHR surface_format();
+  VkExtent2D &swap_extent();
 
   std::optional<std::uint32_t> acquire_image(VkSemaphore semaphore);
-  void build();
+  void build(VkExtent2D swap_extent);
 
 private:
   std::uint32_t m_ImageCount;

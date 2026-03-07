@@ -3,8 +3,8 @@
 
 #include <ashfault/renderer/buffer.hpp>
 #include <ashfault/renderer/pipeline.h>
-#include <vulkan/vulkan_core.h>
 #include <vector>
+#include <vulkan/vulkan_core.h>
 
 namespace ashfault {
 class Swapchain;
@@ -55,6 +55,8 @@ public:
   Frame(FrameData frame_data);
 
   std::uint32_t image_index();
+  std::uint32_t current_frame();
+  VkQueue &graphics_queue();
 
   void begin_command_buffer(VkCommandBuffer cmd);
   void bind_graphics_pipeline(VkCommandBuffer cmd, GraphicsPipeline *pipeline);
@@ -82,6 +84,7 @@ public:
       VkCommandBuffer *cmd, const clstl::vector<VkSemaphore> &signal_semaphores,
       const clstl::vector<VkSemaphore> &wait_semaphores,
       VkPipelineStageFlags *wait_stages);
+
   void submit_all(VkFence fence);
 
   void wait_and_present();

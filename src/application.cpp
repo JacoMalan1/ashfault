@@ -8,6 +8,5 @@ Application::Application(clstl::shared_ptr<Engine> engine,
   engine->setup_renderer(window);
 }
 
-void Application::run() {
-}
+void Application::run() {}
 } // namespace ashfault

@@ -5,11 +5,10 @@
 #include <ashfault/renderer/buffer.hpp>
 
 namespace ashfault {
-template<class T, class I>
-struct MeshComponent {
+template <class T, class I> struct MeshComponent {
   clstl::shared_ptr<ashfault::VulkanBuffer<T>> vertex_buffer;
   clstl::shared_ptr<ashfault::VulkanBuffer<I>> index_buffer;
 };
-}
+} // namespace ashfault
 
 #endif

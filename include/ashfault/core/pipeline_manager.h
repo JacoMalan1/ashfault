@@ -10,7 +10,8 @@ class PipelineManager {
 public:
   PipelineManager() = default;
 
-  void add_graphics_pipeline(const std::string &name, clstl::shared_ptr<GraphicsPipeline> pipeline);
+  void add_graphics_pipeline(const std::string &name,
+                             clstl::shared_ptr<GraphicsPipeline> pipeline);
   GraphicsPipeline *get_graphics_pipeline(const std::string &name);
 
 private:

@@ -1,7 +1,7 @@
 #include <CLSTL/algorithm.h>
-#include <ashfault/renderer/descriptor_set.h>
 #include <CLSTL/array.h>
 #include <CLSTL/shared_ptr.h>
+#include <ashfault/renderer/descriptor_set.h>
 #include <ashfault/renderer/pipeline.h>
 #include <vulkan/vulkan_core.h>
 
@@ -18,7 +18,8 @@ GraphicsPipeline::~GraphicsPipeline() {
 
 GraphicsPipelineBuilder::GraphicsPipelineBuilder(
     VkDevice device, VkFormat swapchain_image_format,
-    clstl::array<std::uint32_t, 2> window_dims, VkSampleCountFlagBits msaa_samples)
+    clstl::array<std::uint32_t, 2> window_dims,
+    VkSampleCountFlagBits msaa_samples)
     : m_VertexShader(), m_FragmentShader(), m_DescriptorSets(),
       m_Device(device), m_ImageFormat(swapchain_image_format),
       m_MsaaSamples(msaa_samples), m_WindowDims(std::move(window_dims)) {}
@@ -208,15 +209,14 @@ GraphicsPipelineBuilder &GraphicsPipelineBuilder::fragment_shader(
   return *this;
 }
 
-VkPipeline GraphicsPipeline::handle() const {
-  return this->m_Pipeline;
-}
+VkPipeline GraphicsPipeline::handle() const { return this->m_Pipeline; }
 
 GraphicsPipelineBuilder &GraphicsPipelineBuilder::descriptor_sets(
-      const clstl::vector<clstl::shared_ptr<VulkanDescriptorSet>> &dsets) {
-  clstl::for_each(dsets.begin(), dsets.end(), [&](clstl::shared_ptr<VulkanDescriptorSet> set) {
-    this->m_DescriptorSets.push_back(set);
-  });
+    const clstl::vector<clstl::shared_ptr<VulkanDescriptorSet>> &dsets) {
+  clstl::for_each(dsets.begin(), dsets.end(),
+                  [&](clstl::shared_ptr<VulkanDescriptorSet> set) {
+                    this->m_DescriptorSets.push_back(set);
+                  });
   return *this;
 }
 
@@ -224,7 +224,5 @@ const VkPipelineLayout &GraphicsPipeline::layout() const {
   return this->m_Layout;
 }
 
-VkPipelineLayout &GraphicsPipeline::layout() {
-  return this->m_Layout;
-}
+VkPipelineLayout &GraphicsPipeline::layout() { return this->m_Layout; }
 } // namespace ashfault

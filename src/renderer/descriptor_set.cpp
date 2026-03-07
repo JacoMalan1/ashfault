@@ -1,18 +1,16 @@
 #include <ashfault/renderer/descriptor_set.h>
+#include <spdlog/spdlog.h>
 #include <stdexcept>
 #include <utility>
 #include <vulkan/vulkan_core.h>
-#include <spdlog/spdlog.h>
 
 namespace ashfault {
-VulkanDescriptorSetBuilder::VulkanDescriptorSetBuilder(VkDevice device) : m_Device(device) {
+VulkanDescriptorSetBuilder::VulkanDescriptorSetBuilder(VkDevice device)
+    : m_Device(device) {}
 
-}
-
-VulkanDescriptorSetBuilder &VulkanDescriptorSetBuilder::add_binding(VkDescriptorType type,
-                                             VkShaderStageFlags stage_flags,
-                                             std::uint32_t descriptor_count,
-                                             std::uint32_t binding) {
+VulkanDescriptorSetBuilder &VulkanDescriptorSetBuilder::add_binding(
+    VkDescriptorType type, VkShaderStageFlags stage_flags,
+    std::uint32_t descriptor_count, std::uint32_t binding) {
   VkDescriptorSetLayoutBinding el{};
   el.binding = binding;
   el.descriptorCount = descriptor_count;
@@ -114,9 +112,7 @@ VulkanDescriptorSet::~VulkanDescriptorSet() {
   vkDestroyDescriptorSetLayout(this->m_Device, this->m_Layout, nullptr);
 }
 
-VkDescriptorSetLayout &VulkanDescriptorSet::layout() {
-  return this->m_Layout;
-}
+VkDescriptorSetLayout &VulkanDescriptorSet::layout() { return this->m_Layout; }
 
 const VkDescriptorSetLayout &VulkanDescriptorSet::layout() const {
   return this->m_Layout;
@@ -126,7 +122,5 @@ const VkDescriptorSet &VulkanDescriptorSet::handle() const {
   return this->m_DescriptorSet;
 }
 
-VkDescriptorSet &VulkanDescriptorSet::handle() {
-  return this->m_DescriptorSet;
-}
+VkDescriptorSet &VulkanDescriptorSet::handle() { return this->m_DescriptorSet; }
 } // namespace ashfault

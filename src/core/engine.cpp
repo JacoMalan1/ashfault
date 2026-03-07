@@ -1,12 +1,12 @@
-#include "CLSTL/algorithm.h"
-#include "ashfault/core/pipeline_manager.h"
-#include "ashfault/renderer/pipeline.h"
-#include "spdlog/spdlog.h"
+#include <CLSTL/algorithm.h>
 #include <CLSTL/unique_ptr.h>
 #include <algorithm>
 #include <ashfault/core/engine.h>
-#include <vulkan/vulkan_core.h>
+#include <ashfault/core/pipeline_manager.h>
 #include <ashfault/core/scene.h>
+#include <ashfault/renderer/pipeline.h>
+#include <spdlog/spdlog.h>
+#include <vulkan/vulkan_core.h>
 
 namespace ashfault {
 Engine::Engine()
@@ -44,11 +44,13 @@ void Engine::create_pipelines() {
   descriptions[0].binding = 0;
   descriptions[0].location = 0;
 
-  auto simple = m_Renderer->create_graphics_pipeline()
-      .input_attribute_descriptions(descriptions, sizeof(Vertex))
-      .vertex_shader(m_ShaderManager->get_vertex_shader("simple").value())
-      .fragment_shader(m_ShaderManager->get_fragment_shader("simple").value())
-      .build();
+  auto simple =
+      m_Renderer->create_graphics_pipeline()
+          .input_attribute_descriptions(descriptions, sizeof(Vertex))
+          .vertex_shader(m_ShaderManager->get_vertex_shader("simple").value())
+          .fragment_shader(
+              m_ShaderManager->get_fragment_shader("simple").value())
+          .build();
 
   this->m_PipelineManager->add_graphics_pipeline("simple", simple);
 }
@@ -60,7 +62,5 @@ void Engine::setup_renderer(clstl::shared_ptr<Window> window) {
   this->create_pipelines();
 }
 
-PipelineManager &Engine::pipeline_manager() {
-  return *this->m_PipelineManager;
-}
+PipelineManager &Engine::pipeline_manager() { return *this->m_PipelineManager; }
 } // namespace ashfault

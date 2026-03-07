@@ -30,10 +30,10 @@ public:
   bool should_close();
 
   void set_resize_callback(std::function<void(Window &, WindowDims)> callback);
-	  
+
 private:
   GLFWwindow *m_Handle;
-  std::optional<std::function<void(Window&, WindowDims)>> m_ResizeCallback;
+  std::optional<std::function<void(Window &, WindowDims)>> m_ResizeCallback;
 };
 } // namespace ashfault
 

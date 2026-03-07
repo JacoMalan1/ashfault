@@ -12,10 +12,11 @@ Swapchain::Swapchain(VkSurfaceFormatKHR format, VkPresentModeKHR present_mode,
     : m_ImageCount(image_count), m_SwapExtent(extent), m_SurfaceFormat(format),
       m_PresentMode(present_mode), m_Surface(surface), m_Support(support),
       m_Device(device) {
-  this->build();
+  this->build(extent);
 }
 
-void Swapchain::build() {
+void Swapchain::build(VkExtent2D swap_extent) {
+  this->m_SwapExtent = swap_extent;
   VkSwapchainCreateInfoKHR swapchain_info{};
   swapchain_info.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
   swapchain_info.surface = this->m_Surface;
@@ -71,23 +72,22 @@ void Swapchain::cleanup() {
 
 std::optional<std::uint32_t> Swapchain::acquire_image(VkSemaphore semaphore) {
   std::uint32_t ret;
-  VkResult result = vkAcquireNextImageKHR(this->m_Device, this->m_Handle,
-                        std::numeric_limits<std::uint64_t>::max(), semaphore,
-                        VK_NULL_HANDLE, &ret);
+  VkResult result = vkAcquireNextImageKHR(
+      this->m_Device, this->m_Handle, std::numeric_limits<std::uint64_t>::max(),
+      semaphore, VK_NULL_HANDLE, &ret);
 
-  if (result == VK_ERROR_OUT_OF_DATE_KHR) {
+  if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR) {
     return {};
   }
 
   return ret;
 }
 
-std::uint32_t Swapchain::image_count() const {
-  return this->m_ImageCount;
-}
+std::uint32_t Swapchain::image_count() const { return this->m_ImageCount; }
 
-
-void Swapchain::present(VkQueue queue, const clstl::vector<VkSemaphore> &wait_semaphores, std::uint32_t image_index) {
+void Swapchain::present(VkQueue queue,
+                        const clstl::vector<VkSemaphore> &wait_semaphores,
+                        std::uint32_t image_index) {
   VkPresentInfoKHR present_info{};
   present_info.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
   present_info.pImageIndices = &image_index;
@@ -103,7 +103,9 @@ VkImageView Swapchain::image_view(std::size_t index) {
   return this->m_ImageViews[index];
 }
 
-VkImage Swapchain::image(std::size_t index) {
-    return this->m_Images[index];
-}
+VkImage Swapchain::image(std::size_t index) { return this->m_Images[index]; }
+
+VkSurfaceFormatKHR Swapchain::surface_format() { return this->m_SurfaceFormat; }
+
+VkExtent2D &Swapchain::swap_extent() { return this->m_SwapExtent; }
 } // namespace ashfault

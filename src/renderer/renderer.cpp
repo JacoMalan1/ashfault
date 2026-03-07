@@ -1,19 +1,19 @@
-#include <ashfault/renderer/buffer.hpp>
-#include <ashfault/renderer/descriptor_set.h>
-#include <ashfault/renderer/frame.h>
-#include <ashfault/renderer/pipeline.h>
-#include <ashfault/renderer/shader.h>
-#include <ashfault/renderer/swapchain.h>
-#include <imgui.h>
-#include <imgui_impl_glfw.h>
-#include <imgui_impl_vulkan.h>
 #include <CLSTL/algorithm.h>
 #include <CLSTL/array.h>
 #include <CLSTL/vector.h>
 #include <algorithm>
+#include <ashfault/renderer/buffer.hpp>
+#include <ashfault/renderer/descriptor_set.h>
+#include <ashfault/renderer/frame.h>
+#include <ashfault/renderer/pipeline.h>
 #include <ashfault/renderer/renderer.h>
+#include <ashfault/renderer/shader.h>
+#include <ashfault/renderer/swapchain.h>
 #include <cstdint>
 #include <cstring>
+#include <imgui.h>
+#include <imgui_impl_glfw.h>
+#include <imgui_impl_vulkan.h>
 #include <limits>
 #include <set>
 #include <spdlog/spdlog.h>
@@ -22,7 +22,6 @@
 
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
-
 
 namespace ashfault {
 
@@ -349,6 +348,8 @@ void ashfault::Renderer::setup_swapchain() {
   VkExtent2D swap_extent = choose_swap_extent(swapchain_support.capabilities);
 
   std::uint32_t image_count = swapchain_support.capabilities.minImageCount + 1;
+  SPDLOG_INFO("Built swapchain with extent: {}, {}", swap_extent.width,
+              swap_extent.height);
   this->m_Swapchain = new Swapchain(
       swapchain_surface_format, swapchain_present_mode, image_count,
       swap_extent, this->m_Surface, swapchain_support, this->m_Device);
@@ -432,52 +433,22 @@ void Renderer::command_buffer(std::function<void(VkCommandBuffer)> op) {
   vkFreeCommandBuffers(this->m_Device, this->m_CommandPool, 1, &cmd);
 }
 
-void Renderer::create_color_resources() {
-  VmaAllocationCreateInfo alloc_info{};
-  alloc_info.usage = VMA_MEMORY_USAGE_GPU_ONLY;
-  alloc_info.requiredFlags = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
-
-  auto [image, allocation] = this->create_image(
-      this->m_SwapExtent.width, this->m_SwapExtent.height, this->m_MsaaSamples,
-      this->m_SurfaceFormat.format, VK_IMAGE_TILING_OPTIMAL,
-      VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT |
-          VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
-      alloc_info);
-
-  this->m_ColorImage = image;
-  this->m_ColorImageAllocation = allocation;
-  this->m_ColorImageView = this->create_image_view(
-      image, this->m_SurfaceFormat.format, VK_IMAGE_ASPECT_COLOR_BIT);
-}
-
-void Renderer::create_depth_buffers() {
-  VmaAllocationCreateInfo alloc_info{};
-  alloc_info.usage = VMA_MEMORY_USAGE_GPU_ONLY;
-  alloc_info.requiredFlags = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
-
-  auto [image, allocation] = this->create_image(
-      this->m_SwapExtent.width, this->m_SwapExtent.height, VK_SAMPLE_COUNT_1_BIT,
-      VK_FORMAT_D32_SFLOAT, VK_IMAGE_TILING_OPTIMAL,
-      VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT, alloc_info);
-  this->m_DepthImage = image;
-  this->m_DepthImageAllocation = allocation;
-  this->m_DepthImageView = this->create_image_view(image, VK_FORMAT_D32_SFLOAT,
-                                                   VK_IMAGE_ASPECT_DEPTH_BIT);
-}
-
 std::optional<Frame> Renderer::start_frame() {
   vkWaitForFences(this->m_Device, 1,
                   &this->m_InFlightFences[this->m_CurrentFrame], VK_TRUE,
                   std::numeric_limits<std::uint64_t>::max());
 
-  auto result = this->m_Swapchain->acquire_image(this->m_ImageAvailableSemaphores[this->m_CurrentFrame]);
+  auto result = this->m_Swapchain->acquire_image(
+      this->m_ImageAvailableSemaphores[this->m_CurrentFrame]);
+
   if (!result.has_value()) {
     this->m_Resized = true;
     this->recreate_swapchain();
     return {};
   }
 
-  vkResetFences(this->m_Device, 1, &this->m_InFlightFences[this->m_CurrentFrame]);
+  vkResetFences(this->m_Device, 1,
+                &this->m_InFlightFences[this->m_CurrentFrame]);
 
   FrameData data{};
   data.swapchain = this->m_Swapchain;
@@ -564,9 +535,9 @@ void ashfault::Renderer::init(clstl::shared_ptr<Window> window) {
   this->m_ViewportSize[1] = 0;
   this->m_Window = window;
 
-  this->m_Window->set_resize_callback([&](Window& window, WindowDims) {
-      this->m_Resized = true;
-      this->recreate_swapchain();
+  this->m_Window->set_resize_callback([&](Window &window, WindowDims) {
+    this->m_Resized = true;
+    this->recreate_swapchain();
   });
 
   this->m_Resized = false;
@@ -578,8 +549,6 @@ void ashfault::Renderer::init(clstl::shared_ptr<Window> window) {
   this->setup_swapchain();
   this->setup_synchronization();
   this->setup_command_buffers();
-  this->create_color_resources();
-  this->create_depth_buffers();
   this->setup_imgui();
 }
 
@@ -689,8 +658,6 @@ void Renderer::recreate_swapchain() {
   vkDeviceWaitIdle(this->m_Device);
   this->cleanup_swapchain();
   this->setup_swapchain();
-  this->create_color_resources();
-  this->create_depth_buffers();
 
   VmaAllocationCreateInfo alloc_info{};
   alloc_info.requiredFlags = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
@@ -716,15 +683,7 @@ void Renderer::recreate_swapchain() {
   }
 }
 
-void Renderer::cleanup_swapchain() {
-  this->m_Swapchain->cleanup();
-  vkDestroyImageView(this->m_Device, this->m_DepthImageView, nullptr);
-  vkDestroyImageView(this->m_Device, this->m_ColorImageView, nullptr);
-  vmaDestroyImage(this->m_Allocator, this->m_DepthImage,
-                  this->m_DepthImageAllocation);
-  vmaDestroyImage(this->m_Allocator, this->m_ColorImage,
-                  this->m_ColorImageAllocation);
-}
+void Renderer::cleanup_swapchain() { this->m_Swapchain->cleanup(); }
 
 Renderer::~Renderer() {
   ImGui_ImplVulkan_Shutdown();
@@ -778,9 +737,9 @@ clstl::array<std::uint32_t, 2> Renderer::viewport_size() const {
   return this->m_ViewportSize;
 }
 
-
-clstl::vector<VkCommandBuffer> Renderer::allocate_command_buffers(std::uint32_t count) {
-  clstl::vector<VkCommandBuffer> ret;
+std::vector<VkCommandBuffer>
+Renderer::allocate_command_buffers(std::uint32_t count) {
+  std::vector<VkCommandBuffer> ret;
   ret.resize(count);
 
   VkCommandBufferAllocateInfo alloc_info{};
@@ -789,11 +748,23 @@ clstl::vector<VkCommandBuffer> Renderer::allocate_command_buffers(std::uint32_t 
   alloc_info.commandPool = this->m_CommandPool;
   alloc_info.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
 
-  VK_CHECK_RESULT(vkAllocateCommandBuffers(this->m_Device, &alloc_info, ret.data()));
+  VK_CHECK_RESULT(
+      vkAllocateCommandBuffers(this->m_Device, &alloc_info, ret.data()));
   return ret;
 }
 
-Swapchain *Renderer::swapchain() {
-  return this->m_Swapchain;
+Swapchain *Renderer::swapchain() { return this->m_Swapchain; }
+
+VkSampler Renderer::create_sampler() {
+  VkSamplerCreateInfo create_info{};
+  create_info.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
+  create_info.addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+  create_info.addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+  create_info.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+  create_info.anisotropyEnable = VK_FALSE;
+
+  VkSampler ret;
+  VK_CHECK_RESULT(vkCreateSampler(this->m_Device, &create_info, nullptr, &ret));
+  return ret;
 }
 } // namespace ashfault

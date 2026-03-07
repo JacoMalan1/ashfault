@@ -17,10 +17,6 @@ public:
     m_Components[entity.handle()] = component;
   }
 
-  template <typename... Args> void add(Entity entity, Args &&...args) {
-    m_Components.emplace(entity.handle(), std::forward(args)...);
-  }
-
   std::optional<C *> get(Entity e) {
     if (!m_Components.count(e.handle())) {
       return {};
@@ -46,7 +42,9 @@ public:
   template <typename C> ComponentPool<C> &get_pool() {
     std::type_index index(typeid(C));
     if (!m_ComponentPools.count(index)) {
-      m_ComponentPools[index] = std::static_pointer_cast<void>(std::make_shared<ComponentPool<C>>());
+      auto pool = std::make_shared<ComponentPool<C>>();
+      m_ComponentPools[index] = std::static_pointer_cast<void>(pool);
+      return *pool;
     }
 
     return *std::static_pointer_cast<ComponentPool<C>>(m_ComponentPools[index]);

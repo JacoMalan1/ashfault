@@ -14,6 +14,6 @@ private:
   Entity(std::uint64_t handle);
   id_type m_Handle;
 };
-}
+} // namespace ashfault
 
 #endif

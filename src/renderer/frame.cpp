@@ -145,26 +145,30 @@ void Frame::submit_all(VkFence fence) {
                 this->m_Submits.data(), fence);
 }
 
-std::uint32_t Frame::image_index() {
-  return this->m_FrameData.image_index;
-}
+std::uint32_t Frame::image_index() { return this->m_FrameData.image_index; }
 
 VkSemaphore Frame::render_finished_semaphore() {
-    return this->m_FrameData.render_finished_semaphores[this->m_FrameData.image_index];
+  return this->m_FrameData
+      .render_finished_semaphores[this->m_FrameData.image_index];
 }
 VkSemaphore Frame::image_available_semaphore() {
-    return this->m_FrameData.image_available_semaphores[this->m_FrameData.current_frame];
+  return this->m_FrameData
+      .image_available_semaphores[this->m_FrameData.current_frame];
 }
 
 VkFence Frame::in_flight_fence() {
-    return this->m_FrameData.in_flight_fences[this->m_FrameData.current_frame];
+  return this->m_FrameData.in_flight_fences[this->m_FrameData.current_frame];
 }
 
 void Frame::set_viewport(VkCommandBuffer cmd, VkViewport viewport) {
-    vkCmdSetViewport(cmd, 0, 1, &viewport);
+  vkCmdSetViewport(cmd, 0, 1, &viewport);
 }
 
 void Frame::set_scissor(VkCommandBuffer cmd, VkRect2D scissor) {
-    vkCmdSetScissor(cmd, 0, 1, &scissor);
+  vkCmdSetScissor(cmd, 0, 1, &scissor);
 }
+
+std::uint32_t Frame::current_frame() { return this->m_FrameData.current_frame; }
+
+VkQueue &Frame::graphics_queue() { return this->m_FrameData.graphics_queue; }
 } // namespace ashfault
