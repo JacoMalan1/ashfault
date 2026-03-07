@@ -1,13 +1,11 @@
+name: Build
+
 on:
-  pull_request:
-    branches:
-      - main
-  push:
-    branches:
-      - main
+  workflow_call:
 
 jobs:
-  build:
+  clang:
+    name: Clang
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -24,6 +22,28 @@ jobs:
       - name: Generate Buildscripts
         working-directory: build
         run: cmake .. -DCMAKE_C_COMPILER=$(which clang) -DCMAKE_CXX_COMPILER=$(which clang++) -DCMAKE_BUILD_TYPE=Release -DCMAKE_BUILD_WAYLAND=OFF -DCMAKE_BUILD_X11=OFF
+
+      - name: Build
+        working-directory: build
+        run: make
+  gcc:
+    name: GCC
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: 'recursive'
+
+      - name: Install Dependencies
+        run: |
+          sudo apt update
+          sudo apt install libxrandr-dev libxinerama-dev libxcursor-dev libxi-dev libxext-dev libwayland-dev libxkbcommon-dev libvulkan-dev mesa-common-dev glslc 
+
+      - run: mkdir build
+
+      - name: Generate Buildscripts
+        working-directory: build
+        run: cmake .. -DCMAKE_C_COMPILER=$(which gcc) -DCMAKE_CXX_COMPILER=$(which g++) -DCMAKE_BUILD_TYPE=Release -DCMAKE_BUILD_WAYLAND=OFF -DCMAKE_BUILD_X11=OFF
 
       - name: Build
         working-directory: build

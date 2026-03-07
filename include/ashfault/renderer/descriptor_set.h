@@ -2,8 +2,8 @@
 #define ASHFAULT_DESCRIPTOR_SET_H
 
 #include "CLSTL/vector.h"
-#include "ashfault/buffer.hpp"
 #include <CLSTL/shared_ptr.h>
+#include <ashfault/renderer/buffer.hpp>
 #include <cstdint>
 #include <vulkan/vulkan.h>
 #include <vulkan/vulkan_core.h>
@@ -22,8 +22,10 @@ public:
   /// @param stage_flags The shader stages that will use this binding.
   /// @param descriptor_count How many descriptors to create.
   /// @param binding The binding index.
-  VulkanDescriptorSetBuilder &add_binding(VkDescriptorType type, VkShaderStageFlags stage_flags,
-                   std::uint32_t descriptor_count, std::uint32_t binding);
+  VulkanDescriptorSetBuilder &add_binding(VkDescriptorType type,
+                                          VkShaderStageFlags stage_flags,
+                                          std::uint32_t descriptor_count,
+                                          std::uint32_t binding);
 
   /// @brief Builds the descriptor set and creates a descriptor pool.
   std::pair<clstl::vector<clstl::shared_ptr<VulkanDescriptorSet>>,
@@ -50,8 +52,9 @@ public:
   VulkanDescriptorSet &operator=(const VulkanDescriptorSet &) = delete;
   ~VulkanDescriptorSet();
 
-  template<class T>
-  void update_uniform_buffer(clstl::shared_ptr<VulkanBuffer<T>> buffer, std::uint32_t binding) {
+  template <class T>
+  void update_uniform_buffer(clstl::shared_ptr<VulkanBuffer<T>> buffer,
+                             std::uint32_t binding) {
     VkDescriptorBufferInfo buffer_info{};
     buffer_info.buffer = buffer->handle();
     buffer_info.offset = 0;
@@ -83,6 +86,7 @@ public:
   VulkanDescriptorPool(const VulkanDescriptorPool &) = delete;
   VulkanDescriptorPool &operator=(const VulkanDescriptorPool &) = delete;
   ~VulkanDescriptorPool();
+
 private:
   VkDescriptorPool m_Pool;
   VkDevice m_Device;

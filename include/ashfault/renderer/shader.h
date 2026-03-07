@@ -18,6 +18,6 @@ private:
   VkShaderModule m_Module;
   VkDevice m_Device;
 };
-}
+} // namespace ashfault
 
 #endif

@@ -1,14 +1,15 @@
 #ifndef ASHFAULT_RENDERER_H
 #define ASHFAULT_RENDERER_H
 
-#include "ashfault/buffer.hpp"
-#include "ashfault/descriptor_set.h"
-#include "ashfault/frame.h"
-#include "ashfault/pipeline.h"
 #include <CLSTL/shared_ptr.h>
 #include <CLSTL/string.h>
 #include <CLSTL/vector.h>
-#include <ashfault/shader.h>
+#include <ashfault/core/af_window.h>
+#include <ashfault/renderer/buffer.hpp>
+#include <ashfault/renderer/descriptor_set.h>
+#include <ashfault/renderer/frame.h>
+#include <ashfault/renderer/pipeline.h>
+#include <ashfault/renderer/shader.h>
 #include <cstdint>
 #include <cstring>
 #include <functional>
@@ -27,6 +28,9 @@
   }
 
 namespace ashfault {
+class Swapchain;
+class Frame;
+
 struct QueueSuitability {
   std::optional<std::uint32_t> graphics_queue;
   std::optional<std::uint32_t> present_queue;
@@ -48,8 +52,11 @@ public:
   ~Renderer();
   friend class Frame;
 
+  Swapchain *swapchain();
+  std::vector<VkCommandBuffer> allocate_command_buffers(std::uint32_t count);
+
   /// @brief Initializes the renderer.
-  void init(GLFWwindow *window);
+  void init(clstl::shared_ptr<Window> window);
 
   /// @brief Creates a vulkan shader module object.
   /// @param path Path to the pre-compiled SPIR-V shader binary.
@@ -98,6 +105,8 @@ public:
   VkImageView create_image_view(VkImage image, VkFormat format,
                                 VkImageAspectFlags imageAspect);
 
+  VkSampler create_sampler();
+
   /// @brief Creates a vulkan memory buffer.
   ///
   /// @param usage The intended buffer usage.
@@ -135,9 +144,8 @@ public:
                                VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
     alloc_info.flags = VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT;
 
-    auto [staging_buffer, staging_alloc] =
-        this->create_buffer(sizeof(T),
-                            VK_BUFFER_USAGE_TRANSFER_SRC_BIT, alloc_info);
+    auto [staging_buffer, staging_alloc] = this->create_buffer(
+        sizeof(T), VK_BUFFER_USAGE_TRANSFER_SRC_BIT, alloc_info);
 
     T *mapping;
     vmaMapMemory(this->m_Allocator, staging_alloc,
@@ -156,7 +164,8 @@ public:
     this->copy_buffer(buffer, staging_buffer, sizeof(T));
     vmaDestroyBuffer(this->m_Allocator, staging_buffer, staging_alloc);
 
-    return clstl::make_shared<VulkanBuffer<T>>(this->m_Device, this->m_Allocator, buffer, allocation, 1);
+    return clstl::make_shared<VulkanBuffer<T>>(
+        this->m_Device, this->m_Allocator, buffer, allocation, 1);
   }
 
   /// @brief Creates an index buffer.
@@ -238,25 +247,21 @@ private:
   const std::vector<const char *> s_DeviceExtensions = {
       VK_KHR_SWAPCHAIN_EXTENSION_NAME};
 
-  GLFWwindow *m_Window;
+  clstl::shared_ptr<Window> m_Window;
   VkInstance m_Instance;
   VkPhysicalDevice m_PhysicalDevice;
   VkDevice m_Device;
   VmaAllocator m_Allocator;
   VkSurfaceKHR m_Surface;
-  VkSwapchainKHR m_Swapchain;
   VkSurfaceFormatKHR m_SurfaceFormat;
   VkPresentModeKHR m_PresentMode;
   VkExtent2D m_SwapExtent;
-  clstl::vector<VkImage> m_SwapchainImages;
-  clstl::vector<VkImageView> m_ImageViews;
   VkQueue m_GraphicsQueue;
   VkQueue m_PresentQueue;
-  clstl::vector<VkSemaphore> m_ImageAvailableSemaphores;
-  clstl::vector<VkSemaphore> m_RenderFinishedSemaphores;
-  clstl::vector<VkFence> m_InFlightFences;
+  std::vector<VkSemaphore> m_ImageAvailableSemaphores;
+  std::vector<VkSemaphore> m_RenderFinishedSemaphores;
+  std::vector<VkFence> m_InFlightFences;
   std::uint32_t m_CurrentFrame;
-  clstl::vector<VkCommandBuffer> m_CommandBuffers;
   QueueSuitability m_QueueFamilies;
   VkCommandPool m_CommandPool;
   VkSampleCountFlagBits m_MsaaSamples;
@@ -264,17 +269,11 @@ private:
   clstl::vector<std::pair<VkImage, VmaAllocation>> m_ViewportImages;
   clstl::vector<VkImageView> m_ViewportImageViews;
   clstl::vector<VkDescriptorSet> m_ImGuiViewportTextures;
-  clstl::vector<VkCommandBuffer> m_ImGuiCommandBuffers;
   VkSampler m_ImGuiViewportSampler;
 
-  VkImage m_DepthImage;
-  VmaAllocation m_DepthImageAllocation;
-  VkImageView m_DepthImageView;
-  VkImage m_ColorImage;
-  VmaAllocation m_ColorImageAllocation;
-  VkImageView m_ColorImageView;
-
   clstl::array<std::uint32_t, 2> m_ViewportSize;
+
+  Swapchain *m_Swapchain;
 
   bool m_Resized;
 
@@ -285,8 +284,6 @@ private:
   void setup_swapchain();
   void setup_synchronization();
   void setup_command_buffers();
-  void create_depth_buffers();
-  void create_color_resources();
   void cleanup_swapchain();
   void setup_imgui();
 

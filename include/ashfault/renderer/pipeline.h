@@ -4,8 +4,8 @@
 #include <CLSTL/array.h>
 #include <CLSTL/shared_ptr.h>
 #include <CLSTL/vector.h>
-#include <ashfault/descriptor_set.h>
-#include <ashfault/shader.h>
+#include <ashfault/renderer/descriptor_set.h>
+#include <ashfault/renderer/shader.h>
 #include <optional>
 #include <vulkan/vulkan.h>
 #include <vulkan/vulkan_core.h>
@@ -16,7 +16,8 @@ class GraphicsPipeline;
 class GraphicsPipelineBuilder {
 public:
   GraphicsPipelineBuilder(VkDevice device, VkFormat swapchain_image_format,
-                          clstl::array<std::uint32_t, 2> window_dims, VkSampleCountFlagBits msaaSamples);
+                          clstl::array<std::uint32_t, 2> window_dims,
+                          VkSampleCountFlagBits msaaSamples);
 
   GraphicsPipelineBuilder &
   vertex_shader(clstl::shared_ptr<VulkanShader> shader);
@@ -25,7 +26,8 @@ public:
   GraphicsPipelineBuilder &descriptor_sets(
       const clstl::vector<clstl::shared_ptr<VulkanDescriptorSet>> &dsets);
   GraphicsPipelineBuilder &input_attribute_descriptions(
-      const clstl::vector<VkVertexInputAttributeDescription> &descriptions, std::uint32_t stride);
+      const clstl::vector<VkVertexInputAttributeDescription> &descriptions,
+      std::uint32_t stride);
   GraphicsPipelineBuilder &
   input_assembly_state(VkPipelineInputAssemblyStateCreateInfo assembly_state);
 

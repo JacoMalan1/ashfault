@@ -35,6 +35,7 @@
 		libxi
 		shaderc
 		spirv-tools
+		clang-tools
               ];
 
 	      env = {

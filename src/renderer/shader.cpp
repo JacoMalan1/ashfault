@@ -1,5 +1,5 @@
 #include <CLSTL/vector.h>
-#include <ashfault/shader.h>
+#include <ashfault/renderer/shader.h>
 #include <cstdint>
 #include <cstring>
 #include <fstream>
