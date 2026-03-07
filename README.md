@@ -1,5 +1,7 @@
 # Ashfault
 
+[![Build](https://github.com/JacoMalan1/ashfault/actions/workflows/build.yml/badge.svg?event=push)](https://github.com/JacoMalan1/ashfault/actions/workflows/build.yml)
+
 ## Description
 
 Ashfault is a high-level Vulkan renderer aimed at producing ergonomic and performant Vulkan programs.
