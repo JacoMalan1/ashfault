@@ -1,4 +1,4 @@
-#include <ashfault/core/af_window.h>
+#include <ashfault/core/window.h>
 #include <ashfault/renderer/renderer.h>
 #include <vulkan/vulkan.h>
 
@@ -19,6 +19,7 @@ Window::Window(std::uint32_t width, std::uint32_t height, bool fullscreen) {
 }
 
 Window::~Window() {
+  glfwSetWindowUserPointer(this->m_Handle, nullptr);
   glfwDestroyWindow(this->m_Handle);
   glfwTerminate();
 }
@@ -63,13 +64,39 @@ void Window::poll_events() { glfwPollEvents(); }
 void Window::set_resize_callback(
     std::function<void(Window &, WindowDims)> callback) {
   this->m_ResizeCallback = callback;
-  glfwSetWindowUserPointer(this->m_Handle, this);
+  if (glfwGetWindowUserPointer(this->m_Handle) == nullptr) {
+    this->attach_pointer();
+  }
+
   glfwSetFramebufferSizeCallback(
       this->m_Handle, [](GLFWwindow *window, int, int) {
         Window *window_ptr =
             reinterpret_cast<Window *>(glfwGetWindowUserPointer(window));
+        if (!window_ptr)
+          return;
+
         window_ptr->m_ResizeCallback.value()(*window_ptr,
                                              window_ptr->current_size());
       });
+}
+
+void Window::set_key_callback(
+    std::function<void(Window &, int, int, int, int)> callback) {
+  if (glfwGetWindowUserPointer(this->m_Handle) == nullptr) {
+    this->attach_pointer();
+  }
+
+  glfwSetKeyCallback(this->m_Handle, [](GLFWwindow *window, int key,
+                                        int scancode, int action, int mods) {
+    Window *window_ptr =
+        reinterpret_cast<Window *>(glfwGetWindowUserPointer(window));
+    if (!window_ptr)
+      return;
+    window_ptr->m_Keycallback.value()(*window_ptr, key, scancode, action, mods);
+  });
+}
+
+void Window::attach_pointer() {
+  glfwSetWindowUserPointer(this->m_Handle, this);
 }
 } // namespace ashfault

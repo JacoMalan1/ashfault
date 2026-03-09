@@ -1,5 +1,5 @@
 #include <CLSTL/shared_ptr.h>
-#include <ashfault/core/af_window.h>
+#include <ashfault/core/window.h>
 #include <ashfault/core/component/mesh.h>
 #include <ashfault/core/component/transform.h>
 #include <ashfault/core/scene.h>
@@ -214,6 +214,7 @@ void Editor::run() {
   registry.add_component<MeshComponent<Vertex, std::uint16_t>>(e, mesh);
 
   while (!this->m_Window->should_close()) {
+    this->m_Input->frame_start();
     if (m_ViewportResized) {
       vkDeviceWaitIdle(renderer.device());
       this->clean_images();

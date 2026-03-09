@@ -5,6 +5,7 @@
 #include <cstdint>
 #include <functional>
 #include <optional>
+#include <vulkan/vulkan.h>
 
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
@@ -30,10 +31,14 @@ public:
   bool should_close();
 
   void set_resize_callback(std::function<void(Window &, WindowDims)> callback);
+  void set_key_callback(std::function<void(Window &, int, int, int, int)> callback);
 
 private:
+  void attach_pointer();
+
   GLFWwindow *m_Handle;
   std::optional<std::function<void(Window &, WindowDims)>> m_ResizeCallback;
+  std::optional<std::function<void(Window &, int, int, int, int)>> m_Keycallback;
 };
 } // namespace ashfault
 

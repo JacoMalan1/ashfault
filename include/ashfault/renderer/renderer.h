@@ -4,7 +4,7 @@
 #include <CLSTL/shared_ptr.h>
 #include <CLSTL/string.h>
 #include <CLSTL/vector.h>
-#include <ashfault/core/af_window.h>
+#include <ashfault/core/window.h>
 #include <ashfault/renderer/buffer.hpp>
 #include <ashfault/renderer/descriptor_set.h>
 #include <ashfault/renderer/frame.h>

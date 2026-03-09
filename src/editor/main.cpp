@@ -2,7 +2,7 @@
 
 #include <CLSTL/shared_ptr.h>
 #include <CLSTL/unique_ptr.h>
-#include <ashfault/core/af_window.h>
+#include <ashfault/core/window.h>
 #include <ashfault/core/engine.h>
 #include <ashfault/editor/editor.h>
 #include <spdlog/spdlog.h>
