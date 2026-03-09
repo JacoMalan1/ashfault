@@ -1,3 +1,4 @@
+#include "spdlog/spdlog.h"
 #include <ashfault/core/window.h>
 #include <ashfault/renderer/renderer.h>
 #include <vulkan/vulkan.h>
@@ -8,6 +9,10 @@
 namespace ashfault {
 Window::Window(std::uint32_t width, std::uint32_t height, bool fullscreen) {
   glfwInit();
+  auto platform = glfwGetPlatform();
+  if (platform == GLFW_PLATFORM_X11) {
+    SPDLOG_WARN("GLFW Platform is X11");
+  }
 
   glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
   auto *monitor = fullscreen ? glfwGetPrimaryMonitor() : nullptr;
@@ -16,6 +21,7 @@ Window::Window(std::uint32_t width, std::uint32_t height, bool fullscreen) {
   if (!window)
     throw std::runtime_error("Failed to create GLFW window");
   this->m_Handle = window;
+  glfwSetWindowUserPointer(window, nullptr);
 }
 
 Window::~Window() {
@@ -75,8 +81,10 @@ void Window::set_resize_callback(
         if (!window_ptr)
           return;
 
-        window_ptr->m_ResizeCallback.value()(*window_ptr,
-                                             window_ptr->current_size());
+        if (window_ptr->m_ResizeCallback.has_value()) {
+          window_ptr->m_ResizeCallback.value()(*window_ptr,
+                                               window_ptr->current_size());
+        }
       });
 }
 
@@ -92,7 +100,10 @@ void Window::set_key_callback(
         reinterpret_cast<Window *>(glfwGetWindowUserPointer(window));
     if (!window_ptr)
       return;
-    window_ptr->m_Keycallback.value()(*window_ptr, key, scancode, action, mods);
+    if (window_ptr->m_KeyCallback.has_value()) {
+      window_ptr->m_KeyCallback.value()(*window_ptr, key, scancode, action,
+                                        mods);
+    }
   });
 }
 

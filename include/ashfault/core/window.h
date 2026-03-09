@@ -38,7 +38,7 @@ private:
 
   GLFWwindow *m_Handle;
   std::optional<std::function<void(Window &, WindowDims)>> m_ResizeCallback;
-  std::optional<std::function<void(Window &, int, int, int, int)>> m_Keycallback;
+  std::optional<std::function<void(Window &, int, int, int, int)>> m_KeyCallback;
 };
 } // namespace ashfault
 
