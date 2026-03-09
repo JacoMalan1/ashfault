@@ -1,3 +1,4 @@
+#include <spdlog/common.h>
 #include <CLSTL/shared_ptr.h>
 #include <algorithm>
 #include <ashfault/core/component/mesh.h>
@@ -12,6 +13,11 @@
 #include <imgui.h>
 #include <imgui_impl_glfw.h>
 #include <imgui_impl_vulkan.h>
+#include <imgui_internal.h>
+#include <memory>
+#include <mutex>
+#include <spdlog/details/log_msg.h>
+#include <spdlog/sinks/callback_sink.h>
 #include <spdlog/spdlog.h>
 #include <vulkan/vulkan_core.h>
 
@@ -21,7 +27,91 @@ Editor::Editor(clstl::shared_ptr<Engine> engine,
                clstl::shared_ptr<Window> window)
     : Application(engine, window),
       m_ViewportSize({(std::uint32_t)1, (std::uint32_t)1}),
-      m_CurrentWindowSize({1, 1}), m_ViewportResized(false) {}
+      m_CurrentWindowSize({1, 1}), m_ViewportResized(false), m_LogsLock(),
+      m_Logs() {
+  auto callback_sink = std::make_shared<spdlog::sinks::callback_sink_mt>(
+      [&](const spdlog::details::log_msg &msg) {
+        std::unique_lock<std::mutex> lck(m_LogsLock);
+        m_Logs.push_back(std::make_pair<>(msg, msg.payload.data()));
+      });
+  callback_sink->set_level(spdlog::level::debug);
+  spdlog::default_logger()->sinks().push_back(callback_sink);
+}
+
+void Editor::build_ui_skeleton() {
+  ImGuiID dockspace_id = ImGui::GetID("Main Dockspace");
+  ImGuiViewport *viewport = ImGui::GetMainViewport();
+  if (ImGui::DockBuilderGetNode(dockspace_id) == nullptr) {
+    ImGui::DockBuilderAddNode(dockspace_id, ImGuiDockNodeFlags_DockSpace);
+    ImGui::DockBuilderSetNodeSize(dockspace_id, viewport->Size);
+
+    ImGuiID dock_id_bottom = 0;
+    ImGuiID dock_id_main = dockspace_id;
+    ImGui::DockBuilderSplitNode(dock_id_main, ImGuiDir_Down, 0.20f,
+                                &dock_id_bottom, &dock_id_main);
+
+    ImGuiID dock_id_left = 0;
+    ImGui::DockBuilderSplitNode(dock_id_main, ImGuiDir_Left, 1.20f,
+                                &dock_id_left, &dock_id_main);
+
+    ImGuiID dock_id_right = 0;
+    ImGui::DockBuilderSplitNode(dock_id_main, ImGuiDir_Right, 1.20f,
+                                &dock_id_right, &dock_id_main);
+
+    ImGui::DockBuilderDockWindow("Scene", dock_id_left);
+    ImGui::DockBuilderDockWindow("Components", dock_id_right);
+    ImGui::DockBuilderDockWindow("Viewport", dock_id_main);
+    ImGui::DockBuilderDockWindow("Console", dock_id_bottom);
+    ImGui::DockBuilderFinish(dockspace_id);
+  }
+
+  ImGui::DockSpaceOverViewport(dockspace_id, viewport,
+                               ImGuiDockNodeFlags_PassthruCentralNode);
+  ImGui::Begin("Scene");
+  if (ImGui::TreeNodeEx("Scene", ImGuiTreeNodeFlags_DefaultOpen)) {
+    if (ImGui::TreeNodeEx("Triangle", ImGuiTreeNodeFlags_Leaf)) {
+      ImGui::TreePop();
+    }
+    ImGui::TreePop();
+  }
+  ImGui::End();
+
+  ImGui::Begin("Components", nullptr, ImGuiWindowFlags_MenuBar);
+  if (ImGui::BeginMenuBar()) {
+    if (ImGui::BeginMenu("Add Component")) {
+      ImGui::MenuItem("Transform");
+      ImGui::MenuItem("Mesh");
+      ImGui::EndMenu();
+    }
+    ImGui::EndMenuBar();
+  }
+  ImGui::End();
+
+  ImGui::Begin("Console");
+  std::for_each(
+      m_Logs.begin(), m_Logs.end(),
+      [](const std::pair<spdlog::details::log_msg, std::string> &msg) {
+        auto level = spdlog::level::to_string_view(msg.first.level);
+        ImVec4 color;
+        switch (msg.first.level) {
+        case spdlog::level::err:
+          color = ImVec4(255.0f / 255.0f, 20.0f / 255.0f, 20.0f / 255.0f, 1.0f);
+          break;
+        case spdlog::level::info:
+          color = ImVec4(47.0f / 255.0f, 255.0f / 255.0f, 20.0f / 255.0f, 1.0f);
+          break;
+        case spdlog::level::warn:
+          color =
+              ImVec4(255.0f / 255.0f, 251.0f / 255.0f, 20.0f / 255.0f, 1.0f);
+          break;
+        default:
+          color = ImVec4(1.0f, 1.0f, 1.0f, 1.0f);
+        }
+
+        ImGui::TextColored(color, "[%s]: %s", level.data(), msg.second.c_str());
+      });
+  ImGui::End();
+}
 
 SubmitData Editor::render_ui(Frame &frame) {
   auto cmd = this->m_UiCommandBuffers[frame.current_frame()];
@@ -56,7 +146,7 @@ SubmitData Editor::render_ui(Frame &frame) {
   ImGui_ImplVulkan_NewFrame();
   ImGui_ImplGlfw_NewFrame();
   ImGui::NewFrame();
-  ImGui::DockSpaceOverViewport();
+  build_ui_skeleton();
   ImGui::Begin("Viewport");
   auto size = ImGui::GetContentRegionAvail();
   if (size.x != m_ViewportSize[0] || size.y != m_ViewportSize[1]) {

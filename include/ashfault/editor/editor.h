@@ -1,10 +1,12 @@
 #ifndef ASHFAULT_EDITOR_H
 #define ASHFAULT_EDITOR_H
 
+#include "spdlog/details/log_msg.h"
 #include <CLSTL/shared_ptr.h>
 #include <ashfault/application.h>
 #include <ashfault/core/engine.h>
 #include <ashfault/core/scene.h>
+#include <mutex>
 #include <utility>
 
 namespace ashfault {
@@ -24,6 +26,7 @@ public:
 private:
   void create_images();
   void clean_images();
+  void build_ui_skeleton();
 
   std::vector<std::pair<VkImage, VmaAllocation>> m_ViewportImages;
   std::vector<VkImageView> m_ViewportImageViews;
@@ -34,6 +37,8 @@ private:
   std::array<std::uint32_t, 2> m_ViewportRenderSize;
   WindowDims m_CurrentWindowSize;
   bool m_ViewportResized;
+  std::mutex m_LogsLock;
+  std::vector<std::pair<spdlog::details::log_msg, std::string>> m_Logs;
 };
 } // namespace ashfault
 
