@@ -1,8 +1,9 @@
 #include <CLSTL/shared_ptr.h>
-#include <ashfault/core/window.h>
+#include <algorithm>
 #include <ashfault/core/component/mesh.h>
 #include <ashfault/core/component/transform.h>
 #include <ashfault/core/scene.h>
+#include <ashfault/core/window.h>
 #include <ashfault/editor/editor.h>
 #include <ashfault/renderer/frame.h>
 #include <ashfault/renderer/renderer.h>
@@ -82,20 +83,25 @@ SubmitData Editor::render_ui(Frame &frame) {
 }
 
 SubmitData Editor::render_viewport(Frame &frame, Scene &scene) {
+  std::uint32_t image_width =
+      std::clamp<std::uint32_t>(m_ViewportSize[0], 1, 8192);
+  std::uint32_t image_height =
+      std::clamp<std::uint32_t>(m_ViewportSize[1], 1, 8192);
+
   auto cmd = m_PrimaryCommandBuffers[frame.current_frame()];
   auto image_i = frame.image_index();
   frame.begin_command_buffer(cmd);
   VkViewport viewport{};
   viewport.minDepth = 0.0f;
   viewport.maxDepth = 1.0f;
-  viewport.width = m_ViewportRenderSize[0];
-  viewport.height = m_ViewportRenderSize[1];
+  viewport.width = image_width;
+  viewport.height = image_height;
   viewport.x = 0;
   viewport.y = 0;
 
   VkRect2D scissor{};
-  scissor.extent.width = m_ViewportRenderSize[0];
-  scissor.extent.height = m_ViewportRenderSize[1];
+  scissor.extent.width = image_width;
+  scissor.extent.height = image_height;
   scissor.offset.x = 0;
   scissor.offset.y = 0;
 
@@ -109,8 +115,8 @@ SubmitData Editor::render_viewport(Frame &frame, Scene &scene) {
               VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
 
   VkRect2D render_area{};
-  render_area.extent.width = m_ViewportRenderSize[0];
-  render_area.extent.height = m_ViewportRenderSize[1];
+  render_area.extent.width = image_width;
+  render_area.extent.height = image_height;
   render_area.offset.x = 0;
   render_area.offset.y = 0;
   frame.insert_pipeline_barrier(
@@ -140,13 +146,18 @@ void Editor::create_images() {
   this->m_ImGuiViewportTextures.resize(renderer.swapchain()->image_count());
   m_ViewportRenderSize = m_ViewportSize;
 
+  std::uint32_t image_width =
+      std::clamp<std::uint32_t>(m_ViewportSize[0], 1, 8192);
+  std::uint32_t image_height =
+      std::clamp<std::uint32_t>(m_ViewportSize[1], 1, 8192);
+
   for (std::size_t i = 0; i < renderer.swapchain()->image_count(); i++) {
     VmaAllocationCreateInfo alloc_info{};
     alloc_info.requiredFlags = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
     alloc_info.usage = VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE;
 
     auto viewport_image = renderer.create_image(
-        m_ViewportSize[0], m_ViewportSize[1], VK_SAMPLE_COUNT_1_BIT,
+        image_width, image_height, VK_SAMPLE_COUNT_1_BIT,
         renderer.swapchain()->surface_format().format, VK_IMAGE_TILING_OPTIMAL,
         VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
         alloc_info);
