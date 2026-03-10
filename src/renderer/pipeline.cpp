@@ -24,6 +24,18 @@ GraphicsPipelineBuilder::GraphicsPipelineBuilder(
       m_Device(device), m_ImageFormat(swapchain_image_format),
       m_MsaaSamples(msaa_samples), m_WindowDims(std::move(window_dims)) {}
 
+GraphicsPipelineBuilder &
+GraphicsPipelineBuilder::push_constant(VkShaderStageFlags stage,
+                                       VkDeviceSize offset, VkDeviceSize size) {
+  VkPushConstantRange range{};
+  range.stageFlags = stage;
+  range.offset = offset;
+  range.size = size;
+
+  this->m_PushConstants.push_back(range);
+  return *this;
+}
+
 clstl::shared_ptr<GraphicsPipeline> GraphicsPipelineBuilder::build() {
   clstl::vector<VkDescriptorSetLayout> dset_layouts;
   dset_layouts.reserve(this->m_DescriptorSets.size());
@@ -37,6 +49,8 @@ clstl::shared_ptr<GraphicsPipeline> GraphicsPipelineBuilder::build() {
   pipeline_layout_info.setLayoutCount = dset_layouts.size();
   pipeline_layout_info.pSetLayouts =
       dset_layouts.empty() ? nullptr : dset_layouts.data();
+  pipeline_layout_info.pushConstantRangeCount = m_PushConstants.size();
+  pipeline_layout_info.pPushConstantRanges = m_PushConstants.data();
 
   VkPipelineLayout pipeline_layout;
   if (vkCreatePipelineLayout(this->m_Device, &pipeline_layout_info, nullptr,
@@ -97,8 +111,8 @@ clstl::shared_ptr<GraphicsPipeline> GraphicsPipelineBuilder::build() {
   depth_stencil_info.sType =
       VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
   depth_stencil_info.depthCompareOp = VK_COMPARE_OP_LESS;
-  depth_stencil_info.depthTestEnable = VK_FALSE;
-  depth_stencil_info.depthWriteEnable = VK_FALSE;
+  depth_stencil_info.depthTestEnable = VK_TRUE;
+  depth_stencil_info.depthWriteEnable = VK_TRUE;
   depth_stencil_info.depthBoundsTestEnable = VK_FALSE;
   depth_stencil_info.stencilTestEnable = VK_FALSE;
 
@@ -124,7 +138,7 @@ clstl::shared_ptr<GraphicsPipeline> GraphicsPipelineBuilder::build() {
 
   VkPipelineRasterizationStateCreateInfo rasterizer{};
   rasterizer.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
-  rasterizer.cullMode = VK_CULL_MODE_NONE;
+  rasterizer.cullMode = VK_CULL_MODE_BACK_BIT;
   rasterizer.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
   rasterizer.polygonMode = VK_POLYGON_MODE_FILL;
   rasterizer.lineWidth = 1.0f;

@@ -13,6 +13,6 @@ int main() {
 
   auto window = clstl::make_shared<ashfault::Window>(1280, 720, false);
   auto engine = clstl::make_shared<ashfault::Engine>();
-  auto application = clstl::make_unique<ashfault::Editor>(engine, window);
+  auto application = clstl::make_unique<ashfault::editor::Editor>(engine, window);
   application->run();
 }

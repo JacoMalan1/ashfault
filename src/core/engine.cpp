@@ -37,22 +37,6 @@ void Engine::register_shaders() {
 }
 
 void Engine::create_pipelines() {
-  clstl::vector<VkVertexInputAttributeDescription> descriptions;
-  descriptions.resize(1);
-  descriptions[0].format = VK_FORMAT_R32G32B32_SFLOAT;
-  descriptions[0].offset = 0;
-  descriptions[0].binding = 0;
-  descriptions[0].location = 0;
-
-  auto simple =
-      m_Renderer->create_graphics_pipeline()
-          .input_attribute_descriptions(descriptions, sizeof(Vertex))
-          .vertex_shader(m_ShaderManager->get_vertex_shader("simple").value())
-          .fragment_shader(
-              m_ShaderManager->get_fragment_shader("simple").value())
-          .build();
-
-  this->m_PipelineManager->add_graphics_pipeline("simple", simple);
 }
 
 void Engine::setup_renderer(clstl::shared_ptr<Window> window) {
@@ -63,4 +47,5 @@ void Engine::setup_renderer(clstl::shared_ptr<Window> window) {
 }
 
 PipelineManager &Engine::pipeline_manager() { return *this->m_PipelineManager; }
+ShaderManager &Engine::shader_manager() { return *this->m_ShaderManager; }
 } // namespace ashfault

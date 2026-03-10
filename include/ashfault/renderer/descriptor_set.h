@@ -53,7 +53,7 @@ public:
   ~VulkanDescriptorSet();
 
   template <class T>
-  void update_uniform_buffer(clstl::shared_ptr<VulkanBuffer<T>> buffer,
+  void update_uniform_buffer(clstl::shared_ptr<VulkanBuffer> buffer,
                              std::uint32_t binding) {
     VkDescriptorBufferInfo buffer_info{};
     buffer_info.buffer = buffer->handle();

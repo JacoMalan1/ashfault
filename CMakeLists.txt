@@ -32,7 +32,7 @@ if(DOXYGEN_FOUND)
   message("Doxygen build started")
 
   add_custom_target(doc_doxygen ALL
-        COMMAND ${DOXYGEN_EXECUTABLE} ${DOXYGEN_OUT}
+        COMMAND ${DOXYGEN_EXECUTABLE} -q ${DOXYGEN_OUT}
         WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
         COMMENT "Generating documentation with Doxygen"
         VERBATIM)
@@ -89,8 +89,11 @@ target_link_libraries(ashfault GPUOpen::VulkanMemoryAllocator)
 target_link_libraries(ashfault spdlog::spdlog)
 target_link_libraries(ashfault clstl)
 target_link_libraries(ashfault glm::glm)
+target_link_libraries(ashfault tinyobjloader)
 
 target_link_libraries(editor ashfault)
 
 target_link_libraries(program tinyobjloader)
 target_link_libraries(program ashfault)
+
+configure_file(assets/models/monkey.obj monkey.obj COPYONLY)

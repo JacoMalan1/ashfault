@@ -16,6 +16,7 @@ public:
 
   void setup_renderer(clstl::shared_ptr<Window> window);
   PipelineManager &pipeline_manager();
+  ShaderManager &shader_manager();
 
   Renderer &renderer();
   const Renderer &renderer() const;

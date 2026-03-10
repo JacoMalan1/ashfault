@@ -30,6 +30,7 @@ public:
       std::uint32_t stride);
   GraphicsPipelineBuilder &
   input_assembly_state(VkPipelineInputAssemblyStateCreateInfo assembly_state);
+  GraphicsPipelineBuilder &push_constant(VkShaderStageFlags stage, VkDeviceSize offset, VkDeviceSize size);
 
   clstl::shared_ptr<GraphicsPipeline> build();
 
@@ -39,6 +40,7 @@ private:
   std::optional<VkPipelineInputAssemblyStateCreateInfo> m_AssemblyState;
   clstl::vector<clstl::shared_ptr<VulkanDescriptorSet>> m_DescriptorSets;
   clstl::vector<VkVertexInputAttributeDescription> m_VertexAttributes;
+  clstl::vector<VkPushConstantRange> m_PushConstants;
   std::uint32_t m_VertexStride;
   VkDevice m_Device;
   VkFormat m_ImageFormat;

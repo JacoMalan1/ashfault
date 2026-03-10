@@ -10,10 +10,6 @@
 #include <vulkan/vulkan.h>
 
 namespace ashfault {
-struct Vertex {
-  glm::vec3 position;
-};
-
 class Scene {
 public:
   Scene();

@@ -137,7 +137,7 @@ public:
   clstl::array<std::uint32_t, 2> viewport_size() const;
 
   template <class T>
-  clstl::shared_ptr<VulkanBuffer<T>> create_uniform_buffer(const T &data) {
+  clstl::shared_ptr<VulkanBuffer> create_uniform_buffer(const T &data) {
     VmaAllocationCreateInfo alloc_info{};
     alloc_info.usage = VMA_MEMORY_USAGE_AUTO;
     alloc_info.requiredFlags = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
@@ -164,7 +164,7 @@ public:
     this->copy_buffer(buffer, staging_buffer, sizeof(T));
     vmaDestroyBuffer(this->m_Allocator, staging_buffer, staging_alloc);
 
-    return clstl::make_shared<VulkanBuffer<T>>(
+    return clstl::make_shared<VulkanBuffer>(
         this->m_Device, this->m_Allocator, buffer, allocation, 1);
   }
 
@@ -173,7 +173,7 @@ public:
   /// @note This function can only be instantiated with unsigned integers of
   /// size 8, 16, and 32 bits.
   template <class T>
-  clstl::shared_ptr<VulkanBuffer<T>>
+  clstl::shared_ptr<VulkanBuffer>
   create_index_buffer(const clstl::vector<T> &indices) {
     static_assert(std::is_integral<T>::value && std::is_unsigned<T>::value);
 
@@ -204,13 +204,13 @@ public:
     this->copy_buffer(buffer, staging_buffer, indices.size() * sizeof(T));
     vmaDestroyBuffer(this->m_Allocator, staging_buffer, staging_alloc);
 
-    return clstl::make_shared<VulkanBuffer<T>>(
+    return clstl::make_shared<VulkanBuffer>(
         this->m_Device, this->m_Allocator, buffer, allocation, indices.size());
   }
 
   /// @brief Creates a vertex buffer.
   template <class T>
-  clstl::shared_ptr<VulkanBuffer<T>>
+  clstl::shared_ptr<VulkanBuffer>
   create_vertex_buffer(const clstl::vector<T> &vertices) {
     VmaAllocationCreateInfo alloc_info{};
     alloc_info.usage = VMA_MEMORY_USAGE_AUTO;
@@ -239,7 +239,7 @@ public:
     this->copy_buffer(buffer, staging_buffer, vertices.size() * sizeof(T));
     vmaDestroyBuffer(this->m_Allocator, staging_buffer, staging_alloc);
 
-    return clstl::make_shared<VulkanBuffer<T>>(
+    return clstl::make_shared<VulkanBuffer>(
         this->m_Device, this->m_Allocator, buffer, allocation, vertices.size());
   }
 

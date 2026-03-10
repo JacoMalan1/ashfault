@@ -1,6 +1,7 @@
 #ifndef ASHFAULT_FRAME_H
 #define ASHFAULT_FRAME_H
 
+#include "ashfault/renderer/descriptor_set.h"
 #include <ashfault/renderer/buffer.hpp>
 #include <ashfault/renderer/pipeline.h>
 #include <vector>
@@ -47,7 +48,7 @@ public:
 
 private:
   clstl::vector<VkRenderingAttachmentInfo> m_ColorInfos;
-  VkRenderingAttachmentInfo m_DepthInfo;
+  std::optional<VkRenderingAttachmentInfo> m_DepthInfo;
 };
 
 class Frame {
@@ -74,8 +75,9 @@ public:
                        VkRect2D rendering_area);
   void end_rendering(VkCommandBuffer cmd);
 
-  template <class V>
-  void draw(VkCommandBuffer cmd, clstl::shared_ptr<VulkanBuffer<V>> buffer) {
+  void bind_descriptor_set(VkCommandBuffer cmd, VulkanDescriptorSet *dset, GraphicsPipeline *pipeline);
+
+  void draw(VkCommandBuffer cmd, clstl::shared_ptr<VulkanBuffer> buffer) {
     vkCmdBindVertexBuffers(cmd, 0, 1, &buffer->handle(), 0);
     vkCmdDraw(cmd, buffer->count(), 1, 0, 0);
   }
