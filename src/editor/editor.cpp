@@ -1,3 +1,5 @@
+#include "glm/ext/scalar_constants.hpp"
+#include "glm/gtc/constants.hpp"
 #include <CLSTL/shared_ptr.h>
 #include <algorithm>
 #include <ashfault/core/component/mesh.h>
@@ -12,6 +14,7 @@
 #include <ashfault/renderer/renderer.h>
 #include <ashfault/renderer/swapchain.h>
 #include <glm/glm.hpp>
+#include <glm/gtc/type_ptr.hpp>
 #include <imgui.h>
 #include <imgui_impl_glfw.h>
 #include <imgui_impl_vulkan.h>
@@ -23,6 +26,8 @@
 #include <spdlog/sinks/callback_sink.h>
 #include <spdlog/spdlog.h>
 #include <vulkan/vulkan_core.h>
+
+#include <ImGuizmo.h>
 
 namespace ashfault::editor {
 
@@ -42,6 +47,7 @@ Editor::Editor(clstl::shared_ptr<Engine> engine,
 
   auto camera = std::make_shared<PerspectiveEditorCamera>(
       PerspectiveEditorCamera::builder()
+          .fov(glm::half_pi<float>())
           .aspect_ratio(static_cast<float>(m_CurrentWindowSize.width) /
                         static_cast<float>(m_CurrentWindowSize.height))
           .build());
@@ -194,8 +200,16 @@ SubmitData Editor::render_ui(Frame &frame) {
   ImGui_ImplVulkan_NewFrame();
   ImGui_ImplGlfw_NewFrame();
   ImGui::NewFrame();
+  ImGuizmo::BeginFrame();
   build_ui_skeleton();
   ImGui::Begin("Viewport");
+  ImVec2 window_pos = ImGui::GetWindowPos();
+  ImVec2 window_size = ImGui::GetWindowSize();
+  ImGuizmo::SetDrawlist();
+  ImGuizmo::SetRect(window_pos.x, window_pos.y, window_size.x, window_size.y);
+  glm::mat4 view_mat = this->m_Camera->view();
+  view_mat = glm::scale(view_mat, glm::vec3(1.0f, 1.0f, -1.0f));
+
   auto size = ImGui::GetContentRegionAvail();
   if (size.x != m_ViewportSize[0] || size.y != m_ViewportSize[1]) {
     m_ViewportResized = true;
@@ -203,7 +217,15 @@ SubmitData Editor::render_ui(Frame &frame) {
   m_ViewportSize[0] = size.x;
   m_ViewportSize[1] = size.y;
   ImGui::Image(this->m_ImGuiViewportTextures[frame.image_index()], size);
-
+  ImGuizmo::ViewManipulate(reinterpret_cast<float *>(&view_mat), 1.0f,
+                           ImGui::GetWindowPos(), ImVec2(200.0f, 200.0f), 0);
+  ImGuizmo::Enable(true);
+  view_mat = glm::scale(view_mat, glm::vec3(1.0f, 1.0f, -1.0f));
+  glm::vec3 translation, rotation, scale;
+  ImGuizmo::DecomposeMatrixToComponents(reinterpret_cast<float *>(&view_mat),
+                                        reinterpret_cast<float *>(&translation),
+                                        reinterpret_cast<float *>(&rotation),
+                                        reinterpret_cast<float *>(&scale));
   if (ImGui::IsItemHovered() &&
       ImGui::IsMouseDragging(ImGuiMouseButton_Right)) {
     this->m_Camera->rotate(glm::vec3(ImGui::GetIO().MouseDelta.y * 0.01,
@@ -423,7 +445,7 @@ void Editor::run() {
   auto &registry = scene.component_registry();
   auto mesh = Mesh::load_from_file("monkey.obj", &renderer);
   MeshComponent component{mesh};
-  TransformComponent transform{glm::vec3(0.0f, 0.0f, 1.0f), glm::vec3(0.0f),
+  TransformComponent transform{glm::vec3(0.0f, 0.0f, 1.0f), glm::vec3(glm::pi<float>(), 0.0f, 0.0f),
                                glm::vec3(1.0f)};
 
   registry.add_component(e, component);

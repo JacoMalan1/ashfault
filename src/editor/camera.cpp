@@ -1,3 +1,4 @@
+#include "glm/trigonometric.hpp"
 #include <ashfault/editor/camera.h>
 #include <cmath>
 #include <glm/ext/matrix_clip_space.hpp>
@@ -88,12 +89,22 @@ PerspectiveCameraControls::PerspectiveCameraControls(
     : m_Camera(camera) {}
 
 void PerspectiveCameraControls::render_controls() {
-  ImGui::SliderFloat("FOV", &this->m_Camera->m_Fov, 80.0f, 120.0f);
+  float fov = glm::degrees(this->m_Camera->m_Fov);
+  ImGui::SliderFloat("FOV", &fov, 80.0f, 120.0f);
+  this->m_Camera->m_Fov = glm::radians(fov);
 }
 
 float PerspectiveEditorCamera::fov() { return this->m_Fov; }
 
 void PerspectiveCameraControls::resize(float width, float height) {
   this->m_Camera->m_AspectRatio = width / height;
+}
+
+void EditorCamera::set_rotation(const glm::vec3 &rotation) {
+  this->m_Rotation = rotation;
+}
+
+void EditorCamera::set_position(const glm::vec3 &position) {
+  this->m_Position = position;
 }
 } // namespace ashfault

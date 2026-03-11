@@ -20,6 +20,9 @@ public:
   void rotate(const glm::vec3 &rotation);
   void move(const glm::vec3 &delta);
 
+  void set_rotation(const glm::vec3 &rotation);
+  void set_position(const glm::vec3 &position);
+
 protected:
   glm::vec3 m_Position, m_Rotation;
 
