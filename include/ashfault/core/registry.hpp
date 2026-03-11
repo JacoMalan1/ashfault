@@ -2,7 +2,6 @@
 #define ASHFAULT_REGISTRY_H
 
 #include <ashfault/core/entity.h>
-#include <CLSTL/shared_ptr.h>
 #include <memory>
 #include <optional>
 #include <typeindex>

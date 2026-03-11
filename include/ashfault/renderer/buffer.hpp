@@ -2,10 +2,10 @@
 #define ASHFAULT_BUFFER_H
 
 #include <cstdint>
-#include <type_traits>
 #include <vk_mem_alloc.h>
 #include <vulkan/vulkan.h>
 #include <vulkan/vulkan_core.h>
+#include <cstddef>
 
 namespace ashfault {
 /// @private
@@ -31,11 +31,8 @@ public:
 };
 #endif
 
-template <class T> class VulkanBuffer {
+class VulkanBuffer {
 public:
-  static constexpr bool is_index_buffer =
-      std::is_unsigned<T>::value && std::is_integral<T>::value;
-
   VulkanBuffer(VkDevice device, VmaAllocator allocator, VkBuffer buffer,
                VmaAllocation allocation, std::size_t count)
       : m_Device(device), m_Allocator(allocator), m_Buffer(buffer), m_Allocation(allocation), m_Count(count) {}

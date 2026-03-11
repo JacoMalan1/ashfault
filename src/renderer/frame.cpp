@@ -1,4 +1,5 @@
 #include <ashfault/renderer/frame.h>
+#include <ashfault/renderer/pipeline.h>
 #include <ashfault/renderer/renderer.h>
 #include <ashfault/renderer/swapchain.h>
 #include <vulkan/vulkan_core.h>
@@ -19,7 +20,7 @@ void Frame::bind_graphics_pipeline(VkCommandBuffer cmd,
 }
 
 void Frame::wait_and_present() {
-  clstl::vector<VkSemaphore> wait_semaphores;
+  std::vector<VkSemaphore> wait_semaphores;
   wait_semaphores.push_back(
       this->m_FrameData
           .render_finished_semaphores[this->m_FrameData.image_index]);
@@ -33,7 +34,7 @@ VulkanRenderingAttachments::VulkanRenderingAttachments() {}
 VulkanAttachmentBuilder VulkanRenderingAttachments::build_color_attachment() {
   VkRenderingAttachmentInfo info{};
   info.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
-  info.loadOp = VK_ATTACHMENT_LOAD_OP_LOAD;
+  info.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
   info.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
 
   this->m_ColorInfos.push_back(info);
@@ -43,11 +44,11 @@ VulkanAttachmentBuilder VulkanRenderingAttachments::build_color_attachment() {
 VulkanAttachmentBuilder VulkanRenderingAttachments::build_depth_attachment() {
   VkRenderingAttachmentInfo info{};
   info.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
-  info.loadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-  info.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+  info.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+  info.storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
 
   this->m_DepthInfo = info;
-  return VulkanAttachmentBuilder(&this->m_DepthInfo);
+  return VulkanAttachmentBuilder(&this->m_DepthInfo.value());
 }
 
 VulkanAttachmentBuilder::VulkanAttachmentBuilder(
@@ -113,6 +114,9 @@ void Frame::begin_rendering(VkCommandBuffer cmd,
   rendering_info.sType = VK_STRUCTURE_TYPE_RENDERING_INFO;
   rendering_info.colorAttachmentCount = attachments.m_ColorInfos.size();
   rendering_info.pColorAttachments = attachments.m_ColorInfos.data();
+  rendering_info.pDepthAttachment = attachments.m_DepthInfo.has_value()
+                                        ? &attachments.m_DepthInfo.value()
+                                        : nullptr;
   rendering_info.layerCount = 1;
   rendering_info.renderArea = rendering_area;
 
@@ -122,8 +126,8 @@ void Frame::begin_rendering(VkCommandBuffer cmd,
 void Frame::end_rendering(VkCommandBuffer cmd) { vkCmdEndRendering(cmd); }
 
 void Frame::add_command_buffer_for_submit(
-    VkCommandBuffer *cmd, const clstl::vector<VkSemaphore> &signal_semaphores,
-    const clstl::vector<VkSemaphore> &wait_semaphores,
+    VkCommandBuffer *cmd, const std::vector<VkSemaphore> &signal_semaphores,
+    const std::vector<VkSemaphore> &wait_semaphores,
     VkPipelineStageFlags *wait_stages) {
 
   vkEndCommandBuffer(*cmd);
@@ -171,4 +175,11 @@ void Frame::set_scissor(VkCommandBuffer cmd, VkRect2D scissor) {
 std::uint32_t Frame::current_frame() { return this->m_FrameData.current_frame; }
 
 VkQueue &Frame::graphics_queue() { return this->m_FrameData.graphics_queue; }
+
+void Frame::bind_descriptor_set(VkCommandBuffer cmd, VulkanDescriptorSet *dset,
+                                GraphicsPipeline *pipeline) {
+  vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS,
+                          pipeline->layout(), 0, 1, &dset->handle(), 0,
+                          nullptr);
+}
 } // namespace ashfault

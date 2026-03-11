@@ -1,6 +1,7 @@
 #ifndef ASHFAULT_FRAME_H
 #define ASHFAULT_FRAME_H
 
+#include "ashfault/renderer/descriptor_set.h"
 #include <ashfault/renderer/buffer.hpp>
 #include <ashfault/renderer/pipeline.h>
 #include <vector>
@@ -46,8 +47,8 @@ public:
   VulkanAttachmentBuilder build_depth_attachment();
 
 private:
-  clstl::vector<VkRenderingAttachmentInfo> m_ColorInfos;
-  VkRenderingAttachmentInfo m_DepthInfo;
+  std::vector<VkRenderingAttachmentInfo> m_ColorInfos;
+  std::optional<VkRenderingAttachmentInfo> m_DepthInfo;
 };
 
 class Frame {
@@ -74,15 +75,16 @@ public:
                        VkRect2D rendering_area);
   void end_rendering(VkCommandBuffer cmd);
 
-  template <class V>
-  void draw(VkCommandBuffer cmd, clstl::shared_ptr<VulkanBuffer<V>> buffer) {
+  void bind_descriptor_set(VkCommandBuffer cmd, VulkanDescriptorSet *dset, GraphicsPipeline *pipeline);
+
+  void draw(VkCommandBuffer cmd, std::shared_ptr<VulkanBuffer> buffer) {
     vkCmdBindVertexBuffers(cmd, 0, 1, &buffer->handle(), 0);
     vkCmdDraw(cmd, buffer->count(), 1, 0, 0);
   }
 
   void add_command_buffer_for_submit(
-      VkCommandBuffer *cmd, const clstl::vector<VkSemaphore> &signal_semaphores,
-      const clstl::vector<VkSemaphore> &wait_semaphores,
+      VkCommandBuffer *cmd, const std::vector<VkSemaphore> &signal_semaphores,
+      const std::vector<VkSemaphore> &wait_semaphores,
       VkPipelineStageFlags *wait_stages);
 
   void submit_all(VkFence fence);
@@ -97,7 +99,7 @@ public:
 
 private:
   FrameData m_FrameData;
-  clstl::vector<VkSubmitInfo> m_Submits;
+  std::vector<VkSubmitInfo> m_Submits;
 };
 } // namespace ashfault
 

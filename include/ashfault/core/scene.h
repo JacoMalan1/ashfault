@@ -1,19 +1,15 @@
 #ifndef ASHFAULT_SCENE_H
 #define ASHFAULT_SCENE_H
 
-#include <CLSTL/vector.h>
 #include <ashfault/core/engine.h>
 #include <ashfault/core/entity.h>
 #include <ashfault/core/registry.hpp>
 #include <ashfault/renderer/frame.h>
 #include <glm/glm.hpp>
 #include <vulkan/vulkan.h>
+#include <vector>
 
 namespace ashfault {
-struct Vertex {
-  glm::vec3 position;
-};
-
 class Scene {
 public:
   Scene();
@@ -28,7 +24,7 @@ public:
 private:
   Entity::id_type m_NextEntityId;
   ComponentRegistry m_ComponentRegistry;
-  clstl::vector<Entity> m_Entities;
+  std::vector<Entity> m_Entities;
 };
 } // namespace ashfault
 

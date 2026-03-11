@@ -37,11 +37,11 @@ WindowDims Window::current_size() const {
           static_cast<std::uint32_t>(height)};
 }
 
-clstl::vector<const char *> Window::required_instance_extensions() {
+std::vector<const char *> Window::required_instance_extensions() {
   std::uint32_t count;
   const char **extensions = glfwGetRequiredInstanceExtensions(&count);
 
-  clstl::vector<const char *> ret;
+  std::vector<const char *> ret;
   ret.resize(count);
   for (std::size_t i = 0; i < ret.size(); i++) {
     ret[i] = extensions[i];

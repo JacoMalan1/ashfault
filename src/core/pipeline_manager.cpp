@@ -1,10 +1,9 @@
-#include "CLSTL/shared_ptr.h"
 #include "ashfault/renderer/pipeline.h"
 #include <ashfault/core/pipeline_manager.h>
 
 namespace ashfault {
 void PipelineManager::add_graphics_pipeline(
-    const std::string &name, clstl::shared_ptr<GraphicsPipeline> pipeline) {
+    const std::string &name, std::shared_ptr<GraphicsPipeline> pipeline) {
   this->m_Pipelines[name] = pipeline;
 }
 

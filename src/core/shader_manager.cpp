@@ -17,7 +17,7 @@ void ShaderManager::add_fragment_shader(Renderer *renderer,
   this->m_FragmentShaders[name] = shader;
 }
 
-std::optional<clstl::shared_ptr<VulkanShader>>
+std::optional<std::shared_ptr<VulkanShader>>
 ShaderManager::get_vertex_shader(const std::string &name) {
   if (!this->m_VertexShaders.count(name))
     return {};
@@ -25,7 +25,7 @@ ShaderManager::get_vertex_shader(const std::string &name) {
   return this->m_VertexShaders[name];
 }
 
-std::optional<clstl::shared_ptr<VulkanShader>>
+std::optional<std::shared_ptr<VulkanShader>>
 ShaderManager::get_fragment_shader(const std::string &name) {
   if (!this->m_FragmentShaders.count(name))
     return {};

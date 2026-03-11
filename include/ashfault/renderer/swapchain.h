@@ -1,7 +1,6 @@
 #ifndef ASHFAULT_RENDERER_SWAPCHAIN_H
 #define ASHFAULT_RENDERER_SWAPCHAIN_H
 
-#include <CLSTL/vector.h>
 #include <ashfault/renderer/renderer.h>
 #include <cstdint>
 #include <vk_mem_alloc.h>
@@ -23,7 +22,7 @@ public:
 
   void cleanup();
 
-  void present(VkQueue queue, const clstl::vector<VkSemaphore> &wait_semaphores,
+  void present(VkQueue queue, const std::vector<VkSemaphore> &wait_semaphores,
                std::uint32_t image_index);
   VkSurfaceFormatKHR surface_format();
   VkExtent2D &swap_extent();
@@ -34,8 +33,8 @@ public:
 private:
   std::uint32_t m_ImageCount;
   VkSwapchainKHR m_Handle;
-  clstl::vector<VkImage> m_Images;
-  clstl::vector<VkImageView> m_ImageViews;
+  std::vector<VkImage> m_Images;
+  std::vector<VkImageView> m_ImageViews;
   VkExtent2D m_SwapExtent;
   VkSurfaceFormatKHR m_SurfaceFormat;
   VkPresentModeKHR m_PresentMode;

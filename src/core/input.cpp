@@ -3,7 +3,7 @@
 #include <cstring>
 
 namespace ashfault {
-Input::Input(clstl::shared_ptr<Window> window) : m_Window(window) {
+Input::Input(std::shared_ptr<Window> window) : m_Window(window) {
   std::memset(this->m_Keys.data(), 0, this->m_Keys.size() * sizeof(bool));
   window->set_key_callback([&](Window &, int key, int, int action, int) {
     if (action == GLFW_PRESS) {

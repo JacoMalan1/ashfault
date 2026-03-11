@@ -1,9 +1,6 @@
 #ifndef ASHFAULT_RENDERER_H
 #define ASHFAULT_RENDERER_H
 
-#include <CLSTL/shared_ptr.h>
-#include <CLSTL/string.h>
-#include <CLSTL/vector.h>
 #include <ashfault/core/window.h>
 #include <ashfault/renderer/buffer.hpp>
 #include <ashfault/renderer/descriptor_set.h>
@@ -15,6 +12,7 @@
 #include <functional>
 #include <optional>
 #include <vk_mem_alloc.h>
+#include <stdexcept>
 
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
@@ -39,8 +37,8 @@ struct QueueSuitability {
 };
 
 struct SwapchainSupportDetails {
-  clstl::vector<VkPresentModeKHR> present_modes;
-  clstl::vector<VkSurfaceFormatKHR> formats;
+  std::vector<VkPresentModeKHR> present_modes;
+  std::vector<VkSurfaceFormatKHR> formats;
   VkSurfaceCapabilitiesKHR capabilities;
 };
 
@@ -56,12 +54,12 @@ public:
   std::vector<VkCommandBuffer> allocate_command_buffers(std::uint32_t count);
 
   /// @brief Initializes the renderer.
-  void init(clstl::shared_ptr<Window> window);
+  void init(std::shared_ptr<Window> window);
 
   /// @brief Creates a vulkan shader module object.
   /// @param path Path to the pre-compiled SPIR-V shader binary.
-  clstl::shared_ptr<VulkanShader>
-  create_shader(const clstl::string &path) const;
+  std::shared_ptr<VulkanShader>
+  create_shader(const std::string &path) const;
 
   /// @brief Returns a graphics pipeline builder.
   GraphicsPipelineBuilder create_graphics_pipeline() const;
@@ -134,10 +132,12 @@ public:
   /// @brief Returns a handle to the GPU memory allocator.
   VmaAllocator allocator();
 
-  clstl::array<std::uint32_t, 2> viewport_size() const;
+  VkSampleCountFlagBits msaa_samples() const;
+
+  std::array<std::uint32_t, 2> viewport_size() const;
 
   template <class T>
-  clstl::shared_ptr<VulkanBuffer<T>> create_uniform_buffer(const T &data) {
+  std::shared_ptr<VulkanBuffer> create_uniform_buffer(const T &data) {
     VmaAllocationCreateInfo alloc_info{};
     alloc_info.usage = VMA_MEMORY_USAGE_AUTO;
     alloc_info.requiredFlags = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
@@ -164,7 +164,7 @@ public:
     this->copy_buffer(buffer, staging_buffer, sizeof(T));
     vmaDestroyBuffer(this->m_Allocator, staging_buffer, staging_alloc);
 
-    return clstl::make_shared<VulkanBuffer<T>>(
+    return std::make_shared<VulkanBuffer>(
         this->m_Device, this->m_Allocator, buffer, allocation, 1);
   }
 
@@ -173,8 +173,8 @@ public:
   /// @note This function can only be instantiated with unsigned integers of
   /// size 8, 16, and 32 bits.
   template <class T>
-  clstl::shared_ptr<VulkanBuffer<T>>
-  create_index_buffer(const clstl::vector<T> &indices) {
+  std::shared_ptr<VulkanBuffer>
+  create_index_buffer(const std::vector<T> &indices) {
     static_assert(std::is_integral<T>::value && std::is_unsigned<T>::value);
 
     VmaAllocationCreateInfo alloc_info{};
@@ -204,14 +204,14 @@ public:
     this->copy_buffer(buffer, staging_buffer, indices.size() * sizeof(T));
     vmaDestroyBuffer(this->m_Allocator, staging_buffer, staging_alloc);
 
-    return clstl::make_shared<VulkanBuffer<T>>(
+    return std::make_shared<VulkanBuffer>(
         this->m_Device, this->m_Allocator, buffer, allocation, indices.size());
   }
 
   /// @brief Creates a vertex buffer.
   template <class T>
-  clstl::shared_ptr<VulkanBuffer<T>>
-  create_vertex_buffer(const clstl::vector<T> &vertices) {
+  std::shared_ptr<VulkanBuffer>
+  create_vertex_buffer(const std::vector<T> &vertices) {
     VmaAllocationCreateInfo alloc_info{};
     alloc_info.usage = VMA_MEMORY_USAGE_AUTO;
     alloc_info.requiredFlags = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
@@ -239,7 +239,7 @@ public:
     this->copy_buffer(buffer, staging_buffer, vertices.size() * sizeof(T));
     vmaDestroyBuffer(this->m_Allocator, staging_buffer, staging_alloc);
 
-    return clstl::make_shared<VulkanBuffer<T>>(
+    return std::make_shared<VulkanBuffer>(
         this->m_Device, this->m_Allocator, buffer, allocation, vertices.size());
   }
 
@@ -247,7 +247,7 @@ private:
   const std::vector<const char *> s_DeviceExtensions = {
       VK_KHR_SWAPCHAIN_EXTENSION_NAME};
 
-  clstl::shared_ptr<Window> m_Window;
+  std::shared_ptr<Window> m_Window;
   VkInstance m_Instance;
   VkPhysicalDevice m_PhysicalDevice;
   VkDevice m_Device;
@@ -266,13 +266,6 @@ private:
   VkCommandPool m_CommandPool;
   VkSampleCountFlagBits m_MsaaSamples;
 
-  clstl::vector<std::pair<VkImage, VmaAllocation>> m_ViewportImages;
-  clstl::vector<VkImageView> m_ViewportImageViews;
-  clstl::vector<VkDescriptorSet> m_ImGuiViewportTextures;
-  VkSampler m_ImGuiViewportSampler;
-
-  clstl::array<std::uint32_t, 2> m_ViewportSize;
-
   Swapchain *m_Swapchain;
 
   bool m_Resized;
@@ -288,8 +281,8 @@ private:
   void setup_imgui();
 
   VkSurfaceFormatKHR
-  select_surface_format(const clstl::vector<VkSurfaceFormatKHR> &);
-  VkPresentModeKHR select_present_mode(const clstl::vector<VkPresentModeKHR> &);
+  select_surface_format(const std::vector<VkSurfaceFormatKHR> &);
+  VkPresentModeKHR select_present_mode(const std::vector<VkPresentModeKHR> &);
   VkExtent2D choose_swap_extent(VkSurfaceCapabilitiesKHR caps);
 
   bool check_device_suitability(VkPhysicalDevice device);

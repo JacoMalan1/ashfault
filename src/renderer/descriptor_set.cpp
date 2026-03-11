@@ -20,10 +20,10 @@ VulkanDescriptorSetBuilder &VulkanDescriptorSetBuilder::add_binding(
   return *this;
 }
 
-std::pair<clstl::vector<clstl::shared_ptr<VulkanDescriptorSet>>,
-          clstl::shared_ptr<VulkanDescriptorPool>>
+std::pair<std::vector<std::shared_ptr<VulkanDescriptorSet>>,
+          std::shared_ptr<VulkanDescriptorPool>>
 VulkanDescriptorSetBuilder::build() {
-  clstl::vector<VkDescriptorSetLayout> layouts;
+  std::vector<VkDescriptorSetLayout> layouts;
   layouts.reserve(this->m_Bindings.size());
 
   for (const auto &binding : this->m_Bindings) {
@@ -40,10 +40,10 @@ VulkanDescriptorSetBuilder::build() {
     layouts.push_back(layout);
   }
 
-  clstl::vector<std::uint32_t> counts;
+  std::vector<std::uint32_t> counts;
   counts.reserve(this->m_Bindings.size());
 
-  clstl::vector<VkDescriptorPoolSize> pool_sizes;
+  std::vector<VkDescriptorPoolSize> pool_sizes;
   pool_sizes.reserve(this->m_Bindings.size());
   for (const auto &binding : this->m_Bindings) {
     VkDescriptorPoolSize el{};
@@ -77,21 +77,21 @@ VulkanDescriptorSetBuilder::build() {
   alloc_info.pSetLayouts = layouts.data();
   alloc_info.descriptorSetCount = layouts.size();
 
-  clstl::vector<VkDescriptorSet> descriptor_sets;
+  std::vector<VkDescriptorSet> descriptor_sets;
   descriptor_sets.resize(layouts.size());
   if (vkAllocateDescriptorSets(this->m_Device, &alloc_info,
                                descriptor_sets.data()) != VK_SUCCESS) {
     throw std::runtime_error("Failed to allocate descriptor sets");
   }
 
-  clstl::vector<clstl::shared_ptr<VulkanDescriptorSet>> dsets{};
+  std::vector<std::shared_ptr<VulkanDescriptorSet>> dsets{};
   for (std::size_t i = 0; i < descriptor_sets.size(); i++) {
-    dsets.push_back(clstl::make_shared<VulkanDescriptorSet>(
+    dsets.push_back(std::make_shared<VulkanDescriptorSet>(
         this->m_Device, descriptor_sets[i], layouts[i]));
   }
 
   auto ret_pool =
-      clstl::make_shared<VulkanDescriptorPool>(this->m_Device, pool);
+      std::make_shared<VulkanDescriptorPool>(this->m_Device, pool);
   return std::make_pair(dsets, ret_pool);
 }
 

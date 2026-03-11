@@ -86,7 +86,7 @@ std::optional<std::uint32_t> Swapchain::acquire_image(VkSemaphore semaphore) {
 std::uint32_t Swapchain::image_count() const { return this->m_ImageCount; }
 
 void Swapchain::present(VkQueue queue,
-                        const clstl::vector<VkSemaphore> &wait_semaphores,
+                        const std::vector<VkSemaphore> &wait_semaphores,
                         std::uint32_t image_index) {
   VkPresentInfoKHR present_info{};
   present_info.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;

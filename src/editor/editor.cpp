@@ -1,41 +1,98 @@
-#include <spdlog/common.h>
-#include <CLSTL/shared_ptr.h>
 #include <algorithm>
 #include <ashfault/core/component/mesh.h>
 #include <ashfault/core/component/transform.h>
 #include <ashfault/core/scene.h>
+#include <ashfault/core/vertex.h>
 #include <ashfault/core/window.h>
+#include <ashfault/editor/camera.h>
 #include <ashfault/editor/editor.h>
+#include <ashfault/renderer/descriptor_set.h>
 #include <ashfault/renderer/frame.h>
 #include <ashfault/renderer/renderer.h>
 #include <ashfault/renderer/swapchain.h>
+#include <glm/ext/scalar_constants.hpp>
 #include <glm/glm.hpp>
+#include <glm/gtc/constants.hpp>
+#include <glm/gtc/type_ptr.hpp>
 #include <imgui.h>
 #include <imgui_impl_glfw.h>
 #include <imgui_impl_vulkan.h>
 #include <imgui_internal.h>
 #include <memory>
 #include <mutex>
+#include <spdlog/common.h>
 #include <spdlog/details/log_msg.h>
 #include <spdlog/sinks/callback_sink.h>
 #include <spdlog/spdlog.h>
 #include <vulkan/vulkan_core.h>
 
-namespace ashfault {
+#include <ImGuizmo.h>
 
-Editor::Editor(clstl::shared_ptr<Engine> engine,
-               clstl::shared_ptr<Window> window)
+namespace ashfault::editor {
+
+Editor::Editor(std::shared_ptr<Engine> engine,
+               std::shared_ptr<Window> window)
     : Application(engine, window),
       m_ViewportSize({(std::uint32_t)1, (std::uint32_t)1}),
       m_CurrentWindowSize({1, 1}), m_ViewportResized(false), m_LogsLock(),
-      m_Logs() {
+      m_Logs(), m_PipelineManager(std::make_unique<PipelineManager>()) {
   auto callback_sink = std::make_shared<spdlog::sinks::callback_sink_mt>(
       [&](const spdlog::details::log_msg &msg) {
         std::unique_lock<std::mutex> lck(m_LogsLock);
-        m_Logs.push_back(std::make_pair<>(msg, msg.payload.data()));
+        auto *data = new char[msg.payload.size() + 1];
+        std::memcpy(data, msg.payload.data(), msg.payload.size());
+        data[msg.payload.size()] = 0;
+        std::string payload(data);
+        delete[] data;
+        m_Logs.push_back(std::make_pair<>(msg, payload));
       });
   callback_sink->set_level(spdlog::level::debug);
   spdlog::default_logger()->sinks().push_back(callback_sink);
+
+  auto camera = std::make_shared<PerspectiveEditorCamera>(
+      PerspectiveEditorCamera::builder()
+          .fov(glm::half_pi<float>())
+          .aspect_ratio(static_cast<float>(m_CurrentWindowSize.width) /
+                        static_cast<float>(m_CurrentWindowSize.height))
+          .build());
+  this->m_CameraControls = std::make_unique<PerspectiveCameraControls>(camera);
+  this->m_Camera = camera;
+}
+
+void Editor::build_pipelines() {
+  VkVertexInputAttributeDescription desc{};
+  desc.binding = 0;
+  desc.offset = 0;
+  desc.location = 0;
+  desc.format = VK_FORMAT_R32G32B32_SFLOAT;
+
+  VkVertexInputAttributeDescription normal{};
+  normal.binding = 0;
+  normal.location = 1;
+  normal.offset = 3 * sizeof(float);
+  normal.format = VK_FORMAT_R32G32B32_SFLOAT;
+
+  std::vector<VkVertexInputAttributeDescription> descriptions;
+  descriptions.push_back(desc);
+  descriptions.push_back(normal);
+
+  std::vector<std::shared_ptr<VulkanDescriptorSet>> dsets;
+  dsets.push_back(this->m_DescriptorSet);
+
+  auto pipeline =
+      this->m_Engine->renderer()
+          .create_graphics_pipeline()
+          .vertex_shader(this->m_Engine->shader_manager()
+                             .get_vertex_shader("blinn_phong")
+                             .value())
+          .fragment_shader(this->m_Engine->shader_manager()
+                               .get_fragment_shader("blinn_phong")
+                               .value())
+          .input_attribute_descriptions(descriptions, sizeof(StaticVertex))
+          .descriptor_sets(dsets)
+          .push_constant(VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(glm::mat4))
+          .build();
+  this->m_Engine->pipeline_manager().add_graphics_pipeline("simple", pipeline);
 }
 
 void Editor::build_ui_skeleton() {
@@ -85,6 +142,7 @@ void Editor::build_ui_skeleton() {
     }
     ImGui::EndMenuBar();
   }
+  this->m_CameraControls->render_controls();
   ImGui::End();
 
   ImGui::Begin("Console");
@@ -146,8 +204,16 @@ SubmitData Editor::render_ui(Frame &frame) {
   ImGui_ImplVulkan_NewFrame();
   ImGui_ImplGlfw_NewFrame();
   ImGui::NewFrame();
+  ImGuizmo::BeginFrame();
   build_ui_skeleton();
   ImGui::Begin("Viewport");
+  ImVec2 window_pos = ImGui::GetWindowPos();
+  ImVec2 window_size = ImGui::GetWindowSize();
+  ImGuizmo::SetDrawlist();
+  ImGuizmo::SetRect(window_pos.x, window_pos.y, window_size.x, window_size.y);
+  glm::mat4 view_mat = this->m_Camera->view();
+  view_mat = glm::scale(view_mat, glm::vec3(1.0f, 1.0f, -1.0f));
+
   auto size = ImGui::GetContentRegionAvail();
   if (size.x != m_ViewportSize[0] || size.y != m_ViewportSize[1]) {
     m_ViewportResized = true;
@@ -155,6 +221,33 @@ SubmitData Editor::render_ui(Frame &frame) {
   m_ViewportSize[0] = size.x;
   m_ViewportSize[1] = size.y;
   ImGui::Image(this->m_ImGuiViewportTextures[frame.image_index()], size);
+  ImGuizmo::ViewManipulate(reinterpret_cast<float *>(&view_mat), 1.0f,
+                           ImGui::GetWindowPos(), ImVec2(200.0f, 200.0f), 0);
+  ImGuizmo::Enable(true);
+  view_mat = glm::scale(view_mat, glm::vec3(1.0f, 1.0f, -1.0f));
+  glm::vec3 translation, rotation, scale;
+  ImGuizmo::DecomposeMatrixToComponents(reinterpret_cast<float *>(&view_mat),
+                                        reinterpret_cast<float *>(&translation),
+                                        reinterpret_cast<float *>(&rotation),
+                                        reinterpret_cast<float *>(&scale));
+  if (ImGui::IsItemHovered() &&
+      ImGui::IsMouseDragging(ImGuiMouseButton_Right)) {
+    this->m_Camera->rotate(glm::vec3(ImGui::GetIO().MouseDelta.y * 0.01,
+                                     -ImGui::GetIO().MouseDelta.x * 0.01,
+                                     0.0f));
+  }
+
+  if (ImGui::IsItemHovered() &&
+      ImGui::IsMouseDragging(ImGuiMouseButton_Middle)) {
+    auto delta = ImGui::GetIO().MouseDelta;
+    this->m_Camera->move(0.01f * glm::vec3(-delta.x, -delta.y, 0.0f));
+  }
+
+  if (ImGui::IsItemHovered()) {
+    this->m_Camera->move(0.08f *
+                         glm::vec3(0.0f, 0.0f, -ImGui::GetIO().MouseWheel));
+  }
+
   ImGui::End();
   ImGui::Render();
   auto draw_data = ImGui::GetDrawData();
@@ -201,8 +294,12 @@ SubmitData Editor::render_viewport(Frame &frame, Scene &scene) {
   VulkanRenderingAttachments attachments;
   attachments.build_color_attachment()
       .clear_color(0.0f, 0.0f, 0.0f, 1.0f)
-      .target(m_ViewportImageViews[image_i],
-              VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+      .target(m_ColorImageView, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL)
+      .resolve_target(m_ViewportImageViews[image_i],
+                      VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+
+  attachments.build_depth_attachment().clear_depth(1.0f).target(
+      m_DepthImageView, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL);
 
   VkRect2D render_area{};
   render_area.extent.width = image_width;
@@ -215,14 +312,31 @@ SubmitData Editor::render_viewport(Frame &frame, Scene &scene) {
       VK_ACCESS_NONE, VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
       VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
       VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT);
+  frame.insert_pipeline_barrier(
+      cmd, this->m_ColorImage.first, VK_IMAGE_ASPECT_COLOR_BIT,
+      VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+      VK_ACCESS_NONE, VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
+      VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
+      VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT);
+  frame.insert_pipeline_barrier(
+      cmd, m_DepthImage.first, VK_IMAGE_ASPECT_DEPTH_BIT,
+      VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL,
+      VK_ACCESS_NONE,
+      VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT |
+          VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT,
+      VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
+      VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT);
   frame.begin_rendering(cmd, attachments, render_area);
+  frame.bind_descriptor_set(
+      cmd, this->m_DescriptorSet.get(),
+      this->m_Engine->pipeline_manager().get_graphics_pipeline("simple"));
   scene.record_command_buffers(cmd, *this->m_Engine, frame);
   frame.end_rendering(cmd);
   VkPipelineStageFlags wait_stages =
       VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-  clstl::vector<VkSemaphore> signal_semaphores = {
+  std::vector<VkSemaphore> signal_semaphores = {
       frame.render_finished_semaphore()};
-  clstl::vector<VkSemaphore> wait_semaphores = {
+  std::vector<VkSemaphore> wait_semaphores = {
       frame.image_available_semaphore()};
   return {wait_semaphores, signal_semaphores, wait_stages};
 }
@@ -230,6 +344,7 @@ SubmitData Editor::render_viewport(Frame &frame, Scene &scene) {
 void Editor::create_images() {
   auto &renderer = this->m_Engine->renderer();
   vkDeviceWaitIdle(renderer.device());
+  VkSampleCountFlagBits msaa_samples = renderer.msaa_samples();
 
   this->m_ViewportImages.resize(renderer.swapchain()->image_count());
   this->m_ViewportImageViews.resize(renderer.swapchain()->image_count());
@@ -241,11 +356,26 @@ void Editor::create_images() {
   std::uint32_t image_height =
       std::clamp<std::uint32_t>(m_ViewportSize[1], 1, 8192);
 
-  for (std::size_t i = 0; i < renderer.swapchain()->image_count(); i++) {
-    VmaAllocationCreateInfo alloc_info{};
-    alloc_info.requiredFlags = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
-    alloc_info.usage = VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE;
+  VmaAllocationCreateInfo alloc_info{};
+  alloc_info.requiredFlags = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
+  alloc_info.usage = VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE;
 
+  this->m_DepthImage = renderer.create_image(
+      image_width, image_height, msaa_samples, VK_FORMAT_D32_SFLOAT,
+      VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
+      alloc_info);
+  this->m_DepthImageView =
+      renderer.create_image_view(this->m_DepthImage.first, VK_FORMAT_D32_SFLOAT,
+                                 VK_IMAGE_ASPECT_DEPTH_BIT);
+  this->m_ColorImage = renderer.create_image(
+      image_width, image_height, msaa_samples,
+      renderer.swapchain()->surface_format().format, VK_IMAGE_TILING_OPTIMAL,
+      VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, alloc_info);
+  this->m_ColorImageView = renderer.create_image_view(
+      this->m_ColorImage.first, renderer.swapchain()->surface_format().format,
+      VK_IMAGE_ASPECT_COLOR_BIT);
+
+  for (std::size_t i = 0; i < renderer.swapchain()->image_count(); i++) {
     auto viewport_image = renderer.create_image(
         image_width, image_height, VK_SAMPLE_COUNT_1_BIT,
         renderer.swapchain()->surface_format().format, VK_IMAGE_TILING_OPTIMAL,
@@ -265,12 +395,54 @@ void Editor::create_images() {
 
 void Editor::clean_images() {
   auto &renderer = this->m_Engine->renderer();
+  vkDestroyImageView(renderer.device(), this->m_DepthImageView, nullptr);
+  vkDestroyImageView(renderer.device(), this->m_ColorImageView, nullptr);
+  vmaDestroyImage(renderer.allocator(), m_ColorImage.first,
+                  m_ColorImage.second);
+  vmaDestroyImage(renderer.allocator(), m_DepthImage.first,
+                  m_DepthImage.second);
   for (std::size_t i = 0; i < m_ViewportImages.size(); i++) {
     vkDestroyImageView(renderer.device(), m_ViewportImageViews[i], nullptr);
     vmaDestroyImage(renderer.allocator(), m_ViewportImages[i].first,
                     m_ViewportImages[i].second);
     ImGui_ImplVulkan_RemoveTexture(m_ImGuiViewportTextures[i]);
   }
+}
+
+void Editor::create_descriptor_sets() {
+  auto [dset, pool] = this->m_Engine->renderer()
+                          .create_descriptor_sets()
+                          .add_binding(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+                                       VK_SHADER_STAGE_VERTEX_BIT, 1, 0)
+                          .build();
+
+  this->m_DescriptorSet = dset[0];
+  this->m_DescriptorPool = pool;
+  this->update_camera();
+}
+
+void Editor::update_camera() {
+  UniformBufferObject ubo{};
+  ubo.projection = this->m_Camera->projection();
+  ubo.view = this->m_Camera->view();
+  auto buffer = this->m_Engine->renderer().create_uniform_buffer(ubo);
+
+  VkDescriptorBufferInfo buffer_info{};
+  buffer_info.offset = 0;
+  buffer_info.buffer = buffer->handle();
+  buffer_info.range = sizeof(UniformBufferObject);
+
+  VkWriteDescriptorSet write{};
+  write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+  write.descriptorCount = 1;
+  write.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+  write.pBufferInfo = &buffer_info;
+  write.dstBinding = 0;
+  write.dstSet = this->m_DescriptorSet->handle();
+
+  vkUpdateDescriptorSets(this->m_Engine->renderer().device(), 1, &write, 0,
+                         nullptr);
+  this->m_UniformBuffer = buffer;
 }
 
 void Editor::run() {
@@ -281,6 +453,7 @@ void Editor::run() {
 
   SPDLOG_INFO("Current window size: {}, {}", m_CurrentWindowSize.width,
               m_CurrentWindowSize.height);
+
   this->m_PrimaryCommandBuffers =
       renderer.allocate_command_buffers(renderer.swapchain()->image_count());
   this->m_UiCommandBuffers =
@@ -292,27 +465,16 @@ void Editor::run() {
   Scene scene{};
   auto e = scene.create_entity();
   auto &registry = scene.component_registry();
-  registry.add_component<TransformComponent>(
-      e, {glm::vec3(0), glm::vec3(0), glm::vec3(1)});
+  auto mesh = Mesh::load_from_file("monkey.obj", &renderer);
+  MeshComponent component{mesh};
+  TransformComponent transform{glm::vec3(0.0f, 0.0f, 1.0f),
+                               glm::vec3(glm::pi<float>(), 0.0f, 0.0f),
+                               glm::vec3(1.0f)};
 
-  clstl::vector<Vertex> vertices;
-  vertices.push_back({glm::vec3(0.0f, -0.5f, 0.0f)});
-  vertices.push_back({glm::vec3(-0.5f, 0.5f, 0.0f)});
-  vertices.push_back({glm::vec3(0.5f, 0.5f, 0.0f)});
-
-  clstl::vector<std::uint16_t> indices;
-  indices.push_back(0);
-  indices.push_back(1);
-  indices.push_back(2);
-
-  auto vbuf = renderer.create_vertex_buffer(vertices);
-  auto ibuf = renderer.create_index_buffer(indices);
-
-  MeshComponent<Vertex, std::uint16_t> mesh;
-  mesh.vertex_buffer = vbuf;
-  mesh.index_buffer = ibuf;
-
-  registry.add_component<MeshComponent<Vertex, std::uint16_t>>(e, mesh);
+  registry.add_component(e, component);
+  registry.add_component(e, transform);
+  this->create_descriptor_sets();
+  this->build_pipelines();
 
   while (!this->m_Window->should_close()) {
     this->m_Input->frame_start();
@@ -341,7 +503,7 @@ void Editor::run() {
       VkPipelineStageFlags wait_stage =
           VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
 
-      clstl::array<VkCommandBuffer, 2> cmd_buffers = {
+      std::array<VkCommandBuffer, 2> cmd_buffers = {
           this->m_PrimaryCommandBuffers[frame->current_frame()],
           m_UiCommandBuffers[frame->current_frame()]};
 
@@ -364,6 +526,10 @@ void Editor::run() {
       this->clean_images();
       this->create_images();
     }
+    if (m_ViewportResized) {
+      this->m_CameraControls->resize(m_ViewportSize[0], m_ViewportSize[1]);
+    }
+    this->update_camera();
     this->m_Window->poll_events();
   }
 }
@@ -373,4 +539,4 @@ Editor::~Editor() {
   vkDestroySampler(this->m_Engine->renderer().device(), this->m_ViewportSampler,
                    nullptr);
 }
-} // namespace ashfault
+} // namespace ashfault::editor

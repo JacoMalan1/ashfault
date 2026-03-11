@@ -1,9 +1,8 @@
-#include <CLSTL/algorithm.h>
-#include <CLSTL/array.h>
-#include <CLSTL/shared_ptr.h>
 #include <ashfault/renderer/descriptor_set.h>
 #include <ashfault/renderer/pipeline.h>
 #include <vulkan/vulkan_core.h>
+#include <stdexcept>
+#include <algorithm>
 
 namespace ashfault {
 GraphicsPipeline::GraphicsPipeline(VkDevice device, VkPipelineLayout layout,
@@ -18,17 +17,29 @@ GraphicsPipeline::~GraphicsPipeline() {
 
 GraphicsPipelineBuilder::GraphicsPipelineBuilder(
     VkDevice device, VkFormat swapchain_image_format,
-    clstl::array<std::uint32_t, 2> window_dims,
+    std::array<std::uint32_t, 2> window_dims,
     VkSampleCountFlagBits msaa_samples)
     : m_VertexShader(), m_FragmentShader(), m_DescriptorSets(),
       m_Device(device), m_ImageFormat(swapchain_image_format),
       m_MsaaSamples(msaa_samples), m_WindowDims(std::move(window_dims)) {}
 
-clstl::shared_ptr<GraphicsPipeline> GraphicsPipelineBuilder::build() {
-  clstl::vector<VkDescriptorSetLayout> dset_layouts;
+GraphicsPipelineBuilder &
+GraphicsPipelineBuilder::push_constant(VkShaderStageFlags stage,
+                                       VkDeviceSize offset, VkDeviceSize size) {
+  VkPushConstantRange range{};
+  range.stageFlags = stage;
+  range.offset = offset;
+  range.size = size;
+
+  this->m_PushConstants.push_back(range);
+  return *this;
+}
+
+std::shared_ptr<GraphicsPipeline> GraphicsPipelineBuilder::build() {
+  std::vector<VkDescriptorSetLayout> dset_layouts;
   dset_layouts.reserve(this->m_DescriptorSets.size());
-  clstl::for_each(m_DescriptorSets.begin(), m_DescriptorSets.end(),
-                  [&](clstl::shared_ptr<VulkanDescriptorSet> set) {
+  std::for_each(m_DescriptorSets.begin(), m_DescriptorSets.end(),
+                  [&](std::shared_ptr<VulkanDescriptorSet> set) {
                     dset_layouts.push_back(set->layout());
                   });
 
@@ -37,6 +48,8 @@ clstl::shared_ptr<GraphicsPipeline> GraphicsPipelineBuilder::build() {
   pipeline_layout_info.setLayoutCount = dset_layouts.size();
   pipeline_layout_info.pSetLayouts =
       dset_layouts.empty() ? nullptr : dset_layouts.data();
+  pipeline_layout_info.pushConstantRangeCount = m_PushConstants.size();
+  pipeline_layout_info.pPushConstantRanges = m_PushConstants.data();
 
   VkPipelineLayout pipeline_layout;
   if (vkCreatePipelineLayout(this->m_Device, &pipeline_layout_info, nullptr,
@@ -58,10 +71,10 @@ clstl::shared_ptr<GraphicsPipeline> GraphicsPipelineBuilder::build() {
   fshader_stage_info.module = this->m_FragmentShader.value()->handle();
   fshader_stage_info.pName = "main";
 
-  clstl::array<VkPipelineShaderStageCreateInfo, 2> stages = {
+  std::array<VkPipelineShaderStageCreateInfo, 2> stages = {
       vshader_stage_info, fshader_stage_info};
 
-  clstl::array<VkDynamicState, 2> dynamic_states = {VK_DYNAMIC_STATE_VIEWPORT,
+  std::array<VkDynamicState, 2> dynamic_states = {VK_DYNAMIC_STATE_VIEWPORT,
                                                     VK_DYNAMIC_STATE_SCISSOR};
 
   VkPipelineDynamicStateCreateInfo dynamic_state_info{};
@@ -90,15 +103,15 @@ clstl::shared_ptr<GraphicsPipeline> GraphicsPipelineBuilder::build() {
   VkPipelineMultisampleStateCreateInfo multisample_info{};
   multisample_info.sType =
       VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
-  multisample_info.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
+  multisample_info.rasterizationSamples = this->m_MsaaSamples;
   multisample_info.sampleShadingEnable = VK_FALSE;
 
   VkPipelineDepthStencilStateCreateInfo depth_stencil_info{};
   depth_stencil_info.sType =
       VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
   depth_stencil_info.depthCompareOp = VK_COMPARE_OP_LESS;
-  depth_stencil_info.depthTestEnable = VK_FALSE;
-  depth_stencil_info.depthWriteEnable = VK_FALSE;
+  depth_stencil_info.depthTestEnable = VK_TRUE;
+  depth_stencil_info.depthWriteEnable = VK_TRUE;
   depth_stencil_info.depthBoundsTestEnable = VK_FALSE;
   depth_stencil_info.stencilTestEnable = VK_FALSE;
 
@@ -124,7 +137,7 @@ clstl::shared_ptr<GraphicsPipeline> GraphicsPipelineBuilder::build() {
 
   VkPipelineRasterizationStateCreateInfo rasterizer{};
   rasterizer.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
-  rasterizer.cullMode = VK_CULL_MODE_NONE;
+  rasterizer.cullMode = VK_CULL_MODE_BACK_BIT;
   rasterizer.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
   rasterizer.polygonMode = VK_POLYGON_MODE_FILL;
   rasterizer.lineWidth = 1.0f;
@@ -175,15 +188,15 @@ clstl::shared_ptr<GraphicsPipeline> GraphicsPipelineBuilder::build() {
     throw std::runtime_error("Failed to create graphics pipeline");
   }
 
-  return clstl::make_shared<GraphicsPipeline>(this->m_Device, pipeline_layout,
+  return std::make_shared<GraphicsPipeline>(this->m_Device, pipeline_layout,
                                               pipeline);
 }
 
 GraphicsPipelineBuilder &GraphicsPipelineBuilder::input_attribute_descriptions(
-    const clstl::vector<VkVertexInputAttributeDescription> &descriptions,
+    const std::vector<VkVertexInputAttributeDescription> &descriptions,
     std::uint32_t stride) {
   this->m_VertexAttributes.reserve(descriptions.size());
-  clstl::for_each(descriptions.begin(), descriptions.end(),
+  std::for_each(descriptions.begin(), descriptions.end(),
                   [&](VkVertexInputAttributeDescription desc) {
                     this->m_VertexAttributes.push_back(desc);
                   });
@@ -198,13 +211,13 @@ GraphicsPipelineBuilder &GraphicsPipelineBuilder::input_assembly_state(
 }
 
 GraphicsPipelineBuilder &
-GraphicsPipelineBuilder::vertex_shader(clstl::shared_ptr<VulkanShader> shader) {
+GraphicsPipelineBuilder::vertex_shader(std::shared_ptr<VulkanShader> shader) {
   this->m_VertexShader = shader;
   return *this;
 }
 
 GraphicsPipelineBuilder &GraphicsPipelineBuilder::fragment_shader(
-    clstl::shared_ptr<VulkanShader> shader) {
+    std::shared_ptr<VulkanShader> shader) {
   this->m_FragmentShader = shader;
   return *this;
 }
@@ -212,9 +225,9 @@ GraphicsPipelineBuilder &GraphicsPipelineBuilder::fragment_shader(
 VkPipeline GraphicsPipeline::handle() const { return this->m_Pipeline; }
 
 GraphicsPipelineBuilder &GraphicsPipelineBuilder::descriptor_sets(
-    const clstl::vector<clstl::shared_ptr<VulkanDescriptorSet>> &dsets) {
-  clstl::for_each(dsets.begin(), dsets.end(),
-                  [&](clstl::shared_ptr<VulkanDescriptorSet> set) {
+    const std::vector<std::shared_ptr<VulkanDescriptorSet>> &dsets) {
+  std::for_each(dsets.begin(), dsets.end(),
+                  [&](std::shared_ptr<VulkanDescriptorSet> set) {
                     this->m_DescriptorSets.push_back(set);
                   });
   return *this;

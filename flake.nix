@@ -36,10 +36,11 @@
 		shaderc
 		spirv-tools
 		clang-tools
+		xwayland
               ];
 
 	      env = {
-		LD_LIBRARY_PATH = pkgs.lib.makeLibraryPath [ pkgs.wayland pkgs.libxkbcommon ];
+		LD_LIBRARY_PATH = pkgs.lib.makeLibraryPath [ pkgs.wayland pkgs.libxkbcommon pkgs.libx11 ];
 		MAKEFLAGS = "-j16";
 	      };
             };

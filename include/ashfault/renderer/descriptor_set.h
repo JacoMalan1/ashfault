@@ -1,12 +1,12 @@
 #ifndef ASHFAULT_DESCRIPTOR_SET_H
 #define ASHFAULT_DESCRIPTOR_SET_H
 
-#include <CLSTL/vector.h>
-#include <CLSTL/shared_ptr.h>
 #include <ashfault/renderer/buffer.hpp>
 #include <cstdint>
 #include <vulkan/vulkan.h>
 #include <vulkan/vulkan_core.h>
+#include <memory>
+#include <vector>
 
 namespace ashfault {
 class VulkanDescriptorSet;
@@ -28,12 +28,12 @@ public:
                                           std::uint32_t binding);
 
   /// @brief Builds the descriptor set and creates a descriptor pool.
-  std::pair<clstl::vector<clstl::shared_ptr<VulkanDescriptorSet>>,
-            clstl::shared_ptr<VulkanDescriptorPool>>
+  std::pair<std::vector<std::shared_ptr<VulkanDescriptorSet>>,
+            std::shared_ptr<VulkanDescriptorPool>>
   build();
 
 private:
-  clstl::vector<VkDescriptorSetLayoutBinding> m_Bindings;
+  std::vector<VkDescriptorSetLayoutBinding> m_Bindings;
   VkDevice m_Device;
 };
 
@@ -53,7 +53,7 @@ public:
   ~VulkanDescriptorSet();
 
   template <class T>
-  void update_uniform_buffer(clstl::shared_ptr<VulkanBuffer<T>> buffer,
+  void update_uniform_buffer(std::shared_ptr<VulkanBuffer> buffer,
                              std::uint32_t binding) {
     VkDescriptorBufferInfo buffer_info{};
     buffer_info.buffer = buffer->handle();

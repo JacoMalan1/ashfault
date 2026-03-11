@@ -1,6 +1,3 @@
-#include <CLSTL/algorithm.h>
-#include <CLSTL/array.h>
-#include <CLSTL/vector.h>
 #include <algorithm>
 #include <ashfault/renderer/buffer.hpp>
 #include <ashfault/renderer/descriptor_set.h>
@@ -40,7 +37,7 @@ int device_type_ranking(VkPhysicalDeviceType type) {
 
 QueueSuitability Renderer::find_queue_families(VkPhysicalDevice device) {
   std::uint32_t queue_family_count;
-  clstl::vector<VkQueueFamilyProperties> queue_family_props;
+  std::vector<VkQueueFamilyProperties> queue_family_props;
   vkGetPhysicalDeviceQueueFamilyProperties(device, &queue_family_count,
                                            nullptr);
   queue_family_props.resize(queue_family_count);
@@ -134,12 +131,12 @@ Renderer::query_swapchain_support(VkPhysicalDevice device) {
 std::optional<std::pair<VkPhysicalDevice, QueueSuitability>>
 Renderer::choose_physical_device() {
   std::uint32_t device_count;
-  clstl::vector<VkPhysicalDevice> devices;
+  std::vector<VkPhysicalDevice> devices;
   vkEnumeratePhysicalDevices(this->m_Instance, &device_count, nullptr);
   devices.resize(device_count);
   vkEnumeratePhysicalDevices(this->m_Instance, &device_count, devices.data());
 
-  clstl::sort(devices.begin(), devices.end(),
+  std::sort(devices.begin(), devices.end(),
               [](VkPhysicalDevice a, VkPhysicalDevice b) {
                 VkPhysicalDeviceProperties a_props;
                 VkPhysicalDeviceProperties b_props;
@@ -150,7 +147,7 @@ Renderer::choose_physical_device() {
                        device_type_ranking(a_props.deviceType);
               });
 
-  clstl::for_each(devices.begin(), devices.end(), [](VkPhysicalDevice device) {
+  std::for_each(devices.begin(), devices.end(), [](VkPhysicalDevice device) {
     VkPhysicalDeviceProperties props;
     vkGetPhysicalDeviceProperties(device, &props);
     SPDLOG_INFO("Found physical device: {}", props.deviceName);
@@ -174,7 +171,7 @@ void ashfault::Renderer::create_instance() {
   app_info.pApplicationName = "AshFault";
   app_info.pEngineName = "AshFault";
 
-  clstl::vector<const char *> enabled_layers = {};
+  std::vector<const char *> enabled_layers = {};
   std::uint32_t layer_count;
   vkEnumerateInstanceLayerProperties(&layer_count, nullptr);
   std::vector<VkLayerProperties> layer_props = {};
@@ -189,10 +186,10 @@ void ashfault::Renderer::create_instance() {
     }
   }
 
-  clstl::vector<const char *> enabled_extensions =
+  std::vector<const char *> enabled_extensions =
       this->m_Window->required_instance_extensions();
   enabled_extensions.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
-  clstl::for_each(enabled_extensions.begin(), enabled_extensions.end(),
+  std::for_each(enabled_extensions.begin(), enabled_extensions.end(),
                   [](const char *name) {
                     SPDLOG_DEBUG("Required instance extension: {}", name);
                   });
@@ -284,7 +281,7 @@ void ashfault::Renderer::create_surface() {
 }
 
 VkSurfaceFormatKHR Renderer::select_surface_format(
-    const clstl::vector<VkSurfaceFormatKHR> &formats) {
+    const std::vector<VkSurfaceFormatKHR> &formats) {
   for (const auto &format : formats) {
     if (format.colorSpace == VK_COLORSPACE_SRGB_NONLINEAR_KHR &&
         format.format == VK_FORMAT_B8G8R8A8_SRGB) {
@@ -309,9 +306,9 @@ int present_mode_ranking(VkPresentModeKHR mode) {
 }
 
 VkPresentModeKHR
-Renderer::select_present_mode(const clstl::vector<VkPresentModeKHR> &formats) {
+Renderer::select_present_mode(const std::vector<VkPresentModeKHR> &formats) {
   auto preference_order = formats;
-  clstl::sort(preference_order.begin(), preference_order.end(),
+  std::sort(preference_order.begin(), preference_order.end(),
               [](VkPresentModeKHR a, VkPresentModeKHR b) {
                 return present_mode_ranking(a) < present_mode_ranking(b);
               });
@@ -495,44 +492,9 @@ void Renderer::setup_imgui() {
   init_info.PipelineInfoMain.MSAASamples = VK_SAMPLE_COUNT_1_BIT;
   init_info.UseDynamicRendering = true;
   ImGui_ImplVulkan_Init(&init_info);
-
-  VkSamplerCreateInfo sampler_info{};
-  sampler_info.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
-  sampler_info.addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT;
-  sampler_info.addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT;
-  sampler_info.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT;
-  sampler_info.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
-  sampler_info.minFilter = VK_FILTER_LINEAR;
-  sampler_info.magFilter = VK_FILTER_LINEAR;
-  vkCreateSampler(this->m_Device, &sampler_info, nullptr,
-                  &this->m_ImGuiViewportSampler);
-
-  this->m_ViewportImageViews.resize(this->m_Swapchain->image_count());
-  this->m_ViewportImages.resize(this->m_Swapchain->image_count());
-  this->m_ImGuiViewportTextures.resize(this->m_Swapchain->image_count());
-  VmaAllocationCreateInfo alloc_info{};
-  alloc_info.requiredFlags = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
-  alloc_info.usage = VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE;
-
-  for (std::size_t i = 0; i < this->m_Swapchain->image_count(); i++) {
-    this->m_ViewportImages[i] = this->create_image(
-        this->m_SwapExtent.width, this->m_SwapExtent.height,
-        VK_SAMPLE_COUNT_1_BIT, this->m_SurfaceFormat.format,
-        VK_IMAGE_TILING_OPTIMAL,
-        VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
-        alloc_info);
-    this->m_ViewportImageViews[i] = this->create_image_view(
-        this->m_ViewportImages[i].first, this->m_SurfaceFormat.format,
-        VK_IMAGE_ASPECT_COLOR_BIT);
-    this->m_ImGuiViewportTextures[i] = ImGui_ImplVulkan_AddTexture(
-        this->m_ImGuiViewportSampler, this->m_ViewportImageViews[i],
-        VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
-  }
 }
 
-void ashfault::Renderer::init(clstl::shared_ptr<Window> window) {
-  this->m_ViewportSize[0] = 0;
-  this->m_ViewportSize[1] = 0;
+void ashfault::Renderer::init(std::shared_ptr<Window> window) {
   this->m_Window = window;
 
   this->m_Window->set_resize_callback([&](Window &window, WindowDims) {
@@ -552,18 +514,18 @@ void ashfault::Renderer::init(clstl::shared_ptr<Window> window) {
   this->setup_imgui();
 }
 
-clstl::shared_ptr<VulkanShader>
-Renderer::create_shader(const clstl::string &path) const {
-  return clstl::make_shared<VulkanShader>(this->m_Device, path);
+std::shared_ptr<VulkanShader>
+Renderer::create_shader(const std::string &path) const {
+  return std::make_shared<VulkanShader>(this->m_Device, path);
 }
 
 GraphicsPipelineBuilder Renderer::create_graphics_pipeline() const {
-  clstl::array<std::uint32_t, 2> window_dims;
+  std::array<std::uint32_t, 2> window_dims;
   WindowDims dims = this->m_Window->current_size();
   window_dims[0] = dims.width;
   window_dims[1] = dims.height;
   return GraphicsPipelineBuilder(this->m_Device, this->m_SurfaceFormat.format,
-                                 std::move(window_dims), VK_SAMPLE_COUNT_1_BIT);
+                                 std::move(window_dims), this->m_MsaaSamples);
 }
 
 std::pair<VkImage, VmaAllocation>
@@ -662,25 +624,6 @@ void Renderer::recreate_swapchain() {
   VmaAllocationCreateInfo alloc_info{};
   alloc_info.requiredFlags = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
   alloc_info.usage = VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE;
-
-  for (std::size_t i = 0; i < this->m_Swapchain->image_count(); i++) {
-    vkDestroyImageView(this->m_Device, this->m_ViewportImageViews[i], nullptr);
-    vmaDestroyImage(this->m_Allocator, this->m_ViewportImages[i].first,
-                    this->m_ViewportImages[i].second);
-    this->m_ViewportImages[i] = this->create_image(
-        this->m_SwapExtent.width, this->m_SwapExtent.height,
-        VK_SAMPLE_COUNT_1_BIT, this->m_SurfaceFormat.format,
-        VK_IMAGE_TILING_OPTIMAL,
-        VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
-        alloc_info);
-    this->m_ViewportImageViews[i] = this->create_image_view(
-        this->m_ViewportImages[i].first, this->m_SurfaceFormat.format,
-        VK_IMAGE_ASPECT_COLOR_BIT);
-    ImGui_ImplVulkan_RemoveTexture(this->m_ImGuiViewportTextures[i]);
-    this->m_ImGuiViewportTextures[i] = ImGui_ImplVulkan_AddTexture(
-        this->m_ImGuiViewportSampler, this->m_ViewportImageViews[i],
-        VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
-  }
 }
 
 void Renderer::cleanup_swapchain() { this->m_Swapchain->cleanup(); }
@@ -689,7 +632,6 @@ Renderer::~Renderer() {
   ImGui_ImplVulkan_Shutdown();
   ImGui_ImplGlfw_Shutdown();
   ImGui::DestroyContext();
-  vkDestroySampler(this->m_Device, this->m_ImGuiViewportSampler, nullptr);
 
   SPDLOG_INFO("Renderer shutting down...");
 
@@ -699,15 +641,9 @@ Renderer::~Renderer() {
 
   this->cleanup_swapchain();
 
-  for (std::size_t i = 0; i < this->m_Swapchain->image_count(); i++) {
-    vkDestroyImageView(this->m_Device, this->m_ViewportImageViews[i], nullptr);
-    vmaDestroyImage(this->m_Allocator, this->m_ViewportImages[i].first,
-                    this->m_ViewportImages[i].second);
-  }
-
   vkDestroyCommandPool(this->m_Device, this->m_CommandPool, nullptr);
 
-  for (std::size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
+  for (std::size_t i = 0; i < this->m_ImageAvailableSemaphores.size(); i++) {
     vkDestroySemaphore(this->m_Device, this->m_ImageAvailableSemaphores[i],
                        nullptr);
     vkDestroySemaphore(this->m_Device, this->m_RenderFinishedSemaphores[i],
@@ -732,10 +668,6 @@ VulkanDescriptorSetBuilder Renderer::create_descriptor_sets() const {
 VkDevice Renderer::device() { return this->m_Device; }
 
 VmaAllocator Renderer::allocator() { return this->m_Allocator; }
-
-clstl::array<std::uint32_t, 2> Renderer::viewport_size() const {
-  return this->m_ViewportSize;
-}
 
 std::vector<VkCommandBuffer>
 Renderer::allocate_command_buffers(std::uint32_t count) {
@@ -766,5 +698,9 @@ VkSampler Renderer::create_sampler() {
   VkSampler ret;
   VK_CHECK_RESULT(vkCreateSampler(this->m_Device, &create_info, nullptr, &ret));
   return ret;
+}
+
+VkSampleCountFlagBits Renderer::msaa_samples() const {
+  return this->m_MsaaSamples;
 }
 } // namespace ashfault
