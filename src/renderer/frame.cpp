@@ -20,7 +20,7 @@ void Frame::bind_graphics_pipeline(VkCommandBuffer cmd,
 }
 
 void Frame::wait_and_present() {
-  clstl::vector<VkSemaphore> wait_semaphores;
+  std::vector<VkSemaphore> wait_semaphores;
   wait_semaphores.push_back(
       this->m_FrameData
           .render_finished_semaphores[this->m_FrameData.image_index]);
@@ -126,8 +126,8 @@ void Frame::begin_rendering(VkCommandBuffer cmd,
 void Frame::end_rendering(VkCommandBuffer cmd) { vkCmdEndRendering(cmd); }
 
 void Frame::add_command_buffer_for_submit(
-    VkCommandBuffer *cmd, const clstl::vector<VkSemaphore> &signal_semaphores,
-    const clstl::vector<VkSemaphore> &wait_semaphores,
+    VkCommandBuffer *cmd, const std::vector<VkSemaphore> &signal_semaphores,
+    const std::vector<VkSemaphore> &wait_semaphores,
     VkPipelineStageFlags *wait_stages) {
 
   vkEndCommandBuffer(*cmd);

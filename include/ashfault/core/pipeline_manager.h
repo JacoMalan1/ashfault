@@ -4,6 +4,7 @@
 #include <ashfault/renderer/pipeline.h>
 #include <string>
 #include <unordered_map>
+#include <memory>
 
 namespace ashfault {
 class PipelineManager {
@@ -11,11 +12,11 @@ public:
   PipelineManager() = default;
 
   void add_graphics_pipeline(const std::string &name,
-                             clstl::shared_ptr<GraphicsPipeline> pipeline);
+                             std::shared_ptr<GraphicsPipeline> pipeline);
   GraphicsPipeline *get_graphics_pipeline(const std::string &name);
 
 private:
-  std::unordered_map<std::string, clstl::shared_ptr<GraphicsPipeline>>
+  std::unordered_map<std::string, std::shared_ptr<GraphicsPipeline>>
       m_Pipelines;
 };
 } // namespace ashfault

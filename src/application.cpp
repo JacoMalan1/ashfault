@@ -1,11 +1,10 @@
-#include <CLSTL/shared_ptr.h>
 #include <ashfault/application.h>
 
 namespace ashfault {
-Application::Application(clstl::shared_ptr<Engine> engine,
-                         clstl::shared_ptr<Window> window)
+Application::Application(std::shared_ptr<Engine> engine,
+                         std::shared_ptr<Window> window)
     : m_Engine(engine), m_Window(window),
-      m_Input(clstl::make_shared<Input>(window)) {
+      m_Input(std::make_shared<Input>(window)) {
   engine->setup_renderer(window);
 }
 

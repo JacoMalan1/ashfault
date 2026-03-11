@@ -1,13 +1,13 @@
-#include <CLSTL/vector.h>
 #include <ashfault/renderer/shader.h>
 #include <cstdint>
 #include <cstring>
 #include <fstream>
 #include <stdexcept>
 #include <vulkan/vulkan_core.h>
+#include <vector>
 
 namespace ashfault {
-VulkanShader::VulkanShader(VkDevice device, const clstl::string &path)
+VulkanShader::VulkanShader(VkDevice device, const std::string &path)
     : m_Module(VK_NULL_HANDLE), m_Device(device) {
   std::ifstream fs(path.c_str(), std::ios_base::binary | std::ios_base::in);
 
@@ -23,10 +23,10 @@ VulkanShader::VulkanShader(VkDevice device, const clstl::string &path)
   }
 
   fs.seekg(0, std::ios::beg);
-  clstl::vector<char> buf;
+  std::vector<char> buf;
   buf.resize(file_size);
   fs.read(buf.data(), file_size);
-  clstl::vector<std::uint32_t> data;
+  std::vector<std::uint32_t> data;
   data.resize(file_size / sizeof(std::uint32_t));
   std::memcpy(data.data(), buf.data(), file_size);
 

@@ -1,5 +1,3 @@
-#include "CLSTL/shared_ptr.h"
-#include "CLSTL/vector.h"
 #include "ashfault/core/vertex.h"
 #include "ashfault/renderer/renderer.h"
 #include "spdlog/spdlog.h"
@@ -8,21 +6,21 @@
 #include <vector>
 
 namespace ashfault {
-Mesh::Mesh(MeshType type, clstl::shared_ptr<VulkanBuffer> vertices,
-           clstl::shared_ptr<VulkanBuffer> indices)
+Mesh::Mesh(MeshType type, std::shared_ptr<VulkanBuffer> vertices,
+           std::shared_ptr<VulkanBuffer> indices)
     : m_VertexBuffer(vertices), m_IndexBuffer(indices), m_Type(type) {}
 
 Mesh::MeshType Mesh::type() const { return this->m_Type; }
 
-clstl::shared_ptr<VulkanBuffer> Mesh::vertex_buffer() {
+std::shared_ptr<VulkanBuffer> Mesh::vertex_buffer() {
   return this->m_VertexBuffer;
 }
 
-clstl::shared_ptr<VulkanBuffer> Mesh::index_buffer() {
+std::shared_ptr<VulkanBuffer> Mesh::index_buffer() {
   return this->m_IndexBuffer;
 }
 
-clstl::shared_ptr<Mesh> Mesh::load_from_file(const std::string &path,
+std::shared_ptr<Mesh> Mesh::load_from_file(const std::string &path,
                                              Renderer *renderer) {
   tinyobj::attrib_t attribs;
   std::vector<tinyobj::shape_t> shapes;
@@ -32,8 +30,8 @@ clstl::shared_ptr<Mesh> Mesh::load_from_file(const std::string &path,
     throw std::runtime_error(err);
   }
 
-  clstl::vector<StaticVertex> vertices;
-  clstl::vector<std::uint32_t> indices;
+  std::vector<StaticVertex> vertices;
+  std::vector<std::uint32_t> indices;
 
   for (std::size_t f = 0; f < shapes[0].mesh.indices.size(); f++) {
     indices.push_back(f);
@@ -55,6 +53,6 @@ clstl::shared_ptr<Mesh> Mesh::load_from_file(const std::string &path,
   auto index_buffer = renderer->create_index_buffer(indices);
   SPDLOG_INFO("Loaded {} vertices", vertices.size());
   SPDLOG_INFO("Loaded {} indices", indices.size());
-  return clstl::make_shared<Mesh>(Mesh::Static, vertex_buffer, index_buffer);
+  return std::make_shared<Mesh>(Mesh::Static, vertex_buffer, index_buffer);
 }
 } // namespace ashfault

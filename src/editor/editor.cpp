@@ -1,4 +1,3 @@
-#include <CLSTL/shared_ptr.h>
 #include <algorithm>
 #include <ashfault/core/component/mesh.h>
 #include <ashfault/core/component/transform.h>
@@ -31,12 +30,12 @@
 
 namespace ashfault::editor {
 
-Editor::Editor(clstl::shared_ptr<Engine> engine,
-               clstl::shared_ptr<Window> window)
+Editor::Editor(std::shared_ptr<Engine> engine,
+               std::shared_ptr<Window> window)
     : Application(engine, window),
       m_ViewportSize({(std::uint32_t)1, (std::uint32_t)1}),
       m_CurrentWindowSize({1, 1}), m_ViewportResized(false), m_LogsLock(),
-      m_Logs(), m_PipelineManager(clstl::make_unique<PipelineManager>()) {
+      m_Logs(), m_PipelineManager(std::make_unique<PipelineManager>()) {
   auto callback_sink = std::make_shared<spdlog::sinks::callback_sink_mt>(
       [&](const spdlog::details::log_msg &msg) {
         std::unique_lock<std::mutex> lck(m_LogsLock);
@@ -73,11 +72,11 @@ void Editor::build_pipelines() {
   normal.offset = 3 * sizeof(float);
   normal.format = VK_FORMAT_R32G32B32_SFLOAT;
 
-  clstl::vector<VkVertexInputAttributeDescription> descriptions;
+  std::vector<VkVertexInputAttributeDescription> descriptions;
   descriptions.push_back(desc);
   descriptions.push_back(normal);
 
-  clstl::vector<clstl::shared_ptr<VulkanDescriptorSet>> dsets;
+  std::vector<std::shared_ptr<VulkanDescriptorSet>> dsets;
   dsets.push_back(this->m_DescriptorSet);
 
   auto pipeline =
@@ -335,9 +334,9 @@ SubmitData Editor::render_viewport(Frame &frame, Scene &scene) {
   frame.end_rendering(cmd);
   VkPipelineStageFlags wait_stages =
       VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-  clstl::vector<VkSemaphore> signal_semaphores = {
+  std::vector<VkSemaphore> signal_semaphores = {
       frame.render_finished_semaphore()};
-  clstl::vector<VkSemaphore> wait_semaphores = {
+  std::vector<VkSemaphore> wait_semaphores = {
       frame.image_available_semaphore()};
   return {wait_semaphores, signal_semaphores, wait_stages};
 }
@@ -504,7 +503,7 @@ void Editor::run() {
       VkPipelineStageFlags wait_stage =
           VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
 
-      clstl::array<VkCommandBuffer, 2> cmd_buffers = {
+      std::array<VkCommandBuffer, 2> cmd_buffers = {
           this->m_PrimaryCommandBuffers[frame->current_frame()],
           m_UiCommandBuffers[frame->current_frame()]};
 

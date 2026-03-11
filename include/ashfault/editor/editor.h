@@ -2,7 +2,6 @@
 #define ASHFAULT_EDITOR_H
 
 #include <ashfault/core/pipeline_manager.h>
-#include <CLSTL/shared_ptr.h>
 #include <ashfault/application.h>
 #include <ashfault/core/engine.h>
 #include <ashfault/core/scene.h>
@@ -13,7 +12,7 @@
 
 namespace ashfault::editor {
 struct SubmitData {
-  clstl::vector<VkSemaphore> wait_semaphores, signal_semaphores;
+  std::vector<VkSemaphore> wait_semaphores, signal_semaphores;
   VkPipelineStageFlags wait_stages;
 };
 
@@ -24,7 +23,7 @@ struct UniformBufferObject {
 
 class Editor : public Application {
 public:
-  Editor(clstl::shared_ptr<Engine> engine, clstl::shared_ptr<Window> window);
+  Editor(std::shared_ptr<Engine> engine, std::shared_ptr<Window> window);
   ~Editor();
   void run() override;
   SubmitData render_viewport(Frame &frame, Scene &scene);
@@ -53,10 +52,10 @@ private:
   bool m_ViewportResized;
   std::mutex m_LogsLock;
   std::vector<std::pair<spdlog::details::log_msg, std::string>> m_Logs;
-  clstl::shared_ptr<VulkanDescriptorSet> m_DescriptorSet;
-  clstl::shared_ptr<VulkanDescriptorPool> m_DescriptorPool;
-  clstl::unique_ptr<PipelineManager> m_PipelineManager;
-  clstl::shared_ptr<VulkanBuffer> m_UniformBuffer;
+  std::shared_ptr<VulkanDescriptorSet> m_DescriptorSet;
+  std::shared_ptr<VulkanDescriptorPool> m_DescriptorPool;
+  std::unique_ptr<PipelineManager> m_PipelineManager;
+  std::shared_ptr<VulkanBuffer> m_UniformBuffer;
   std::pair<VkImage, VmaAllocation> m_ColorImage;
   VkImageView m_ColorImageView;
 };

@@ -2,12 +2,12 @@
 #define ASHFAULT_COMPONENT_MODEL_H
 
 #include <ashfault/core/mesh.h>
-#include <CLSTL/shared_ptr.h>
 #include <ashfault/renderer/buffer.hpp>
+#include <memory>
 
 namespace ashfault {
 struct MeshComponent {
-  clstl::shared_ptr<Mesh> mesh;
+  std::shared_ptr<Mesh> mesh;
 };
 } // namespace ashfault
 

@@ -1,9 +1,8 @@
-#include <CLSTL/algorithm.h>
-#include <CLSTL/array.h>
-#include <CLSTL/shared_ptr.h>
 #include <ashfault/renderer/descriptor_set.h>
 #include <ashfault/renderer/pipeline.h>
 #include <vulkan/vulkan_core.h>
+#include <stdexcept>
+#include <algorithm>
 
 namespace ashfault {
 GraphicsPipeline::GraphicsPipeline(VkDevice device, VkPipelineLayout layout,
@@ -18,7 +17,7 @@ GraphicsPipeline::~GraphicsPipeline() {
 
 GraphicsPipelineBuilder::GraphicsPipelineBuilder(
     VkDevice device, VkFormat swapchain_image_format,
-    clstl::array<std::uint32_t, 2> window_dims,
+    std::array<std::uint32_t, 2> window_dims,
     VkSampleCountFlagBits msaa_samples)
     : m_VertexShader(), m_FragmentShader(), m_DescriptorSets(),
       m_Device(device), m_ImageFormat(swapchain_image_format),
@@ -36,11 +35,11 @@ GraphicsPipelineBuilder::push_constant(VkShaderStageFlags stage,
   return *this;
 }
 
-clstl::shared_ptr<GraphicsPipeline> GraphicsPipelineBuilder::build() {
-  clstl::vector<VkDescriptorSetLayout> dset_layouts;
+std::shared_ptr<GraphicsPipeline> GraphicsPipelineBuilder::build() {
+  std::vector<VkDescriptorSetLayout> dset_layouts;
   dset_layouts.reserve(this->m_DescriptorSets.size());
-  clstl::for_each(m_DescriptorSets.begin(), m_DescriptorSets.end(),
-                  [&](clstl::shared_ptr<VulkanDescriptorSet> set) {
+  std::for_each(m_DescriptorSets.begin(), m_DescriptorSets.end(),
+                  [&](std::shared_ptr<VulkanDescriptorSet> set) {
                     dset_layouts.push_back(set->layout());
                   });
 
@@ -72,10 +71,10 @@ clstl::shared_ptr<GraphicsPipeline> GraphicsPipelineBuilder::build() {
   fshader_stage_info.module = this->m_FragmentShader.value()->handle();
   fshader_stage_info.pName = "main";
 
-  clstl::array<VkPipelineShaderStageCreateInfo, 2> stages = {
+  std::array<VkPipelineShaderStageCreateInfo, 2> stages = {
       vshader_stage_info, fshader_stage_info};
 
-  clstl::array<VkDynamicState, 2> dynamic_states = {VK_DYNAMIC_STATE_VIEWPORT,
+  std::array<VkDynamicState, 2> dynamic_states = {VK_DYNAMIC_STATE_VIEWPORT,
                                                     VK_DYNAMIC_STATE_SCISSOR};
 
   VkPipelineDynamicStateCreateInfo dynamic_state_info{};
@@ -189,15 +188,15 @@ clstl::shared_ptr<GraphicsPipeline> GraphicsPipelineBuilder::build() {
     throw std::runtime_error("Failed to create graphics pipeline");
   }
 
-  return clstl::make_shared<GraphicsPipeline>(this->m_Device, pipeline_layout,
+  return std::make_shared<GraphicsPipeline>(this->m_Device, pipeline_layout,
                                               pipeline);
 }
 
 GraphicsPipelineBuilder &GraphicsPipelineBuilder::input_attribute_descriptions(
-    const clstl::vector<VkVertexInputAttributeDescription> &descriptions,
+    const std::vector<VkVertexInputAttributeDescription> &descriptions,
     std::uint32_t stride) {
   this->m_VertexAttributes.reserve(descriptions.size());
-  clstl::for_each(descriptions.begin(), descriptions.end(),
+  std::for_each(descriptions.begin(), descriptions.end(),
                   [&](VkVertexInputAttributeDescription desc) {
                     this->m_VertexAttributes.push_back(desc);
                   });
@@ -212,13 +211,13 @@ GraphicsPipelineBuilder &GraphicsPipelineBuilder::input_assembly_state(
 }
 
 GraphicsPipelineBuilder &
-GraphicsPipelineBuilder::vertex_shader(clstl::shared_ptr<VulkanShader> shader) {
+GraphicsPipelineBuilder::vertex_shader(std::shared_ptr<VulkanShader> shader) {
   this->m_VertexShader = shader;
   return *this;
 }
 
 GraphicsPipelineBuilder &GraphicsPipelineBuilder::fragment_shader(
-    clstl::shared_ptr<VulkanShader> shader) {
+    std::shared_ptr<VulkanShader> shader) {
   this->m_FragmentShader = shader;
   return *this;
 }
@@ -226,9 +225,9 @@ GraphicsPipelineBuilder &GraphicsPipelineBuilder::fragment_shader(
 VkPipeline GraphicsPipeline::handle() const { return this->m_Pipeline; }
 
 GraphicsPipelineBuilder &GraphicsPipelineBuilder::descriptor_sets(
-    const clstl::vector<clstl::shared_ptr<VulkanDescriptorSet>> &dsets) {
-  clstl::for_each(dsets.begin(), dsets.end(),
-                  [&](clstl::shared_ptr<VulkanDescriptorSet> set) {
+    const std::vector<std::shared_ptr<VulkanDescriptorSet>> &dsets) {
+  std::for_each(dsets.begin(), dsets.end(),
+                  [&](std::shared_ptr<VulkanDescriptorSet> set) {
                     this->m_DescriptorSets.push_back(set);
                   });
   return *this;

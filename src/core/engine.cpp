@@ -1,5 +1,3 @@
-#include <CLSTL/algorithm.h>
-#include <CLSTL/unique_ptr.h>
 #include <algorithm>
 #include <ashfault/core/engine.h>
 #include <ashfault/core/pipeline_manager.h>
@@ -10,9 +8,9 @@
 
 namespace ashfault {
 Engine::Engine()
-    : m_Renderer(clstl::make_unique<Renderer>()),
-      m_ShaderManager(clstl::make_unique<ShaderManager>()),
-      m_PipelineManager(clstl::make_unique<PipelineManager>()) {}
+    : m_Renderer(std::make_unique<Renderer>()),
+      m_ShaderManager(std::make_unique<ShaderManager>()),
+      m_PipelineManager(std::make_unique<PipelineManager>()) {}
 
 Engine::~Engine() {}
 
@@ -39,7 +37,7 @@ void Engine::register_shaders() {
 void Engine::create_pipelines() {
 }
 
-void Engine::setup_renderer(clstl::shared_ptr<Window> window) {
+void Engine::setup_renderer(std::shared_ptr<Window> window) {
   SPDLOG_INFO("Starting Vulkan renderer");
   this->m_Renderer->init(window);
   this->register_shaders();

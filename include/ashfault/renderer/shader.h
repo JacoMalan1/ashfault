@@ -1,13 +1,13 @@
 #ifndef ASHFAULT_SHADER_H
 #define ASHFAULT_SHADER_H
 
-#include <CLSTL/string.h>
 #include <vulkan/vulkan_core.h>
+#include <string>
 
 namespace ashfault {
 class VulkanShader {
 public:
-  VulkanShader(VkDevice device, const clstl::string &path);
+  VulkanShader(VkDevice device, const std::string &path);
   VulkanShader(const VulkanShader &) = delete;
   VulkanShader &operator=(const VulkanShader &) = delete;
   ~VulkanShader();

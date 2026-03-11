@@ -1,7 +1,7 @@
 #ifndef ASHFAULT_ENGINE_H
 #define ASHFAULT_ENGINE_H
 
-#include <CLSTL/unique_ptr.h>
+#include <memory>
 #include <ashfault/core/pipeline_manager.h>
 #include <ashfault/core/shader_manager.h>
 #include <ashfault/renderer/renderer.h>
@@ -14,7 +14,7 @@ public:
   Engine &operator=(const Engine &) = delete;
   ~Engine();
 
-  void setup_renderer(clstl::shared_ptr<Window> window);
+  void setup_renderer(std::shared_ptr<Window> window);
   PipelineManager &pipeline_manager();
   ShaderManager &shader_manager();
 
@@ -25,9 +25,9 @@ private:
   void register_shaders();
   void create_pipelines();
 
-  clstl::unique_ptr<Renderer> m_Renderer;
-  clstl::unique_ptr<ShaderManager> m_ShaderManager;
-  clstl::unique_ptr<PipelineManager> m_PipelineManager;
+  std::unique_ptr<Renderer> m_Renderer;
+  std::unique_ptr<ShaderManager> m_ShaderManager;
+  std::unique_ptr<PipelineManager> m_PipelineManager;
 };
 } // namespace ashfault
 

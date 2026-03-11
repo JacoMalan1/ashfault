@@ -47,7 +47,7 @@ public:
   VulkanAttachmentBuilder build_depth_attachment();
 
 private:
-  clstl::vector<VkRenderingAttachmentInfo> m_ColorInfos;
+  std::vector<VkRenderingAttachmentInfo> m_ColorInfos;
   std::optional<VkRenderingAttachmentInfo> m_DepthInfo;
 };
 
@@ -77,14 +77,14 @@ public:
 
   void bind_descriptor_set(VkCommandBuffer cmd, VulkanDescriptorSet *dset, GraphicsPipeline *pipeline);
 
-  void draw(VkCommandBuffer cmd, clstl::shared_ptr<VulkanBuffer> buffer) {
+  void draw(VkCommandBuffer cmd, std::shared_ptr<VulkanBuffer> buffer) {
     vkCmdBindVertexBuffers(cmd, 0, 1, &buffer->handle(), 0);
     vkCmdDraw(cmd, buffer->count(), 1, 0, 0);
   }
 
   void add_command_buffer_for_submit(
-      VkCommandBuffer *cmd, const clstl::vector<VkSemaphore> &signal_semaphores,
-      const clstl::vector<VkSemaphore> &wait_semaphores,
+      VkCommandBuffer *cmd, const std::vector<VkSemaphore> &signal_semaphores,
+      const std::vector<VkSemaphore> &wait_semaphores,
       VkPipelineStageFlags *wait_stages);
 
   void submit_all(VkFence fence);
@@ -99,7 +99,7 @@ public:
 
 private:
   FrameData m_FrameData;
-  clstl::vector<VkSubmitInfo> m_Submits;
+  std::vector<VkSubmitInfo> m_Submits;
 };
 } // namespace ashfault
 
