@@ -57,6 +57,8 @@ private:
   clstl::shared_ptr<VulkanDescriptorPool> m_DescriptorPool;
   clstl::unique_ptr<PipelineManager> m_PipelineManager;
   clstl::shared_ptr<VulkanBuffer> m_UniformBuffer;
+  std::pair<VkImage, VmaAllocation> m_ColorImage;
+  VkImageView m_ColorImageView;
 };
 } // namespace ashfault::editor
 

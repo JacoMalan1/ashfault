@@ -1,5 +1,3 @@
-#include "glm/ext/scalar_constants.hpp"
-#include "glm/gtc/constants.hpp"
 #include <CLSTL/shared_ptr.h>
 #include <algorithm>
 #include <ashfault/core/component/mesh.h>
@@ -13,7 +11,9 @@
 #include <ashfault/renderer/frame.h>
 #include <ashfault/renderer/renderer.h>
 #include <ashfault/renderer/swapchain.h>
+#include <glm/ext/scalar_constants.hpp>
 #include <glm/glm.hpp>
+#include <glm/gtc/constants.hpp>
 #include <glm/gtc/type_ptr.hpp>
 #include <imgui.h>
 #include <imgui_impl_glfw.h>
@@ -40,7 +40,12 @@ Editor::Editor(clstl::shared_ptr<Engine> engine,
   auto callback_sink = std::make_shared<spdlog::sinks::callback_sink_mt>(
       [&](const spdlog::details::log_msg &msg) {
         std::unique_lock<std::mutex> lck(m_LogsLock);
-        m_Logs.push_back(std::make_pair<>(msg, msg.payload.data()));
+        auto *data = new char[msg.payload.size() + 1];
+        std::memcpy(data, msg.payload.data(), msg.payload.size());
+        data[msg.payload.size()] = 0;
+        std::string payload(data);
+        delete[] data;
+        m_Logs.push_back(std::make_pair<>(msg, payload));
       });
   callback_sink->set_level(spdlog::level::debug);
   spdlog::default_logger()->sinks().push_back(callback_sink);
@@ -290,8 +295,9 @@ SubmitData Editor::render_viewport(Frame &frame, Scene &scene) {
   VulkanRenderingAttachments attachments;
   attachments.build_color_attachment()
       .clear_color(0.0f, 0.0f, 0.0f, 1.0f)
-      .target(m_ViewportImageViews[image_i],
-              VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+      .target(m_ColorImageView, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL)
+      .resolve_target(m_ViewportImageViews[image_i],
+                      VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
 
   attachments.build_depth_attachment().clear_depth(1.0f).target(
       m_DepthImageView, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL);
@@ -303,6 +309,12 @@ SubmitData Editor::render_viewport(Frame &frame, Scene &scene) {
   render_area.offset.y = 0;
   frame.insert_pipeline_barrier(
       cmd, m_ViewportImages[image_i].first, VK_IMAGE_ASPECT_COLOR_BIT,
+      VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+      VK_ACCESS_NONE, VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
+      VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
+      VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT);
+  frame.insert_pipeline_barrier(
+      cmd, this->m_ColorImage.first, VK_IMAGE_ASPECT_COLOR_BIT,
       VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
       VK_ACCESS_NONE, VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
       VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
@@ -333,6 +345,7 @@ SubmitData Editor::render_viewport(Frame &frame, Scene &scene) {
 void Editor::create_images() {
   auto &renderer = this->m_Engine->renderer();
   vkDeviceWaitIdle(renderer.device());
+  VkSampleCountFlagBits msaa_samples = renderer.msaa_samples();
 
   this->m_ViewportImages.resize(renderer.swapchain()->image_count());
   this->m_ViewportImageViews.resize(renderer.swapchain()->image_count());
@@ -349,12 +362,19 @@ void Editor::create_images() {
   alloc_info.usage = VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE;
 
   this->m_DepthImage = renderer.create_image(
-      image_width, image_height, VK_SAMPLE_COUNT_1_BIT, VK_FORMAT_D32_SFLOAT,
+      image_width, image_height, msaa_samples, VK_FORMAT_D32_SFLOAT,
       VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
       alloc_info);
   this->m_DepthImageView =
       renderer.create_image_view(this->m_DepthImage.first, VK_FORMAT_D32_SFLOAT,
                                  VK_IMAGE_ASPECT_DEPTH_BIT);
+  this->m_ColorImage = renderer.create_image(
+      image_width, image_height, msaa_samples,
+      renderer.swapchain()->surface_format().format, VK_IMAGE_TILING_OPTIMAL,
+      VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, alloc_info);
+  this->m_ColorImageView = renderer.create_image_view(
+      this->m_ColorImage.first, renderer.swapchain()->surface_format().format,
+      VK_IMAGE_ASPECT_COLOR_BIT);
 
   for (std::size_t i = 0; i < renderer.swapchain()->image_count(); i++) {
     auto viewport_image = renderer.create_image(
@@ -377,6 +397,9 @@ void Editor::create_images() {
 void Editor::clean_images() {
   auto &renderer = this->m_Engine->renderer();
   vkDestroyImageView(renderer.device(), this->m_DepthImageView, nullptr);
+  vkDestroyImageView(renderer.device(), this->m_ColorImageView, nullptr);
+  vmaDestroyImage(renderer.allocator(), m_ColorImage.first,
+                  m_ColorImage.second);
   vmaDestroyImage(renderer.allocator(), m_DepthImage.first,
                   m_DepthImage.second);
   for (std::size_t i = 0; i < m_ViewportImages.size(); i++) {
@@ -445,7 +468,8 @@ void Editor::run() {
   auto &registry = scene.component_registry();
   auto mesh = Mesh::load_from_file("monkey.obj", &renderer);
   MeshComponent component{mesh};
-  TransformComponent transform{glm::vec3(0.0f, 0.0f, 1.0f), glm::vec3(glm::pi<float>(), 0.0f, 0.0f),
+  TransformComponent transform{glm::vec3(0.0f, 0.0f, 1.0f),
+                               glm::vec3(glm::pi<float>(), 0.0f, 0.0f),
                                glm::vec3(1.0f)};
 
   registry.add_component(e, component);

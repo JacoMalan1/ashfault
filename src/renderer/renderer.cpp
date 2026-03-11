@@ -563,7 +563,7 @@ GraphicsPipelineBuilder Renderer::create_graphics_pipeline() const {
   window_dims[0] = dims.width;
   window_dims[1] = dims.height;
   return GraphicsPipelineBuilder(this->m_Device, this->m_SurfaceFormat.format,
-                                 std::move(window_dims), VK_SAMPLE_COUNT_1_BIT);
+                                 std::move(window_dims), this->m_MsaaSamples);
 }
 
 std::pair<VkImage, VmaAllocation>
@@ -766,5 +766,9 @@ VkSampler Renderer::create_sampler() {
   VkSampler ret;
   VK_CHECK_RESULT(vkCreateSampler(this->m_Device, &create_info, nullptr, &ret));
   return ret;
+}
+
+VkSampleCountFlagBits Renderer::msaa_samples() const {
+  return this->m_MsaaSamples;
 }
 } // namespace ashfault

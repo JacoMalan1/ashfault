@@ -134,6 +134,8 @@ public:
   /// @brief Returns a handle to the GPU memory allocator.
   VmaAllocator allocator();
 
+  VkSampleCountFlagBits msaa_samples() const;
+
   clstl::array<std::uint32_t, 2> viewport_size() const;
 
   template <class T>

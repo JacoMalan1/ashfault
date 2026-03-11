@@ -104,7 +104,7 @@ clstl::shared_ptr<GraphicsPipeline> GraphicsPipelineBuilder::build() {
   VkPipelineMultisampleStateCreateInfo multisample_info{};
   multisample_info.sType =
       VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
-  multisample_info.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
+  multisample_info.rasterizationSamples = this->m_MsaaSamples;
   multisample_info.sampleShadingEnable = VK_FALSE;
 
   VkPipelineDepthStencilStateCreateInfo depth_stencil_info{};
