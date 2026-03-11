@@ -266,13 +266,6 @@ private:
   VkCommandPool m_CommandPool;
   VkSampleCountFlagBits m_MsaaSamples;
 
-  std::vector<std::pair<VkImage, VmaAllocation>> m_ViewportImages;
-  std::vector<VkImageView> m_ViewportImageViews;
-  std::vector<VkDescriptorSet> m_ImGuiViewportTextures;
-  VkSampler m_ImGuiViewportSampler;
-
-  std::array<std::uint32_t, 2> m_ViewportSize;
-
   Swapchain *m_Swapchain;
 
   bool m_Resized;

@@ -51,3 +51,31 @@ jobs:
       - name: Build
         working-directory: build
         run: make
+
+  msvc:
+    name: "MSVC"
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: 'recursive'
+
+      - uses: ilammy/msvc-dev-cmd@v1.13.0
+
+      - name: Setup Vulkan SDK
+        uses: humbletim/install-vulkan-sdk@v1.2
+        with:
+          version: 1.4.309.0
+          cache: true
+
+      - name: Generate build scripts
+        run: |
+          mkdir build
+          cd build
+          cmake -G "NMake Makefiles" -DCMAKE_BUILD_TYPE=Relase ..
+
+      - name: Build
+        run: |
+          cd build
+          nmake

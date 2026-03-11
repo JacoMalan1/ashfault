@@ -58,6 +58,7 @@ endforeach()
 
 add_custom_target(shaders ALL DEPENDS ${SPV_SHADERS})
 
+add_library(tinyobjloader vendor/tinyobjloader/tiny_obj_loader.cc vendor/tinyobjloader/tiny_obj_loader.h)
 add_library(ashfault ${LIB_SRC_FILES} ${IMGUI_SRC_FILES} ${LIB_HEADERS} ${IMGUIZMO_SRC_FILES})
 add_executable(program ${PROJECT_SOURCE_DIR}/src/main.cpp)
 add_executable(editor ${PROJECT_SOURCE_DIR}/src/editor/main.cpp)
@@ -81,7 +82,6 @@ add_subdirectory(${PROJECT_SOURCE_DIR}/vendor/glfw)
 add_subdirectory(${PROJECT_SOURCE_DIR}/vendor/VulkanMemoryAllocator)
 add_subdirectory(${PROJECT_SOURCE_DIR}/vendor/spdlog)
 add_subdirectory(${PROJECT_SOURCE_DIR}/vendor/glm)
-add_subdirectory(${PROJECT_SOURCE_DIR}/vendor/tinyobjloader)
 
 target_link_libraries(ashfault glfw)
 target_link_libraries(ashfault Vulkan::Vulkan)

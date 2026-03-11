@@ -492,44 +492,9 @@ void Renderer::setup_imgui() {
   init_info.PipelineInfoMain.MSAASamples = VK_SAMPLE_COUNT_1_BIT;
   init_info.UseDynamicRendering = true;
   ImGui_ImplVulkan_Init(&init_info);
-
-  VkSamplerCreateInfo sampler_info{};
-  sampler_info.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
-  sampler_info.addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT;
-  sampler_info.addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT;
-  sampler_info.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT;
-  sampler_info.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
-  sampler_info.minFilter = VK_FILTER_LINEAR;
-  sampler_info.magFilter = VK_FILTER_LINEAR;
-  vkCreateSampler(this->m_Device, &sampler_info, nullptr,
-                  &this->m_ImGuiViewportSampler);
-
-  this->m_ViewportImageViews.resize(this->m_Swapchain->image_count());
-  this->m_ViewportImages.resize(this->m_Swapchain->image_count());
-  this->m_ImGuiViewportTextures.resize(this->m_Swapchain->image_count());
-  VmaAllocationCreateInfo alloc_info{};
-  alloc_info.requiredFlags = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
-  alloc_info.usage = VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE;
-
-  for (std::size_t i = 0; i < this->m_Swapchain->image_count(); i++) {
-    this->m_ViewportImages[i] = this->create_image(
-        this->m_SwapExtent.width, this->m_SwapExtent.height,
-        VK_SAMPLE_COUNT_1_BIT, this->m_SurfaceFormat.format,
-        VK_IMAGE_TILING_OPTIMAL,
-        VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
-        alloc_info);
-    this->m_ViewportImageViews[i] = this->create_image_view(
-        this->m_ViewportImages[i].first, this->m_SurfaceFormat.format,
-        VK_IMAGE_ASPECT_COLOR_BIT);
-    this->m_ImGuiViewportTextures[i] = ImGui_ImplVulkan_AddTexture(
-        this->m_ImGuiViewportSampler, this->m_ViewportImageViews[i],
-        VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
-  }
 }
 
 void ashfault::Renderer::init(std::shared_ptr<Window> window) {
-  this->m_ViewportSize[0] = 0;
-  this->m_ViewportSize[1] = 0;
   this->m_Window = window;
 
   this->m_Window->set_resize_callback([&](Window &window, WindowDims) {
@@ -659,25 +624,6 @@ void Renderer::recreate_swapchain() {
   VmaAllocationCreateInfo alloc_info{};
   alloc_info.requiredFlags = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
   alloc_info.usage = VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE;
-
-  for (std::size_t i = 0; i < this->m_Swapchain->image_count(); i++) {
-    vkDestroyImageView(this->m_Device, this->m_ViewportImageViews[i], nullptr);
-    vmaDestroyImage(this->m_Allocator, this->m_ViewportImages[i].first,
-                    this->m_ViewportImages[i].second);
-    this->m_ViewportImages[i] = this->create_image(
-        this->m_SwapExtent.width, this->m_SwapExtent.height,
-        VK_SAMPLE_COUNT_1_BIT, this->m_SurfaceFormat.format,
-        VK_IMAGE_TILING_OPTIMAL,
-        VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
-        alloc_info);
-    this->m_ViewportImageViews[i] = this->create_image_view(
-        this->m_ViewportImages[i].first, this->m_SurfaceFormat.format,
-        VK_IMAGE_ASPECT_COLOR_BIT);
-    ImGui_ImplVulkan_RemoveTexture(this->m_ImGuiViewportTextures[i]);
-    this->m_ImGuiViewportTextures[i] = ImGui_ImplVulkan_AddTexture(
-        this->m_ImGuiViewportSampler, this->m_ViewportImageViews[i],
-        VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
-  }
 }
 
 void Renderer::cleanup_swapchain() { this->m_Swapchain->cleanup(); }
@@ -686,7 +632,6 @@ Renderer::~Renderer() {
   ImGui_ImplVulkan_Shutdown();
   ImGui_ImplGlfw_Shutdown();
   ImGui::DestroyContext();
-  vkDestroySampler(this->m_Device, this->m_ImGuiViewportSampler, nullptr);
 
   SPDLOG_INFO("Renderer shutting down...");
 
@@ -696,15 +641,9 @@ Renderer::~Renderer() {
 
   this->cleanup_swapchain();
 
-  for (std::size_t i = 0; i < this->m_Swapchain->image_count(); i++) {
-    vkDestroyImageView(this->m_Device, this->m_ViewportImageViews[i], nullptr);
-    vmaDestroyImage(this->m_Allocator, this->m_ViewportImages[i].first,
-                    this->m_ViewportImages[i].second);
-  }
-
   vkDestroyCommandPool(this->m_Device, this->m_CommandPool, nullptr);
 
-  for (std::size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
+  for (std::size_t i = 0; i < this->m_ImageAvailableSemaphores.size(); i++) {
     vkDestroySemaphore(this->m_Device, this->m_ImageAvailableSemaphores[i],
                        nullptr);
     vkDestroySemaphore(this->m_Device, this->m_RenderFinishedSemaphores[i],
@@ -729,10 +668,6 @@ VulkanDescriptorSetBuilder Renderer::create_descriptor_sets() const {
 VkDevice Renderer::device() { return this->m_Device; }
 
 VmaAllocator Renderer::allocator() { return this->m_Allocator; }
-
-std::array<std::uint32_t, 2> Renderer::viewport_size() const {
-  return this->m_ViewportSize;
-}
 
 std::vector<VkCommandBuffer>
 Renderer::allocate_command_buffers(std::uint32_t count) {
