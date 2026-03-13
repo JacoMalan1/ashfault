@@ -9,6 +9,7 @@ if(CMAKE_EXPORT_COMPILE_COMMANDS)
 endif()
 
 set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 set(SHADER_SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/shaders)
 set(SHADER_BINARY_DIR ${CMAKE_CURRENT_BINARY_DIR})
 
@@ -58,8 +59,10 @@ endforeach()
 
 add_custom_target(shaders ALL DEPENDS ${SPV_SHADERS})
 
-add_library(tinyobjloader vendor/tinyobjloader/tiny_obj_loader.cc vendor/tinyobjloader/tiny_obj_loader.h)
-add_library(ashfault ${LIB_SRC_FILES} ${IMGUI_SRC_FILES} ${LIB_HEADERS} ${IMGUIZMO_SRC_FILES})
+add_library(tinyobjloader STATIC vendor/tinyobjloader/tiny_obj_loader.cc vendor/tinyobjloader/tiny_obj_loader.h)
+add_library(ashfault SHARED ${LIB_SRC_FILES} ${IMGUI_SRC_FILES} ${LIB_HEADERS} ${IMGUIZMO_SRC_FILES})
+target_compile_definitions(ashfault PUBLIC -DASHFAULT_BUILD_DLL)
+
 add_executable(program ${PROJECT_SOURCE_DIR}/src/main.cpp)
 add_executable(editor ${PROJECT_SOURCE_DIR}/src/editor/main.cpp)
 
@@ -77,6 +80,14 @@ include_directories(vendor/ImGuizmo)
 if(NOT(MSVC))
   target_compile_options(ashfault PUBLIC -Wall -Wpedantic -Wno-nullability-extension -Wno-nullability-completeness)
 endif(NOT(MSVC))
+
+if(WIN32)
+  add_definitions(-DASHFAULT_PLATFORM_WINDOWS)
+endif()
+
+if(UNIX)
+  add_definitions(-DASHFAULT_PLATFORM_LINUX)
+endif()
 
 add_subdirectory(${PROJECT_SOURCE_DIR}/vendor/glfw)
 add_subdirectory(${PROJECT_SOURCE_DIR}/vendor/VulkanMemoryAllocator)

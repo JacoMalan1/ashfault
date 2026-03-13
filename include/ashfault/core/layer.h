@@ -2,9 +2,10 @@
 #define ASHFAULT_LAYER_H
 
 #include <ashfault/core/event.h>
+#include <ashfault/ashfault.h>
 
 namespace ashfault {
-class Layer {
+class ASHFAULT_API Layer {
 public:
   Layer();
   virtual ~Layer() = default;

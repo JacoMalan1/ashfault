@@ -2,12 +2,13 @@
 #define ASHFAULT_SHADER_MANAGER_H
 
 #include <ashfault/renderer/renderer.h>
+#include <ashfault/ashfault.h>
 #include <ashfault/renderer/shader.h>
 #include <string>
 #include <unordered_map>
 
 namespace ashfault {
-class ShaderManager {
+class ASHFAULT_API ShaderManager {
 public:
   ShaderManager();
 

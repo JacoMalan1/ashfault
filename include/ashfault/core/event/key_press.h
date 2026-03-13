@@ -2,9 +2,10 @@
 #define ASHFAULT_KEY_PRESS_EVENT_H
 
 #include <ashfault/core/event.h>
+#include <ashfault/ashfault.h>
 
 namespace ashfault {
-class KeyPressEvent : public Event {
+class ASHFAULT_API KeyPressEvent : public Event {
 public:
   KeyPressEvent(int key_code);
   ~KeyPressEvent() = default;
@@ -18,6 +19,6 @@ public:
 private:
   int m_KeyCode;
 };
-}
+} // namespace ashfault
 
 #endif

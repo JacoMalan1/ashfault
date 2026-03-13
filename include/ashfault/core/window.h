@@ -6,16 +6,17 @@
 #include <optional>
 #include <vulkan/vulkan.h>
 #include <vector>
+#include <ashfault/ashfault.h>
 
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
 
 namespace ashfault {
-struct WindowDims {
+struct ASHFAULT_API WindowDims {
   std::uint32_t width, height;
 };
 
-class Window {
+class ASHFAULT_API Window {
 public:
   Window(std::uint32_t width, std::uint32_t height, bool fullscreen = true);
   Window(const Window &) = delete;

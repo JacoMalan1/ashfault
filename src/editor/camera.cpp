@@ -107,4 +107,26 @@ void EditorCamera::set_rotation(const glm::vec3 &rotation) {
 void EditorCamera::set_position(const glm::vec3 &position) {
   this->m_Position = position;
 }
+
+OrthoEditorCamera::OrthoEditorCamera(const glm::vec3 &position,
+                                     const glm::vec3 &rotation, float left,
+                                     float right, float top, float bottom,
+                                     float z_near, float z_far)
+    : EditorCamera(position, rotation), m_Left(left), m_Right(right),
+      m_Top(top), m_Bottom(bottom), m_ZNear(z_near), m_ZFar(z_far) {}
+
+OrthoEditorCameraBuilder OrthoEditorCamera::builder() {
+  return OrthoEditorCameraBuilder();
+}
+
+glm::mat4 OrthoEditorCamera::projection() const {
+  return glm::identity<glm::mat4>();
+}
+glm::mat4 OrthoEditorCamera::view() const { return glm::identity<glm::mat4>(); }
+
+OrthoCameraControls::OrthoCameraControls(
+    std::shared_ptr<OrthoEditorCamera> camera)
+    : m_Camera(camera) {}
+
+void OrthoCameraControls::render_controls() {}
 } // namespace ashfault

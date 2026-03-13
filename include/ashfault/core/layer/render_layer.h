@@ -3,8 +3,10 @@
 
 #include <ashfault/core/layer.h>
 #include <ashfault/renderer/renderer.h>
+#include <ashfault/ashfault.h>
+
 namespace ashfault {
-class RenderLayer : public Layer {
+class ASHFAULT_API RenderLayer : public Layer {
 public:
   RenderLayer(Renderer &renderer);
 

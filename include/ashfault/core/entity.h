@@ -2,9 +2,10 @@
 #define ASHFAULT_ENTITY_H
 
 #include <cstdint>
+#include <ashfault/ashfault.h>
 
 namespace ashfault {
-class Entity {
+class ASHFAULT_API Entity {
 public:
   using id_type = std::uint64_t;
   friend class Scene;

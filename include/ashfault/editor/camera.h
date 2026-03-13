@@ -1,12 +1,13 @@
 #ifndef ASHFAULT_CAMERA_H
 #define ASHFAULT_CAMERA_H
 
+#include <ashfault/ashfault.h>
 #include <glm/glm.hpp>
 #include <memory>
 #include <optional>
 
 namespace ashfault {
-class EditorCamera {
+class ASHFAULT_API EditorCamera {
 public:
   EditorCamera(const glm::vec3 &position, const glm::vec3 &rotation);
 
@@ -30,8 +31,8 @@ protected:
   glm::mat4 m_View;
 };
 
-class PerspectiveEditorCameraBuilder;
-class PerspectiveEditorCamera : public EditorCamera {
+class ASHFAULT_API PerspectiveEditorCameraBuilder;
+class ASHFAULT_API PerspectiveEditorCamera : public EditorCamera {
 public:
   friend class PerspectiveCameraControls;
   PerspectiveEditorCamera(const glm::vec3 &position, const glm::vec3 &rotation,
@@ -51,7 +52,7 @@ private:
   float m_Fov, m_AspectRatio;
 };
 
-class PerspectiveEditorCameraBuilder {
+class ASHFAULT_API PerspectiveEditorCameraBuilder {
 public:
   PerspectiveEditorCameraBuilder() = default;
 
@@ -68,8 +69,8 @@ private:
   std::optional<float> m_AspectRatio;
 };
 
-class OrthoEditorCamera;
-class OrthoEditorCameraBuilder {
+class ASHFAULT_API OrthoEditorCamera;
+class ASHFAULT_API OrthoEditorCameraBuilder {
 public:
   OrthoEditorCameraBuilder() = default;
 
@@ -89,7 +90,7 @@ private:
   float m_Left, m_Right, m_Top, m_Bottom, m_Near, m_Far;
 };
 
-class OrthoEditorCamera : public EditorCamera {
+class ASHFAULT_API OrthoEditorCamera : public EditorCamera {
 public:
   OrthoEditorCamera(const glm::vec3 &position, const glm::vec3 &rotation,
                     float left, float right, float top, float bottom,
@@ -102,15 +103,18 @@ public:
 
   glm::mat4 projection() const override;
   glm::mat4 view() const override;
+
+private:
+  float m_Left, m_Right, m_Top, m_Bottom, m_ZNear, m_ZFar;
 };
 
-class EditorCameraControls {
+class ASHFAULT_API EditorCameraControls {
 public:
   virtual void render_controls() = 0;
   virtual void resize(float width, float height) = 0;
 };
 
-class PerspectiveCameraControls : public EditorCameraControls {
+class ASHFAULT_API PerspectiveCameraControls : public EditorCameraControls {
 public:
   PerspectiveCameraControls(std::shared_ptr<PerspectiveEditorCamera> camera);
 
@@ -126,8 +130,9 @@ private:
   std::shared_ptr<PerspectiveEditorCamera> m_Camera;
 };
 
-class OrthoCameraControls : public EditorCameraControls {
+class ASHFAULT_API OrthoCameraControls : public EditorCameraControls {
 public:
+  OrthoCameraControls(std::shared_ptr<OrthoEditorCamera> camera);
   OrthoCameraControls(const OrthoCameraControls &) = delete;
   OrthoCameraControls &operator=(const OrthoCameraControls &) = delete;
   ~OrthoCameraControls() = default;

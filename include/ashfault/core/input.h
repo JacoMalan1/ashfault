@@ -2,6 +2,7 @@
 #define ASHFAULT_INPUT_H
 
 #include <ashfault/core/window.h>
+#include <ashfault/ashfault.h>
 #include <memory>
 #include <array>
 
@@ -9,7 +10,7 @@ namespace ashfault {
 typedef int Key;
 typedef int MouseButton;
 
-class Input {
+class ASHFAULT_API Input {
 public:
   Input(std::shared_ptr<Window> window);
 

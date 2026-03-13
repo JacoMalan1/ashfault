@@ -1,11 +1,12 @@
 #ifndef ASHFAULT_LAYER_STACK_H
 #define ASHFAULT_LAYER_STACK_H
 
-#include "ashfault/core/layer.h"
+#include <ashfault/core/layer.h>
+#include <ashfault/ashfault.h>
 #include <vector>
 
 namespace ashfault {
-class LayerStack {
+class ASHFAULT_API LayerStack {
 public:
   LayerStack();
   ~LayerStack();

@@ -4,9 +4,10 @@
 #include <ashfault/core/mesh.h>
 #include <ashfault/renderer/buffer.hpp>
 #include <memory>
+#include <ashfault/ashfault.h>
 
 namespace ashfault {
-struct MeshComponent {
+struct ASHFAULT_API MeshComponent {
   std::shared_ptr<Mesh> mesh;
 };
 } // namespace ashfault

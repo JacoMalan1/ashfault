@@ -13,6 +13,7 @@
 #include <optional>
 #include <vk_mem_alloc.h>
 #include <stdexcept>
+#include <ashfault/ashfault.h>
 
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
@@ -26,23 +27,23 @@
   }
 
 namespace ashfault {
-class Swapchain;
-class Frame;
+class ASHFAULT_API Swapchain;
+class ASHFAULT_API Frame;
 
-struct QueueSuitability {
+struct ASHFAULT_API QueueSuitability {
   std::optional<std::uint32_t> graphics_queue;
   std::optional<std::uint32_t> present_queue;
 
   bool complete() const;
 };
 
-struct SwapchainSupportDetails {
+struct ASHFAULT_API SwapchainSupportDetails {
   std::vector<VkPresentModeKHR> present_modes;
   std::vector<VkSurfaceFormatKHR> formats;
   VkSurfaceCapabilitiesKHR capabilities;
 };
 
-class Renderer {
+class ASHFAULT_API Renderer {
 public:
   Renderer() = default;
   Renderer(const Renderer &) = delete;

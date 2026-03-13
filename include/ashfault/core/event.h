@@ -1,9 +1,11 @@
 #ifndef ASHFAULT_EVENT_H
 #define ASHFAULT_EVENT_H
 
+#include <ashfault/ashfault.h>
 #include <functional>
+
 namespace ashfault {
-class Event {
+class ASHFAULT_API Event {
 public:
   Event();
   virtual ~Event() = default;

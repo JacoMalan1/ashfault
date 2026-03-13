@@ -2,12 +2,13 @@
 #define ASHFAULT_PIPELINE_MANAGER_H
 
 #include <ashfault/renderer/pipeline.h>
+#include <ashfault/ashfault.h>
 #include <string>
 #include <unordered_map>
 #include <memory>
 
 namespace ashfault {
-class PipelineManager {
+class ASHFAULT_API PipelineManager {
 public:
   PipelineManager() = default;
 
