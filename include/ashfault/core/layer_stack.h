@@ -3,6 +3,7 @@
 
 #include <ashfault/core/layer.h>
 #include <ashfault/ashfault.h>
+#include <cstddef>
 #include <vector>
 
 namespace ashfault {
@@ -15,6 +16,7 @@ public:
   void push_overlay(Layer *layer);
 
   void pop_layer(Layer *layer);
+  void pop_overlay(Layer *layer);
 
   void on_update(float dt);
   void on_render();
@@ -22,7 +24,7 @@ public:
 
 private:
   std::vector<Layer *> m_Layers;
-  std::vector<Layer *>::iterator m_InsertPosition;
+  std::size_t m_InsertPosition;
 };
 }
 
