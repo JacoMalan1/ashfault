@@ -7,11 +7,12 @@
 #include <vulkan/vulkan.h>
 #include <vulkan/vulkan_core.h>
 #include <array>
+#include <ashfault/ashfault.h>
 
 namespace ashfault {
-class GraphicsPipeline;
+class ASHFAULT_API GraphicsPipeline;
 
-class GraphicsPipelineBuilder {
+class ASHFAULT_API GraphicsPipelineBuilder {
 public:
   GraphicsPipelineBuilder(VkDevice device, VkFormat swapchain_image_format,
                           std::array<std::uint32_t, 2> window_dims,
@@ -46,7 +47,7 @@ private:
   std::array<std::uint32_t, 2> m_WindowDims;
 };
 
-class GraphicsPipeline {
+class ASHFAULT_API GraphicsPipeline {
 public:
   GraphicsPipeline(VkDevice device, VkPipelineLayout layout,
                    VkPipeline pipeline);

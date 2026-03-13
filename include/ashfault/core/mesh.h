@@ -4,9 +4,10 @@
 #include <ashfault/renderer/renderer.h>
 #include <ashfault/renderer/buffer.hpp>
 #include <memory>
+#include <ashfault/ashfault.h>
 
 namespace ashfault {
-class Mesh {
+class ASHFAULT_API Mesh {
 public:
   enum MeshType { Static };
 

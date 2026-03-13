@@ -3,10 +3,11 @@
 
 #include <ashfault/core/engine.h>
 #include <ashfault/core/input.h>
+#include <ashfault/ashfault.h>
 #include <memory>
 
 namespace ashfault {
-class Application {
+class ASHFAULT_API Application {
 public:
   Application(std::shared_ptr<Engine> engine,
               std::shared_ptr<Window> window);

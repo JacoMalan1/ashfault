@@ -1,16 +1,17 @@
 #ifndef ASHFAULT_FRAME_H
 #define ASHFAULT_FRAME_H
 
-#include "ashfault/renderer/descriptor_set.h"
+#include <ashfault/renderer/descriptor_set.h>
 #include <ashfault/renderer/buffer.hpp>
 #include <ashfault/renderer/pipeline.h>
 #include <vector>
 #include <vulkan/vulkan_core.h>
+#include <ashfault/ashfault.h>
 
 namespace ashfault {
 class Swapchain;
 
-struct FrameData {
+struct ASHFAULT_API FrameData {
   Swapchain *swapchain;
   std::vector<VkSemaphore> render_finished_semaphores,
       image_available_semaphores;
@@ -20,9 +21,9 @@ struct FrameData {
   VkQueue graphics_queue, present_queue;
 };
 
-class Renderer;
+class ASHFAULT_API Renderer;
 
-class VulkanAttachmentBuilder {
+class ASHFAULT_API VulkanAttachmentBuilder {
 public:
   friend class VulkanRenderingAttachments;
 
@@ -38,7 +39,7 @@ private:
   VkRenderingAttachmentInfo *m_DstAttachment;
 };
 
-class VulkanRenderingAttachments {
+class ASHFAULT_API VulkanRenderingAttachments {
 public:
   friend class Frame;
   VulkanRenderingAttachments();
@@ -51,7 +52,7 @@ private:
   std::optional<VkRenderingAttachmentInfo> m_DepthInfo;
 };
 
-class Frame {
+class ASHFAULT_API Frame {
 public:
   Frame(FrameData frame_data);
 

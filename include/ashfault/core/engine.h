@@ -5,9 +5,10 @@
 #include <ashfault/core/pipeline_manager.h>
 #include <ashfault/core/shader_manager.h>
 #include <ashfault/renderer/renderer.h>
+#include <ashfault/ashfault.h>
 
 namespace ashfault {
-class Engine {
+class ASHFAULT_API Engine {
 public:
   Engine();
   Engine(const Engine &) = delete;

@@ -8,9 +8,10 @@
 #include <glm/glm.hpp>
 #include <vulkan/vulkan.h>
 #include <vector>
+#include <ashfault/ashfault.h>
 
 namespace ashfault {
-class Scene {
+class ASHFAULT_API Scene {
 public:
   Scene();
 

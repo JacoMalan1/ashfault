@@ -7,12 +7,13 @@
 #include <vulkan/vulkan_core.h>
 #include <memory>
 #include <vector>
+#include <ashfault/ashfault.h>
 
 namespace ashfault {
 class VulkanDescriptorSet;
 class VulkanDescriptorPool;
 
-class VulkanDescriptorSetBuilder {
+class ASHFAULT_API VulkanDescriptorSetBuilder {
 public:
   explicit VulkanDescriptorSetBuilder(VkDevice device);
 
@@ -37,7 +38,7 @@ private:
   VkDevice m_Device;
 };
 
-class VulkanDescriptorSet {
+class ASHFAULT_API VulkanDescriptorSet {
 public:
   VulkanDescriptorSet(VkDevice device, VkDescriptorSet descriptor_set,
                       VkDescriptorSetLayout layout);
@@ -79,7 +80,7 @@ private:
   VkDescriptorSetLayout m_Layout;
 };
 
-class VulkanDescriptorPool {
+class ASHFAULT_API VulkanDescriptorPool {
 public:
   VulkanDescriptorPool(VkDevice device, VkDescriptorPool pool);
 

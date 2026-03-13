@@ -6,9 +6,10 @@
 #include <vk_mem_alloc.h>
 #include <vulkan/vulkan.h>
 #include <vulkan/vulkan_core.h>
+#include <ashfault/ashfault.h>
 
 namespace ashfault {
-class Swapchain {
+class ASHFAULT_API Swapchain {
 public:
   Swapchain(VkSurfaceFormatKHR format, VkPresentModeKHR present_mode,
             std::uint32_t image_count, VkExtent2D extent, VkSurfaceKHR surface,
