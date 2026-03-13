@@ -1,4 +1,4 @@
-#include "glm/trigonometric.hpp"
+#include <glm/trigonometric.hpp>
 #include <ashfault/editor/camera.h>
 #include <cmath>
 #include <glm/ext/matrix_clip_space.hpp>

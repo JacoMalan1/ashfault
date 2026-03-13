@@ -21,7 +21,7 @@ struct ASHFAULT_API FrameData {
   VkQueue graphics_queue, present_queue;
 };
 
-class ASHFAULT_API Renderer;
+class ASHFAULT_API VulkanRenderer;
 
 class ASHFAULT_API VulkanAttachmentBuilder {
 public:

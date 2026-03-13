@@ -1,4 +1,4 @@
-#include "ashfault/renderer/pipeline.h"
+#include <ashfault/renderer/pipeline.h>
 #include <ashfault/core/pipeline_manager.h>
 
 namespace ashfault {

@@ -1,7 +1,7 @@
 #ifndef ASHFAULT_SHADER_MANAGER_H
 #define ASHFAULT_SHADER_MANAGER_H
 
-#include <ashfault/renderer/renderer.h>
+#include <ashfault/renderer/vkrenderer.h>
 #include <ashfault/ashfault.h>
 #include <ashfault/renderer/shader.h>
 #include <string>
@@ -12,9 +12,9 @@ class ASHFAULT_API ShaderManager {
 public:
   ShaderManager();
 
-  void add_vertex_shader(Renderer *renderer, const std::string &path,
+  void add_vertex_shader(VulkanRenderer *renderer, const std::string &path,
                          const std::string &name);
-  void add_fragment_shader(Renderer *renderer, const std::string &path,
+  void add_fragment_shader(VulkanRenderer *renderer, const std::string &path,
                            const std::string &name);
 
   std::optional<std::shared_ptr<VulkanShader>>

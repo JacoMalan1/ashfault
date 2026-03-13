@@ -3,14 +3,14 @@
 namespace ashfault {
 ShaderManager::ShaderManager() {}
 
-void ShaderManager::add_vertex_shader(Renderer *renderer,
+void ShaderManager::add_vertex_shader(VulkanRenderer *renderer,
                                       const std::string &path,
                                       const std::string &name) {
   auto shader = renderer->create_shader(path.c_str());
   this->m_VertexShaders[name] = shader;
 }
 
-void ShaderManager::add_fragment_shader(Renderer *renderer,
+void ShaderManager::add_fragment_shader(VulkanRenderer *renderer,
                                         const std::string &path,
                                         const std::string &name) {
   auto shader = renderer->create_shader(path.c_str());

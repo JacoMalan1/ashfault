@@ -1,6 +1,6 @@
-#include "spdlog/spdlog.h"
+#include <spdlog/spdlog.h>
 #include <ashfault/core/window.h>
-#include <ashfault/renderer/renderer.h>
+#include <ashfault/renderer/vkrenderer.h>
 #include <vulkan/vulkan.h>
 
 #define GLFW_INCLUDE_VULKAN

@@ -8,15 +8,15 @@
 
 namespace ashfault {
 Engine::Engine()
-    : m_Renderer(std::make_unique<Renderer>()),
+    : m_Renderer(std::make_unique<VulkanRenderer>()),
       m_ShaderManager(std::make_unique<ShaderManager>()),
       m_PipelineManager(std::make_unique<PipelineManager>()) {}
 
 Engine::~Engine() {}
 
-Renderer &Engine::renderer() { return *this->m_Renderer; }
+VulkanRenderer &Engine::renderer() { return *this->m_Renderer; }
 
-const Renderer &Engine::renderer() const { return *this->m_Renderer; }
+const VulkanRenderer &Engine::renderer() const { return *this->m_Renderer; }
 
 void Engine::register_shaders() {
   SPDLOG_INFO("Registering shaders");

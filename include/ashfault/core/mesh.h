@@ -1,7 +1,7 @@
 #ifndef ASHFAULT_MESH_H
 #define ASHFAULT_MESH_H
 
-#include <ashfault/renderer/renderer.h>
+#include <ashfault/renderer/vkrenderer.h>
 #include <ashfault/renderer/buffer.hpp>
 #include <memory>
 #include <ashfault/ashfault.h>
@@ -18,7 +18,7 @@ public:
   std::shared_ptr<VulkanBuffer> index_buffer();
   MeshType type() const;
 
-  static std::shared_ptr<Mesh> load_from_file(const std::string &path, Renderer *);
+  static std::shared_ptr<Mesh> load_from_file(const std::string &path, VulkanRenderer *);
 
 private:
   std::shared_ptr<VulkanBuffer> m_VertexBuffer, m_IndexBuffer;

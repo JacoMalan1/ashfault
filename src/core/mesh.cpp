@@ -1,5 +1,5 @@
-#include "ashfault/core/vertex.h"
-#include "ashfault/renderer/renderer.h"
+#include <ashfault/core/vertex.h>
+#include "ashfault/renderer/vkrenderer.h"
 #include "spdlog/spdlog.h"
 #include <ashfault/core/mesh.h>
 #include <tiny_obj_loader.h>
@@ -21,7 +21,7 @@ std::shared_ptr<VulkanBuffer> Mesh::index_buffer() {
 }
 
 std::shared_ptr<Mesh> Mesh::load_from_file(const std::string &path,
-                                             Renderer *renderer) {
+                                             VulkanRenderer *renderer) {
   tinyobj::attrib_t attribs;
   std::vector<tinyobj::shape_t> shapes;
   std::vector<tinyobj::material_t> materials;

@@ -43,12 +43,12 @@ struct ASHFAULT_API SwapchainSupportDetails {
   VkSurfaceCapabilitiesKHR capabilities;
 };
 
-class ASHFAULT_API Renderer {
+class ASHFAULT_API VulkanRenderer {
 public:
-  Renderer() = default;
-  Renderer(const Renderer &) = delete;
-  Renderer &operator=(const Renderer &) = delete;
-  ~Renderer();
+  VulkanRenderer() = default;
+  VulkanRenderer(const VulkanRenderer &) = delete;
+  VulkanRenderer &operator=(const VulkanRenderer &) = delete;
+  ~VulkanRenderer();
   friend class Frame;
 
   Swapchain *swapchain();

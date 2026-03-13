@@ -2,13 +2,13 @@
 #define ASHFAULT_RENDER_LAYER_H
 
 #include <ashfault/core/layer.h>
-#include <ashfault/renderer/renderer.h>
+#include <ashfault/renderer/vkrenderer.h>
 #include <ashfault/ashfault.h>
 
 namespace ashfault {
 class ASHFAULT_API RenderLayer : public Layer {
 public:
-  RenderLayer(Renderer &renderer);
+  RenderLayer(VulkanRenderer &renderer);
 
   void on_attach() override;
   void on_detach() override;
@@ -17,7 +17,7 @@ public:
   void on_event(Event &event) override;
 
 private:
-  Renderer &m_Renderer;
+  VulkanRenderer &m_Renderer;
 };
 }
 

@@ -1,10 +1,10 @@
-#include "ashfault/renderer/renderer.h"
+#include <ashfault/renderer/vkrenderer.h>
 #include <ashfault/core/event/key_press.h>
 #include <ashfault/core/layer/render_layer.h>
 #include <spdlog/spdlog.h>
 
 namespace ashfault {
-RenderLayer::RenderLayer(Renderer &renderer) : Layer(), m_Renderer(renderer) {}
+RenderLayer::RenderLayer(VulkanRenderer &renderer) : Layer(), m_Renderer(renderer) {}
 
 void RenderLayer::on_attach() {}
 void RenderLayer::on_detach() {}
