@@ -1,3 +1,4 @@
+#include <ashfault/core/layer/render_layer.h>
 #include <algorithm>
 #include <ashfault/core/component/mesh.h>
 #include <ashfault/core/component/transform.h>
@@ -30,8 +31,7 @@
 
 namespace ashfault::editor {
 
-Editor::Editor(std::shared_ptr<Engine> engine,
-               std::shared_ptr<Window> window)
+Editor::Editor(std::shared_ptr<Engine> engine, std::shared_ptr<Window> window)
     : Application(engine, window),
       m_ViewportSize({(std::uint32_t)1, (std::uint32_t)1}),
       m_CurrentWindowSize({1, 1}), m_ViewportResized(false), m_LogsLock(),
@@ -447,6 +447,9 @@ void Editor::update_camera() {
 
 void Editor::run() {
   auto &renderer = this->m_Engine->renderer();
+  m_LayerStack = std::make_unique<LayerStack>();
+  m_LayerStack->push_layer(new RenderLayer(renderer));
+
   m_CurrentWindowSize = this->m_Window->current_size();
   m_ViewportSize[0] = m_CurrentWindowSize.width;
   m_ViewportSize[1] = m_CurrentWindowSize.height;
@@ -477,7 +480,11 @@ void Editor::run() {
   this->build_pipelines();
 
   while (!this->m_Window->should_close()) {
+    this->m_Window->poll_events();
+    m_LayerStack->on_update(1000.0f / 60.0f);
+
     this->m_Input->frame_start();
+    m_LayerStack->on_render();
     if (m_ViewportResized) {
       vkDeviceWaitIdle(renderer.device());
       this->clean_images();
@@ -530,7 +537,6 @@ void Editor::run() {
       this->m_CameraControls->resize(m_ViewportSize[0], m_ViewportSize[1]);
     }
     this->update_camera();
-    this->m_Window->poll_events();
   }
 }
 

@@ -9,6 +9,7 @@
 #include <mutex>
 #include <spdlog/details/log_msg.h>
 #include <utility>
+#include <ashfault/core/layer_stack.h>
 
 namespace ashfault::editor {
 struct SubmitData {
@@ -58,6 +59,7 @@ private:
   std::shared_ptr<VulkanBuffer> m_UniformBuffer;
   std::pair<VkImage, VmaAllocation> m_ColorImage;
   VkImageView m_ColorImageView;
+  std::unique_ptr<LayerStack> m_LayerStack;
 };
 } // namespace ashfault::editor
 
