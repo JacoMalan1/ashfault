@@ -7,7 +7,7 @@
 namespace ashfault {
 class ASHFAULT_API KeyPressEvent : public Event {
 public:
-  KeyPressEvent(int key_code);
+  KeyPressEvent(int key_code, int action);
   ~KeyPressEvent() = default;
 
   static Event::EventType static_type();
@@ -15,9 +15,10 @@ public:
   EventType event_type() const override;
 
   int key_code() const;
+  int action() const;
 
 private:
-  int m_KeyCode;
+  int m_KeyCode, m_Action;
 };
 } // namespace ashfault
 

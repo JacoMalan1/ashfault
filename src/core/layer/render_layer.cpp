@@ -4,12 +4,13 @@
 #include <spdlog/spdlog.h>
 
 namespace ashfault {
-RenderLayer::RenderLayer(VulkanRenderer &renderer) : Layer(), m_Renderer(renderer) {}
+RenderLayer::RenderLayer() : Layer() {}
 
 void RenderLayer::on_attach() {}
 void RenderLayer::on_detach() {}
 
-void RenderLayer::on_update(float) {}
+void RenderLayer::on_update(float) {
+}
 
 void RenderLayer::on_render() {}
 

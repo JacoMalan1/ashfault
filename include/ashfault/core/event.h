@@ -3,6 +3,7 @@
 
 #include <ashfault/ashfault.h>
 #include <functional>
+#include <type_traits>
 
 namespace ashfault {
 class ASHFAULT_API Event {
@@ -26,6 +27,7 @@ private:
 class Dispatcher {
 public:
   template<typename T>
+    requires std::is_base_of<Event, T>::value
   void dispatch(Event &event, std::function<void(T &)> f) {
     if (event.event_type() == T::static_type()) {
       f(static_cast<T&>(event));

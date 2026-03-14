@@ -1,6 +1,7 @@
-#ifndef ASHFAULT_RENDERER_H
-#define ASHFAULT_RENDERER_H
+#ifndef ASHFAULT_VK_RENDERER_H
+#define ASHFAULT_VK_RENDERER_H
 
+#include <ashfault/ashfault.h>
 #include <ashfault/core/window.h>
 #include <ashfault/renderer/buffer.hpp>
 #include <ashfault/renderer/descriptor_set.h>
@@ -11,9 +12,8 @@
 #include <cstring>
 #include <functional>
 #include <optional>
+#include <type_traits>
 #include <vk_mem_alloc.h>
-#include <stdexcept>
-#include <ashfault/ashfault.h>
 
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
@@ -51,6 +51,8 @@ public:
   ~VulkanRenderer();
   friend class Frame;
 
+  std::uint32_t image_index() const;
+
   Swapchain *swapchain();
   std::vector<VkCommandBuffer> allocate_command_buffers(std::uint32_t count);
 
@@ -59,8 +61,7 @@ public:
 
   /// @brief Creates a vulkan shader module object.
   /// @param path Path to the pre-compiled SPIR-V shader binary.
-  std::shared_ptr<VulkanShader>
-  create_shader(const std::string &path) const;
+  std::shared_ptr<VulkanShader> create_shader(const std::string &path) const;
 
   /// @brief Returns a graphics pipeline builder.
   GraphicsPipelineBuilder create_graphics_pipeline() const;
@@ -138,6 +139,10 @@ public:
   std::array<std::uint32_t, 2> viewport_size() const;
 
   template <class T>
+    requires std::is_trivially_copyable<T>::value &&
+             (!std::is_pointer<T>::value) &&
+             (!std::is_lvalue_reference<T>::value) &&
+             (!std::is_rvalue_reference<T>::value)
   std::shared_ptr<VulkanBuffer> create_uniform_buffer(const T &data) {
     VmaAllocationCreateInfo alloc_info{};
     alloc_info.usage = VMA_MEMORY_USAGE_AUTO;
@@ -165,8 +170,8 @@ public:
     this->copy_buffer(buffer, staging_buffer, sizeof(T));
     vmaDestroyBuffer(this->m_Allocator, staging_buffer, staging_alloc);
 
-    return std::make_shared<VulkanBuffer>(
-        this->m_Device, this->m_Allocator, buffer, allocation, 1);
+    return std::make_shared<VulkanBuffer>(this->m_Device, this->m_Allocator,
+                                          buffer, allocation, 1);
   }
 
   /// @brief Creates an index buffer.
@@ -174,10 +179,10 @@ public:
   /// @note This function can only be instantiated with unsigned integers of
   /// size 8, 16, and 32 bits.
   template <class T>
+
+    requires std::is_integral<T>::value && std::is_unsigned<T>::value
   std::shared_ptr<VulkanBuffer>
   create_index_buffer(const std::vector<T> &indices) {
-    static_assert(std::is_integral<T>::value && std::is_unsigned<T>::value);
-
     VmaAllocationCreateInfo alloc_info{};
     alloc_info.usage = VMA_MEMORY_USAGE_AUTO;
     alloc_info.requiredFlags = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
@@ -205,12 +210,16 @@ public:
     this->copy_buffer(buffer, staging_buffer, indices.size() * sizeof(T));
     vmaDestroyBuffer(this->m_Allocator, staging_buffer, staging_alloc);
 
-    return std::make_shared<VulkanBuffer>(
-        this->m_Device, this->m_Allocator, buffer, allocation, indices.size());
+    return std::make_shared<VulkanBuffer>(this->m_Device, this->m_Allocator,
+                                          buffer, allocation, indices.size());
   }
 
   /// @brief Creates a vertex buffer.
   template <class T>
+    requires std::is_trivially_copyable<T>::value &&
+             (!std::is_pointer<T>::value) &&
+             (!std::is_lvalue_reference<T>::value) &&
+             (!std::is_rvalue_reference<T>::value)
   std::shared_ptr<VulkanBuffer>
   create_vertex_buffer(const std::vector<T> &vertices) {
     VmaAllocationCreateInfo alloc_info{};
@@ -240,8 +249,8 @@ public:
     this->copy_buffer(buffer, staging_buffer, vertices.size() * sizeof(T));
     vmaDestroyBuffer(this->m_Allocator, staging_buffer, staging_alloc);
 
-    return std::make_shared<VulkanBuffer>(
-        this->m_Device, this->m_Allocator, buffer, allocation, vertices.size());
+    return std::make_shared<VulkanBuffer>(this->m_Device, this->m_Allocator,
+                                          buffer, allocation, vertices.size());
   }
 
 private:

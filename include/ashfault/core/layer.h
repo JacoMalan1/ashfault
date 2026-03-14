@@ -10,12 +10,13 @@ public:
   Layer();
   virtual ~Layer() = default;
 
-  virtual void on_attach() = 0;
-  virtual void on_detach() = 0;
+  virtual void on_attach() {}
+  virtual void on_detach() {}
 
-  virtual void on_update(float dt) = 0;
-  virtual void on_render() = 0;
-  virtual void on_event(Event &event) = 0;
+  virtual void on_update(float dt) {}
+  virtual void on_render() {}
+  virtual void on_event(Event &event) {}
+  virtual void on_imgui_render() {}
 
   bool is_enabled() const;
   void set_enabled(bool enabled);

@@ -22,7 +22,8 @@ void LayerStack::push_overlay(Layer *layer) {
 }
 
 void LayerStack::pop_layer(Layer *layer) {
-  for (auto it = m_Layers.begin(); it != m_Layers.begin() + m_InsertPosition; it++) {
+  for (auto it = m_Layers.begin(); it != m_Layers.begin() + m_InsertPosition;
+       it++) {
     if (*it == layer) {
       layer->on_detach();
       m_Layers.erase(it);
@@ -33,7 +34,8 @@ void LayerStack::pop_layer(Layer *layer) {
 }
 
 void LayerStack::pop_overlay(Layer *layer) {
-  for (auto it = m_Layers.begin() + m_InsertPosition; it != m_Layers.end(); it++) {
+  for (auto it = m_Layers.begin() + m_InsertPosition; it != m_Layers.end();
+       it++) {
     if (*it == layer) {
       layer->on_detach();
       m_Layers.erase(it);
@@ -49,16 +51,26 @@ void LayerStack::on_update(float dt) {
 }
 
 void LayerStack::on_render() {
-  std::for_each(m_Layers.begin(), m_Layers.end(), [=](Layer *layer) {
+  std::for_each(m_Layers.begin(), m_Layers.end(), [](Layer *layer) {
     if (layer->is_enabled())
       layer->on_render();
   });
 }
 
 void LayerStack::on_event(Event &event) {
-  std::for_each(m_Layers.rbegin(), m_Layers.rend(), [&](Layer *layer) {
+  for (auto it = m_Layers.rbegin(); it != m_Layers.rend(); it++) {
+    if ((*it)->is_enabled())
+      (*it)->on_event(event);
+
+    if (event.is_handled())
+      return;
+  }
+}
+
+void LayerStack::on_imgui_render() {
+  std::for_each(m_Layers.begin(), m_Layers.end(), [](Layer *layer) {
     if (layer->is_enabled())
-      layer->on_event(event);
+      layer->on_imgui_render();
   });
 }
 } // namespace ashfault

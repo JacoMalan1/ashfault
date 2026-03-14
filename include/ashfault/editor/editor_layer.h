@@ -1,20 +1,22 @@
-#ifndef ASHFAULT_RENDER_LAYER_H
-#define ASHFAULT_RENDER_LAYER_H
+#ifndef ASHFAULT_EDITOR_LAYER_H
+#define ASHFAULT_EDITOR_LAYER_H
 
 #include <ashfault/core/layer.h>
-#include <ashfault/renderer/vkrenderer.h>
-#include <ashfault/ashfault.h>
 
 namespace ashfault {
-class ASHFAULT_API RenderLayer : public Layer {
+class EditorLayer : public Layer {
 public:
-  RenderLayer();
+  EditorLayer();
+  ~EditorLayer();
 
   void on_attach() override;
   void on_detach() override;
+
   void on_update(float dt) override;
   void on_render() override;
   void on_event(Event &event) override;
+
+private:
 };
 }
 

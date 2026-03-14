@@ -21,6 +21,7 @@ public:
   void on_update(float dt);
   void on_render();
   void on_event(Event &event);
+  void on_imgui_render();
 
 private:
   std::vector<Layer *> m_Layers;
