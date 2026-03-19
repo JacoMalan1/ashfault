@@ -68,9 +68,16 @@ void LayerStack::on_event(Event &event) {
 }
 
 void LayerStack::on_imgui_render() {
-  std::for_each(m_Layers.begin(), m_Layers.end(), [](Layer *layer) {
-    if (layer->is_enabled())
-      layer->on_imgui_render();
-  });
+  std::for_each(m_Layers.begin() + m_InsertPosition, m_Layers.end(),
+                [](Layer *layer) {
+                  if (layer->is_enabled())
+                    layer->on_imgui_render();
+                });
+
+  std::for_each(m_Layers.begin(), m_Layers.begin() + m_InsertPosition,
+                [](Layer *layer) {
+                  if (layer->is_enabled())
+                    layer->on_imgui_render();
+                });
 }
 } // namespace ashfault

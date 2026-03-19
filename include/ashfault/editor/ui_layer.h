@@ -10,6 +10,7 @@ public:
   EditorUiLayer();
   ~EditorUiLayer();
 
+  void on_attach() override;
   void on_update(float dt) override;
   void on_render() override;
   void on_event(Event &event) override;

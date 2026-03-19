@@ -628,7 +628,7 @@ void VulkanRenderer::recreate_swapchain() {
 
 void VulkanRenderer::cleanup_swapchain() { this->m_Swapchain->cleanup(); }
 
-VulkanRenderer::~VulkanRenderer() {
+void VulkanRenderer::shutdown() {
   ImGui_ImplVulkan_Shutdown();
   ImGui_ImplGlfw_Shutdown();
   ImGui::DestroyContext();
@@ -702,5 +702,40 @@ VkSampler VulkanRenderer::create_sampler() {
 
 VkSampleCountFlagBits VulkanRenderer::msaa_samples() const {
   return this->m_MsaaSamples;
+}
+
+std::vector<VkSemaphore> VulkanRenderer::create_semaphores(std::size_t count) {
+  std::vector<VkSemaphore> result{};
+  result.resize(count);
+  VkSemaphoreCreateInfo create_info{};
+  create_info.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
+
+  for (std::size_t i = 0; i < count; i++) {
+    VK_CHECK_RESULT(vkCreateSemaphore(m_Device, &create_info, nullptr, &result[i]));
+  }
+
+  return result;
+}
+
+std::vector<VkFence> VulkanRenderer::create_fences(std::size_t count) {
+  std::vector<VkFence> result{};
+  result.resize(count);
+  VkFenceCreateInfo create_info{};
+  create_info.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
+  create_info.flags = VK_FENCE_CREATE_SIGNALED_BIT;
+
+  for (std::size_t i = 0; i < count; i++) {
+    VK_CHECK_RESULT(vkCreateFence(m_Device, &create_info, nullptr, &result[i]));
+  }
+
+  return result;
+}
+
+VkQueue &VulkanRenderer::graphics_queue() {
+  return m_GraphicsQueue;
+}
+
+VkQueue &VulkanRenderer::present_queue() {
+  return m_PresentQueue;
 }
 } // namespace ashfault

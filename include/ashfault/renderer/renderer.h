@@ -1,6 +1,7 @@
 #ifndef ASHFAULT_RENDERER_H
 #define ASHFAULT_RENDERER_H
 
+#include <ashfault/core/mesh.h>
 #include <imgui.h>
 #include <ashfault/ashfault.h>
 #include <memory>
@@ -11,7 +12,8 @@ namespace ashfault {
 class ASHFAULT_API Renderer {
 public:
   static void init(std::shared_ptr<Window> window);
-  static void start_frame();
+  static void shutdown();
+  static bool start_frame();
   static void end_frame();
 
   static void push_render_target(std::shared_ptr<RenderTarget> target);
@@ -22,10 +24,9 @@ public:
   static void begin_scene();
   static void end_scene();
 
-  static std::shared_ptr<RenderTarget> create_render_target(bool msaa = true);
+  static std::shared_ptr<RenderTarget> create_render_target(bool msaa = true, bool swapchain = false);
 
-  template<class T>
-  static void submit_mesh(T &mesh);
+  static void submit_mesh(Mesh &mesh);
 
   static void submit_imgui_data(ImDrawData *);
 

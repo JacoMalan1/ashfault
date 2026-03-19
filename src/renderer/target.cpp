@@ -15,10 +15,7 @@ RenderTarget::RenderTarget(
       m_DepthImage(depth_image), m_DepthView(depth_view) {}
 
 RenderTarget::~RenderTarget() {
-  for (auto &view : m_ImageViews) {
-    vkDestroyImageView(m_Renderer->device(), view, nullptr);
-  }
-
+  vkDeviceWaitIdle(m_Renderer->device());
   if (m_DepthImage.has_value()) {
     vkDestroyImageView(m_Renderer->device(), m_DepthView.value(), nullptr);
     vmaDestroyImage(m_Renderer->allocator(), m_DepthImage->first,
@@ -30,10 +27,14 @@ RenderTarget::~RenderTarget() {
       vmaDestroyImage(m_Renderer->allocator(), m_Images[i],
                       m_ImageAllocations.value()[i]);
     }
+
+    for (auto &view : m_ImageViews) {
+      vkDestroyImageView(m_Renderer->device(), view, nullptr);
+    }
   }
 }
 
-VkCommandBuffer RenderTarget::command_buffer(std::uint32_t idx) {
+VkCommandBuffer &RenderTarget::command_buffer(std::uint32_t idx) {
   return this->m_CommandBuffers[idx];
 }
 
@@ -41,5 +42,101 @@ VkImage RenderTarget::image(std::uint32_t idx) { return this->m_Images[idx]; }
 
 VkImageView RenderTarget::image_view(std::uint32_t idx) {
   return this->m_ImageViews[idx];
+}
+
+void RenderTarget::begin_rendering(std::uint32_t image_index,
+                                   std::uint32_t current_frame,
+                                   VkRect2D render_area) {
+  VkCommandBuffer cmd = command_buffer(current_frame);
+
+  VkRenderingAttachmentInfo color_attachment{};
+  color_attachment.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
+  color_attachment.clearValue.color = {{0.0f, 0.0f, 0.0f, 1.0f}};
+  color_attachment.imageView = image_view(image_index);
+  color_attachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+  color_attachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+  color_attachment.imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+
+  VkRenderingAttachmentInfo depth_attachment{};
+
+  VkRenderingInfo rendering_info{};
+  rendering_info.sType = VK_STRUCTURE_TYPE_RENDERING_INFO;
+  rendering_info.colorAttachmentCount = 1;
+  rendering_info.pColorAttachments = &color_attachment;
+  rendering_info.renderArea = render_area;
+  rendering_info.layerCount = 1;
+
+  if (m_DepthImage.has_value()) {
+    depth_attachment.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
+    depth_attachment.clearValue.depthStencil = {1.0f, 0};
+    depth_attachment.imageLayout = VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL;
+    depth_attachment.imageView = m_DepthView.value();
+    depth_attachment.loadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+    depth_attachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+
+    rendering_info.pDepthAttachment = &depth_attachment;
+  }
+
+  VkImageMemoryBarrier color_barrier{};
+  color_barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+  color_barrier.image = image(image_index);
+  color_barrier.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+  color_barrier.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+  color_barrier.newLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+  color_barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+  color_barrier.subresourceRange.baseArrayLayer = 0;
+  color_barrier.subresourceRange.baseMipLevel = 0;
+  color_barrier.subresourceRange.layerCount = 1;
+  color_barrier.subresourceRange.levelCount = 1;
+
+  vkCmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
+                       VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, 0, 0,
+                       nullptr, 0, nullptr, 1, &color_barrier);
+
+  if (m_DepthImage.has_value()) {
+    VkImageMemoryBarrier depth_barrier{};
+    depth_barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+    depth_barrier.image = m_DepthImage.value().first;
+    depth_barrier.dstAccessMask = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT |
+                                  VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+    depth_barrier.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+    depth_barrier.newLayout = VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL;
+    depth_barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
+    depth_barrier.subresourceRange.baseArrayLayer = 0;
+    depth_barrier.subresourceRange.baseMipLevel = 0;
+    depth_barrier.subresourceRange.layerCount = 1;
+    depth_barrier.subresourceRange.levelCount = 1;
+
+    vkCmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
+                         VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT, 0, 0,
+                         nullptr, 0, nullptr, 1, &depth_barrier);
+  }
+
+  vkCmdBeginRendering(cmd, &rendering_info);
+}
+
+void RenderTarget::end_rendering(std::uint32_t image_index,
+                                 std::uint32_t current_frame,
+                                 bool present_source) {
+  VkCommandBuffer cmd = command_buffer(current_frame);
+  vkCmdEndRendering(cmd);
+
+  VkImageMemoryBarrier color_barrier{};
+  color_barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+  color_barrier.image = image(image_index);
+  color_barrier.srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+  color_barrier.oldLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+  color_barrier.newLayout = present_source
+                                ? VK_IMAGE_LAYOUT_PRESENT_SRC_KHR
+                                : VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+  color_barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+  color_barrier.subresourceRange.baseArrayLayer = 0;
+  color_barrier.subresourceRange.baseMipLevel = 0;
+  color_barrier.subresourceRange.layerCount = 1;
+  color_barrier.subresourceRange.levelCount = 1;
+
+  vkCmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+                       VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, 0, 0, nullptr, 0,
+                       nullptr, 1, &color_barrier);
 }
 } // namespace ashfault

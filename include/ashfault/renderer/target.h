@@ -23,9 +23,11 @@ public:
                const std::vector<VkCommandBuffer> &command_buffers);
   ~RenderTarget();
 
-  VkCommandBuffer command_buffer(std::uint32_t index);
+  VkCommandBuffer &command_buffer(std::uint32_t index);
   VkImage image(std::uint32_t index);
   VkImageView image_view(std::uint32_t index);
+  void begin_rendering(std::uint32_t image_index, std::uint32_t current_frame, VkRect2D render_area);
+  void end_rendering(std::uint32_t image_index, std::uint32_t current_frame, bool present_source);
 
 private:
   std::shared_ptr<VulkanRenderer> m_Renderer;

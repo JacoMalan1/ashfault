@@ -48,8 +48,8 @@ public:
   VulkanRenderer() = default;
   VulkanRenderer(const VulkanRenderer &) = delete;
   VulkanRenderer &operator=(const VulkanRenderer &) = delete;
-  ~VulkanRenderer();
   friend class Frame;
+  void shutdown();
 
   std::uint32_t image_index() const;
 
@@ -83,6 +83,12 @@ public:
   /// @param op A function takes the command buffer as an argument and records
   /// to it.
   void command_buffer(std::function<void(VkCommandBuffer)> op);
+
+  std::vector<VkSemaphore> create_semaphores(std::size_t count);
+  std::vector<VkFence> create_fences(std::size_t count);
+
+  VkQueue &graphics_queue();
+  VkQueue &present_queue();
 
   /// @brief Creates a vulkan image object.
   ///

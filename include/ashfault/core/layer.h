@@ -10,7 +10,7 @@ public:
   Layer();
   virtual ~Layer() = default;
 
-  virtual void on_attach() {}
+  virtual void on_attach() { }
   virtual void on_detach() {}
 
   virtual void on_update(float dt) {}
