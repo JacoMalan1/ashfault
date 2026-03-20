@@ -1,5 +1,5 @@
-#ifndef ASHFAULT_CAMERA_H
-#define ASHFAULT_CAMERA_H
+#ifndef ASHFAULT_EDITOR_CAMERA_H
+#define ASHFAULT_EDITOR_CAMERA_H
 
 #include <ashfault/ashfault.h>
 #include <glm/glm.hpp>

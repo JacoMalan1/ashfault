@@ -1,3 +1,4 @@
+#include "ashfault/renderer/buffer.hpp"
 #include <ashfault/renderer/target.h>
 #include <memory>
 #include <vulkan/vulkan_core.h>
@@ -9,10 +10,11 @@ RenderTarget::RenderTarget(
     std::optional<VkImageView> depth_view, const std::vector<VkImage> &images,
     const std::vector<VkImageView> &image_views,
     const std::optional<std::vector<VmaAllocation>> &allocations,
-    const std::vector<VkCommandBuffer> &command_buffers)
+    const std::vector<VkCommandBuffer> &command_buffers, VkRect2D render_area)
     : m_Renderer(renderer), m_Images(images), m_ImageViews(image_views),
       m_ImageAllocations(allocations), m_CommandBuffers(command_buffers),
-      m_DepthImage(depth_image), m_DepthView(depth_view) {}
+      m_DepthImage(depth_image), m_DepthView(depth_view),
+      m_RenderArea(render_area) {}
 
 RenderTarget::~RenderTarget() {
   vkDeviceWaitIdle(m_Renderer->device());
@@ -45,8 +47,7 @@ VkImageView RenderTarget::image_view(std::uint32_t idx) {
 }
 
 void RenderTarget::begin_rendering(std::uint32_t image_index,
-                                   std::uint32_t current_frame,
-                                   VkRect2D render_area) {
+                                   std::uint32_t current_frame) {
   VkCommandBuffer cmd = command_buffer(current_frame);
 
   VkRenderingAttachmentInfo color_attachment{};
@@ -63,7 +64,7 @@ void RenderTarget::begin_rendering(std::uint32_t image_index,
   rendering_info.sType = VK_STRUCTURE_TYPE_RENDERING_INFO;
   rendering_info.colorAttachmentCount = 1;
   rendering_info.pColorAttachments = &color_attachment;
-  rendering_info.renderArea = render_area;
+  rendering_info.renderArea = m_RenderArea;
   rendering_info.layerCount = 1;
 
   if (m_DepthImage.has_value()) {
@@ -71,8 +72,8 @@ void RenderTarget::begin_rendering(std::uint32_t image_index,
     depth_attachment.clearValue.depthStencil = {1.0f, 0};
     depth_attachment.imageLayout = VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL;
     depth_attachment.imageView = m_DepthView.value();
-    depth_attachment.loadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-    depth_attachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+    depth_attachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+    depth_attachment.storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
 
     rendering_info.pDepthAttachment = &depth_attachment;
   }
@@ -113,6 +114,16 @@ void RenderTarget::begin_rendering(std::uint32_t image_index,
   }
 
   vkCmdBeginRendering(cmd, &rendering_info);
+
+  VkViewport viewport{};
+  viewport.x = m_RenderArea.offset.x;
+  viewport.y = m_RenderArea.offset.y;
+  viewport.width = m_RenderArea.extent.width;
+  viewport.height = m_RenderArea.extent.height;
+  viewport.minDepth = 0.0f;
+  viewport.maxDepth = 1.0f;
+  vkCmdSetViewport(cmd, 0, 1, &viewport);
+  vkCmdSetScissor(cmd, 0, 1, &m_RenderArea);
 }
 
 void RenderTarget::end_rendering(std::uint32_t image_index,
@@ -124,7 +135,11 @@ void RenderTarget::end_rendering(std::uint32_t image_index,
   VkImageMemoryBarrier color_barrier{};
   color_barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
   color_barrier.image = image(image_index);
-  color_barrier.srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+  if (present_source) {
+    color_barrier.srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+  } else {
+    color_barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+  }
   color_barrier.oldLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
   color_barrier.newLayout = present_source
                                 ? VK_IMAGE_LAYOUT_PRESENT_SRC_KHR
@@ -135,8 +150,44 @@ void RenderTarget::end_rendering(std::uint32_t image_index,
   color_barrier.subresourceRange.layerCount = 1;
   color_barrier.subresourceRange.levelCount = 1;
 
-  vkCmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
-                       VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, 0, 0, nullptr, 0,
-                       nullptr, 1, &color_barrier);
+  if (present_source) {
+    vkCmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+                         VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, 0, 0,
+                         nullptr, 0, nullptr, 1, &color_barrier);
+  } else {
+    vkCmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
+                         VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0, 0, nullptr,
+                         0, nullptr, 1, &color_barrier);
+  }
+}
+
+void RenderTarget::update_images(
+    const std::vector<VkImage> &images,
+    const std::vector<VkImageView> &image_views,
+    const std::optional<std::vector<VmaAllocation>> &allocations) {
+  vkDeviceWaitIdle(m_Renderer->device());
+  if (m_ImageAllocations.has_value()) {
+    for (std::size_t i = 0; i < m_Images.size(); i++) {
+      vmaDestroyImage(m_Renderer->allocator(), m_Images[i],
+                      m_ImageAllocations.value()[i]);
+      vkDestroyImageView(m_Renderer->device(), m_ImageViews[i], nullptr);
+    }
+  }
+
+  m_Images = images;
+  m_ImageViews = image_views;
+  m_ImageAllocations = allocations;
+}
+
+void RenderTarget::update_depth_image(std::pair<VkImage, VmaAllocation> image,
+                                      VkImageView view) {
+  if (m_DepthImage.has_value()) {
+    vmaDestroyImage(m_Renderer->allocator(), m_DepthImage->first,
+                    m_DepthImage->second);
+    vkDestroyImageView(m_Renderer->device(), m_DepthView.value(), nullptr);
+  }
+
+  m_DepthImage = image;
+  m_DepthView = view;
 }
 } // namespace ashfault

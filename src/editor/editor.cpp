@@ -31,7 +31,6 @@ void Editor::run() {
     m_LayerStack->on_event(ev);
   });
 
-  auto viewport_target = Renderer::create_render_target();
 
   SPDLOG_INFO("Editor startup finished");
   while (!m_Window->should_close()) {
@@ -39,7 +38,7 @@ void Editor::run() {
       SPDLOG_WARN("Couldn't start frame");
       continue;
     }
-    //Renderer::push_render_target(viewport_target);
+
     m_LayerStack->on_update(1000.0f / 60.0f);
     m_LayerStack->on_render();
 

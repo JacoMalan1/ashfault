@@ -1,3 +1,4 @@
+#include "ashfault/core/layer_stack.h"
 #include <ashfault/renderer/vkrenderer.h>
 #include <ashfault/core/event/key_press.h>
 #include <ashfault/core/layer/render_layer.h>
@@ -6,7 +7,7 @@
 namespace ashfault {
 RenderLayer::RenderLayer() : Layer() {}
 
-void RenderLayer::on_attach() {}
+void RenderLayer::on_attach(LayerStack *) {}
 void RenderLayer::on_detach() {}
 
 void RenderLayer::on_update(float) {

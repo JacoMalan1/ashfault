@@ -5,12 +5,14 @@
 #include <ashfault/ashfault.h>
 
 namespace ashfault {
+class LayerStack;
+
 class ASHFAULT_API Layer {
 public:
   Layer();
   virtual ~Layer() = default;
 
-  virtual void on_attach() { }
+  virtual void on_attach(LayerStack *layer_stack) { }
   virtual void on_detach() {}
 
   virtual void on_update(float dt) {}
@@ -23,6 +25,8 @@ public:
 
 protected:
   bool m_Enabled;
+  LayerStack *m_LayerStack;
+
 };
 }
 

@@ -12,7 +12,8 @@ public:
   virtual ~Event() = default;
 
   enum EventType {
-    KeyPress
+    KeyPress,
+    ViewportResize
   };
 
   virtual EventType event_type() const = 0;

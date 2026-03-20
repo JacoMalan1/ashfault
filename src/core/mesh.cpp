@@ -1,7 +1,7 @@
-#include <ashfault/core/vertex.h>
-#include "ashfault/renderer/vkrenderer.h"
-#include "spdlog/spdlog.h"
+#include <ashfault/renderer/renderer.h>
+#include <spdlog/spdlog.h>
 #include <ashfault/core/mesh.h>
+#include <ashfault/core/vertex.h>
 #include <tiny_obj_loader.h>
 #include <vector>
 
@@ -20,8 +20,7 @@ std::shared_ptr<VulkanBuffer> Mesh::index_buffer() {
   return this->m_IndexBuffer;
 }
 
-std::shared_ptr<Mesh> Mesh::load_from_file(const std::string &path,
-                                             VulkanRenderer *renderer) {
+std::shared_ptr<Mesh> Mesh::load_from_file(const std::string &path) {
   tinyobj::attrib_t attribs;
   std::vector<tinyobj::shape_t> shapes;
   std::vector<tinyobj::material_t> materials;
@@ -30,7 +29,7 @@ std::shared_ptr<Mesh> Mesh::load_from_file(const std::string &path,
     throw std::runtime_error(err);
   }
 
-  std::vector<StaticVertex> vertices;
+  std::vector<Mesh::Vertex> vertices;
   std::vector<std::uint32_t> indices;
 
   for (std::size_t f = 0; f < shapes[0].mesh.indices.size(); f++) {
@@ -45,14 +44,13 @@ std::shared_ptr<Mesh> Mesh::load_from_file(const std::string &path,
     tinyobj::real_t vny = attribs.normals[3 * idx.normal_index + 1];
     tinyobj::real_t vnz = attribs.normals[3 * idx.normal_index + 2];
 
-    StaticVertex vert = {glm::vec3(vx, vy, vz), glm::vec3(vnx, vny, vnz)};
+    Mesh::Vertex vert = {.position = glm::vec3(vx, vy, vz),
+                         .normal = glm::vec3(vnx, vny, vnz)};
     vertices.push_back(vert);
   }
 
-  auto vertex_buffer = renderer->create_vertex_buffer(vertices);
-  auto index_buffer = renderer->create_index_buffer(indices);
   SPDLOG_INFO("Loaded {} vertices", vertices.size());
   SPDLOG_INFO("Loaded {} indices", indices.size());
-  return std::make_shared<Mesh>(Mesh::Static, vertex_buffer, index_buffer);
+  return Renderer::create_mesh(Mesh::Static, vertices, indices);
 }
 } // namespace ashfault

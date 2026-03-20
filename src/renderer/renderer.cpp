@@ -1,14 +1,27 @@
+#include <ashfault/core/camera.h>
 #include <ashfault/core/pipeline_manager.h>
 #include <ashfault/renderer/buffer.hpp>
+#include <ashfault/renderer/pipeline.h>
 #include <ashfault/renderer/renderer.h>
 #include <ashfault/renderer/swapchain.h>
 #include <ashfault/renderer/vkrenderer.h>
+#include <cstddef>
+#include <glm/ext/matrix_float4x4.hpp>
+#include <glm/ext/matrix_transform.hpp>
+#include <glm/fwd.hpp>
 #include <imgui_impl_vulkan.h>
 #include <limits>
 #include <memory>
+#include <unistd.h>
 #include <vulkan/vulkan_core.h>
 
 namespace ashfault {
+struct CameraData {
+  glm::mat4 projection;
+  glm::mat4 view;
+  glm::mat4 model;
+};
+
 struct RendererData {
   std::shared_ptr<VulkanRenderer> render_backend;
   Swapchain *swapchain;
@@ -28,13 +41,46 @@ struct RendererData {
 
   std::shared_ptr<RenderTarget> default_target;
   std::vector<std::shared_ptr<RenderTarget>> targets;
+
+  std::optional<CameraData> camera_data;
 };
 
 static RendererData s_Data;
 
+void Renderer::create_pipelines() {
+  auto static_vshader = s_Data.render_backend->create_shader("simple.vert.spv");
+  auto static_fshader = s_Data.render_backend->create_shader("simple.frag.spv");
+
+  std::vector<VkVertexInputAttributeDescription> vertex_attribs{};
+  vertex_attribs.push_back({
+      .location = 0,
+      .binding = 0,
+      .format = VK_FORMAT_R32G32B32_SFLOAT,
+      .offset = 0,
+  });
+  vertex_attribs.push_back({
+      .location = 1,
+      .binding = 0,
+      .format = VK_FORMAT_R32G32B32_SFLOAT,
+      .offset = offsetof(Mesh::Vertex, normal),
+  });
+
+  auto static_pipeline =
+      s_Data.render_backend->create_graphics_pipeline()
+          .input_attribute_descriptions(vertex_attribs, sizeof(Mesh::Vertex))
+          .vertex_shader(static_vshader)
+          .fragment_shader(static_fshader)
+          .push_constant(VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(CameraData))
+          .build();
+
+  s_Data.pipeline_manager->add_graphics_pipeline("static", static_pipeline);
+}
+
 bool Renderer::start_frame() {
   s_Data.swapchain = s_Data.render_backend->swapchain();
-  s_Data.default_target = create_render_target(false, true);
+  s_Data.default_target =
+      create_render_target(s_Data.swapchain->swap_extent().width,
+                           s_Data.swapchain->swap_extent().height, false, true);
   s_Data.cmd_to_submit.clear();
   vkWaitForFences(s_Data.render_backend->device(), 1,
                   &s_Data.in_flight_fences[s_Data.current_frame], VK_TRUE,
@@ -62,22 +108,8 @@ bool Renderer::start_frame() {
   begin_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
   vkBeginCommandBuffer(cmd, &begin_info);
 
-  VkRect2D render_area = {.offset = {.x = 0, .y = 0},
-                          .extent = s_Data.swapchain->swap_extent()};
-
   s_Data.default_target->begin_rendering(s_Data.image_index,
-                                         s_Data.current_frame, render_area);
-
-  VkViewport viewport = {
-      .x = 0,
-      .y = 0,
-      .width = static_cast<float>(s_Data.swapchain->swap_extent().width),
-      .height = static_cast<float>(s_Data.swapchain->swap_extent().height),
-      .minDepth = 0.0f,
-      .maxDepth = 1.0f};
-  vkCmdSetViewport(cmd, 0, 1, &viewport);
-
-  vkCmdSetScissor(cmd, 0, 1, &render_area);
+                                         s_Data.current_frame);
   return true;
 }
 
@@ -97,7 +129,9 @@ void Renderer::init(std::shared_ptr<Window> window) {
   s_Data.swapchain = s_Data.render_backend->swapchain();
   s_Data.pipeline_manager = std::make_unique<PipelineManager>();
   s_Data.current_frame = 0;
-  s_Data.default_target = create_render_target(false, true);
+  s_Data.default_target = create_render_target(
+      s_Data.render_backend->swapchain()->swap_extent().width,
+      s_Data.render_backend->swapchain()->swap_extent().height, false, true);
   s_Data.cmd_to_submit = {};
 
   s_Data.image_available_semaphores =
@@ -112,6 +146,8 @@ void Renderer::init(std::shared_ptr<Window> window) {
           s_Data.swapchain->image_count());
   s_Data.command_buffers = s_Data.render_backend->allocate_command_buffers(
       s_Data.swapchain->image_count());
+
+  Renderer::create_pipelines();
 }
 
 void Renderer::submit_imgui_data(ImDrawData *draw_data) {
@@ -130,20 +166,16 @@ void Renderer::push_render_target(std::shared_ptr<RenderTarget> target) {
   begin_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
   vkBeginCommandBuffer(cmd, &begin_info);
 
-  VkRect2D render_area = {.offset = {.x = 0, .y = 0},
-                          .extent = s_Data.swapchain->swap_extent()};
-
-  target->begin_rendering(s_Data.image_index, s_Data.current_frame,
-                          render_area);
+  target->begin_rendering(s_Data.image_index, s_Data.current_frame);
 }
 
 void Renderer::pop_render_target() {
   render_target().end_rendering(s_Data.image_index, s_Data.current_frame,
                                 false);
   vkEndCommandBuffer(render_target().command_buffer(s_Data.current_frame));
-  s_Data.targets.pop_back();
   s_Data.cmd_to_submit.push_back(
       render_target().command_buffer(s_Data.current_frame));
+  s_Data.targets.pop_back();
 }
 
 RenderTarget &Renderer::render_target() {
@@ -151,10 +183,10 @@ RenderTarget &Renderer::render_target() {
                                   : s_Data.targets.back());
 }
 
-std::shared_ptr<RenderTarget> Renderer::create_render_target(bool msaa,
-                                                             bool swapchain) {
+std::shared_ptr<RenderTarget>
+Renderer::create_render_target(std::uint32_t width, std::uint32_t height,
+                               bool msaa, bool swapchain) {
   auto image_count = s_Data.swapchain->image_count();
-  auto dims = s_Data.swapchain->swap_extent();
   auto cmd_buffers =
       s_Data.render_backend->allocate_command_buffers(image_count);
 
@@ -167,7 +199,7 @@ std::shared_ptr<RenderTarget> Renderer::create_render_target(bool msaa,
 
   std::pair<VkImage, VmaAllocation> depth_image =
       s_Data.render_backend->create_image(
-          dims.width, dims.height,
+          width, height,
           msaa ? s_Data.render_backend->msaa_samples() : VK_SAMPLE_COUNT_1_BIT,
           VK_FORMAT_D32_SFLOAT, VK_IMAGE_TILING_OPTIMAL,
           VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT, alloc_info);
@@ -180,10 +212,11 @@ std::shared_ptr<RenderTarget> Renderer::create_render_target(bool msaa,
       views[i] = s_Data.swapchain->image_view(i);
     } else {
       auto image = s_Data.render_backend->create_image(
-          dims.width, dims.height,
+          width, height,
           msaa ? s_Data.render_backend->msaa_samples() : VK_SAMPLE_COUNT_1_BIT,
           s_Data.swapchain->surface_format().format, VK_IMAGE_TILING_OPTIMAL,
-          VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, alloc_info);
+          VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
+          alloc_info);
       images[i] = image.first;
       allocs[i] = image.second;
 
@@ -194,11 +227,14 @@ std::shared_ptr<RenderTarget> Renderer::create_render_target(bool msaa,
     }
   }
 
+  VkRect2D render_area = {.offset = {.x = 0, .y = 0},
+                          .extent = {.width = width, .height = height}};
+
   return std::make_shared<RenderTarget>(
       s_Data.render_backend, depth_image, depth_view, images, views,
       swapchain ? std::optional<std::vector<VmaAllocation>>()
                 : std::make_optional(allocs),
-      cmd_buffers);
+      cmd_buffers, render_area);
 }
 
 void Renderer::submit_and_wait() {
@@ -227,14 +263,22 @@ void Renderer::submit_and_wait() {
 
 void Renderer::submit_mesh(Mesh &mesh) {
   auto cmd = render_target().command_buffer(s_Data.current_frame);
+  GraphicsPipeline *pipeline = nullptr;
   switch (mesh.type()) {
   case Mesh::Static:
-    vkCmdBindPipeline(
-        cmd, VK_PIPELINE_BIND_POINT_GRAPHICS,
-        s_Data.pipeline_manager->get_graphics_pipeline("static")->handle());
+    pipeline = s_Data.pipeline_manager->get_graphics_pipeline("static");
+
     break;
   }
 
+  auto data =
+      s_Data.camera_data.value_or<CameraData>({.projection = glm::identity<glm::mat4>(),
+                                   .view = glm::identity<glm::mat4>(),
+                                   .model = glm::identity<glm::mat4>()});
+  data.model = glm::identity<glm::mat4>();
+  vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline->handle());
+  vkCmdPushConstants(cmd, pipeline->layout(), VK_SHADER_STAGE_VERTEX_BIT, 0,
+                     sizeof(CameraData), &data);
   VkDeviceSize offset = 0;
   vkCmdBindVertexBuffers(cmd, 0, 1, &mesh.vertex_buffer()->handle(), &offset);
   vkCmdDraw(cmd, mesh.vertex_buffer()->count(), 1, 0, 0);
@@ -246,4 +290,27 @@ void Renderer::shutdown() {
   s_Data.targets.clear();
   s_Data.render_backend->shutdown();
 }
+
+VulkanRenderer &Renderer::vulkan_backend() { return *s_Data.render_backend; }
+
+std::uint32_t Renderer::swapchain_image_index() { return s_Data.image_index; }
+
+std::shared_ptr<Mesh>
+Renderer::create_mesh(Mesh::MeshType type,
+                      const std::vector<Mesh::Vertex> &vertices,
+                      const std::vector<std::uint32_t> &indices) {
+  auto vertex_buffer = s_Data.render_backend->create_vertex_buffer(vertices);
+  auto index_buffer = s_Data.render_backend->create_index_buffer(indices);
+  return std::make_shared<Mesh>(type, vertex_buffer, index_buffer);
+}
+
+void Renderer::begin_scene(Camera &camera) {
+  CameraData data = {.projection = camera.projection(), .view = camera.view()};
+
+  s_Data.camera_data = data;
+}
+
+void Renderer::end_scene() { s_Data.camera_data = std::optional<CameraData>(); }
+
+std::uint32_t Renderer::frame_index() { return s_Data.current_frame; }
 } // namespace ashfault

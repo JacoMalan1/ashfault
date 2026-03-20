@@ -13,12 +13,12 @@ LayerStack::~LayerStack() {
 void LayerStack::push_layer(Layer *layer) {
   this->m_Layers.insert(m_Layers.begin() + m_InsertPosition, layer);
   m_InsertPosition++;
-  layer->on_attach();
+  layer->on_attach(this);
 }
 
 void LayerStack::push_overlay(Layer *layer) {
   this->m_Layers.push_back(layer);
-  layer->on_attach();
+  layer->on_attach(this);
 }
 
 void LayerStack::pop_layer(Layer *layer) {
@@ -44,17 +44,21 @@ void LayerStack::pop_overlay(Layer *layer) {
 }
 
 void LayerStack::on_update(float dt) {
-  std::for_each(m_Layers.begin(), m_Layers.end(), [=](Layer *layer) {
+  auto f = [=](Layer *layer) {
     if (layer->is_enabled())
       layer->on_update(dt);
-  });
+  };
+  std::for_each(m_Layers.begin() + m_InsertPosition, m_Layers.end(), f);
+  std::for_each(m_Layers.begin(), m_Layers.begin() + m_InsertPosition, f);
 }
 
 void LayerStack::on_render() {
-  std::for_each(m_Layers.begin(), m_Layers.end(), [](Layer *layer) {
+  auto f = [](Layer *layer) {
     if (layer->is_enabled())
       layer->on_render();
-  });
+  };
+  std::for_each(m_Layers.begin() + m_InsertPosition, m_Layers.end(), f);
+  std::for_each(m_Layers.begin(), m_Layers.begin() + m_InsertPosition, f);
 }
 
 void LayerStack::on_event(Event &event) {
