@@ -1,16 +1,22 @@
-#include <ashfault/renderer/renderer.h>
 #include <ashfault/renderer/swapchain.h>
+#include <ashfault/renderer/vkrenderer.h>
+#include <vulkan/vulkan_core.h>
+
 #include <limits>
 #include <optional>
-#include <vulkan/vulkan_core.h>
+#include <stdexcept>
 
 namespace ashfault {
 Swapchain::Swapchain(VkSurfaceFormatKHR format, VkPresentModeKHR present_mode,
                      std::uint32_t image_count, VkExtent2D extent,
                      VkSurfaceKHR surface, SwapchainSupportDetails support,
                      VkDevice device)
-    : m_ImageCount(image_count), m_SwapExtent(extent), m_SurfaceFormat(format),
-      m_PresentMode(present_mode), m_Surface(surface), m_Support(support),
+    : m_ImageCount(image_count),
+      m_SwapExtent(extent),
+      m_SurfaceFormat(format),
+      m_PresentMode(present_mode),
+      m_Surface(surface),
+      m_Support(support),
       m_Device(device) {
   this->build(extent);
 }
@@ -86,7 +92,7 @@ std::optional<std::uint32_t> Swapchain::acquire_image(VkSemaphore semaphore) {
 std::uint32_t Swapchain::image_count() const { return this->m_ImageCount; }
 
 void Swapchain::present(VkQueue queue,
-                        const std::vector<VkSemaphore> &wait_semaphores,
+                        const std::vector<VkSemaphore>& wait_semaphores,
                         std::uint32_t image_index) {
   VkPresentInfoKHR present_info{};
   present_info.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
@@ -107,5 +113,5 @@ VkImage Swapchain::image(std::size_t index) { return this->m_Images[index]; }
 
 VkSurfaceFormatKHR Swapchain::surface_format() { return this->m_SurfaceFormat; }
 
-VkExtent2D &Swapchain::swap_extent() { return this->m_SwapExtent; }
-} // namespace ashfault
+VkExtent2D& Swapchain::swap_extent() { return this->m_SwapExtent; }
+}  // namespace ashfault

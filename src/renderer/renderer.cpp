@@ -1,706 +1,314 @@
-#include <algorithm>
-#include <ashfault/renderer/buffer.hpp>
-#include <ashfault/renderer/descriptor_set.h>
-#include <ashfault/renderer/frame.h>
+#include <ashfault/core/camera.h>
+#include <ashfault/core/pipeline_manager.h>
 #include <ashfault/renderer/pipeline.h>
 #include <ashfault/renderer/renderer.h>
-#include <ashfault/renderer/shader.h>
 #include <ashfault/renderer/swapchain.h>
-#include <cstdint>
-#include <cstring>
-#include <imgui.h>
-#include <imgui_impl_glfw.h>
+#include <ashfault/renderer/vkrenderer.h>
 #include <imgui_impl_vulkan.h>
-#include <limits>
-#include <set>
-#include <spdlog/spdlog.h>
-#include <stdexcept>
 #include <vulkan/vulkan_core.h>
 
-#define GLFW_INCLUDE_VULKAN
-#include <GLFW/glfw3.h>
+#include <ashfault/renderer/buffer.hpp>
+#include <cstddef>
+#include <glm/ext/matrix_float4x4.hpp>
+#include <glm/ext/matrix_transform.hpp>
+#include <glm/fwd.hpp>
+#include <limits>
+#include <memory>
 
 namespace ashfault {
+struct CameraData {
+  glm::mat4 projection;
+  glm::mat4 view;
+  glm::mat4 model;
+};
 
-int device_type_ranking(VkPhysicalDeviceType type) {
-  switch (type) {
-  case VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU:
-    return 0;
-  case VK_PHYSICAL_DEVICE_TYPE_INTEGRATED_GPU:
-    return 1;
-  case VK_PHYSICAL_DEVICE_TYPE_CPU:
-    return 2;
-  default:
-    return 3;
-  }
-}
+struct RendererData {
+  std::shared_ptr<VulkanRenderer> render_backend;
+  Swapchain* swapchain;
+  std::unique_ptr<PipelineManager> pipeline_manager;
 
-QueueSuitability Renderer::find_queue_families(VkPhysicalDevice device) {
-  std::uint32_t queue_family_count;
-  std::vector<VkQueueFamilyProperties> queue_family_props;
-  vkGetPhysicalDeviceQueueFamilyProperties(device, &queue_family_count,
-                                           nullptr);
-  queue_family_props.resize(queue_family_count);
-  vkGetPhysicalDeviceQueueFamilyProperties(device, &queue_family_count,
-                                           queue_family_props.data());
+  std::vector<VkCommandBuffer> command_buffers;
+  std::vector<VkCommandBuffer> imgui_command_buffers;
+  std::vector<VkSemaphore> image_available_semaphores;
+  std::vector<VkSemaphore> render_finished_semaphores;
+  std::vector<VkFence> in_flight_fences;
+  VkPipelineStageFlags wait_stages;
 
-  QueueSuitability suitability{};
+  std::vector<VkCommandBuffer> cmd_to_submit;
 
-  for (std::size_t i = 0; i < queue_family_props.size(); i++) {
-    if (queue_family_props[i].queueFlags & VK_QUEUE_GRAPHICS_BIT) {
-      suitability.graphics_queue = i;
-    }
+  std::uint32_t image_index;
+  std::uint32_t current_frame;
 
-    VkBool32 present_support;
-    vkGetPhysicalDeviceSurfaceSupportKHR(device, i, this->m_Surface,
-                                         &present_support);
-    if (present_support) {
-      suitability.present_queue = i;
-    }
+  std::shared_ptr<RenderTarget> default_target;
+  std::vector<std::shared_ptr<RenderTarget>> targets;
 
-    if (suitability.complete()) {
-      break;
-    }
-  }
+  std::optional<CameraData> camera_data;
+};
 
-  return suitability;
-}
+static RendererData s_Data;
 
-bool Renderer::check_device_extension_support(VkPhysicalDevice device) {
-  std::uint32_t extension_count;
-  vkEnumerateDeviceExtensionProperties(device, nullptr, &extension_count,
-                                       nullptr);
-  std::vector<VkExtensionProperties> props;
-  props.resize(extension_count);
-  vkEnumerateDeviceExtensionProperties(device, nullptr, &extension_count,
-                                       props.data());
+void Renderer::create_pipelines() {
+  auto static_vshader = s_Data.render_backend->create_shader("simple.vert.spv");
+  auto static_fshader = s_Data.render_backend->create_shader("simple.frag.spv");
 
-  std::set<std::string> required_extensions = {this->s_DeviceExtensions.begin(),
-                                               this->s_DeviceExtensions.end()};
-
-  for (const auto &extension : props) {
-    required_extensions.erase(extension.extensionName);
-  }
-
-  return required_extensions.empty();
-}
-
-bool Renderer::check_device_suitability(VkPhysicalDevice device) {
-  QueueSuitability queue_families = find_queue_families(device);
-  bool extension_support = check_device_extension_support(device);
-  bool swapchain_adequate;
-
-  if (extension_support) {
-    SwapchainSupportDetails swapchain_details = query_swapchain_support(device);
-    swapchain_adequate = !swapchain_details.formats.empty() &&
-                         !swapchain_details.present_modes.empty();
-  }
-
-  return queue_families.complete() && extension_support && swapchain_adequate;
-}
-
-SwapchainSupportDetails
-Renderer::query_swapchain_support(VkPhysicalDevice device) {
-  SwapchainSupportDetails details{};
-
-  std::uint32_t format_count;
-  vkGetPhysicalDeviceSurfaceFormatsKHR(device, this->m_Surface, &format_count,
-                                       nullptr);
-  if (format_count > 0) {
-    details.formats.resize(format_count);
-    vkGetPhysicalDeviceSurfaceFormatsKHR(device, this->m_Surface, &format_count,
-                                         details.formats.data());
-  }
-
-  std::uint32_t present_mode_count;
-  vkGetPhysicalDeviceSurfacePresentModesKHR(device, this->m_Surface,
-                                            &present_mode_count, nullptr);
-  if (present_mode_count > 0) {
-    details.present_modes.resize(present_mode_count);
-    vkGetPhysicalDeviceSurfacePresentModesKHR(device, this->m_Surface,
-                                              &present_mode_count,
-                                              details.present_modes.data());
-  }
-
-  vkGetPhysicalDeviceSurfaceCapabilitiesKHR(device, this->m_Surface,
-                                            &details.capabilities);
-
-  return details;
-}
-
-std::optional<std::pair<VkPhysicalDevice, QueueSuitability>>
-Renderer::choose_physical_device() {
-  std::uint32_t device_count;
-  std::vector<VkPhysicalDevice> devices;
-  vkEnumeratePhysicalDevices(this->m_Instance, &device_count, nullptr);
-  devices.resize(device_count);
-  vkEnumeratePhysicalDevices(this->m_Instance, &device_count, devices.data());
-
-  std::sort(devices.begin(), devices.end(),
-              [](VkPhysicalDevice a, VkPhysicalDevice b) {
-                VkPhysicalDeviceProperties a_props;
-                VkPhysicalDeviceProperties b_props;
-                vkGetPhysicalDeviceProperties(a, &a_props);
-                vkGetPhysicalDeviceProperties(b, &b_props);
-
-                return device_type_ranking(b_props.deviceType) >
-                       device_type_ranking(a_props.deviceType);
-              });
-
-  std::for_each(devices.begin(), devices.end(), [](VkPhysicalDevice device) {
-    VkPhysicalDeviceProperties props;
-    vkGetPhysicalDeviceProperties(device, &props);
-    SPDLOG_INFO("Found physical device: {}", props.deviceName);
+  std::vector<VkVertexInputAttributeDescription> vertex_attribs{};
+  vertex_attribs.push_back({
+      .location = 0,
+      .binding = 0,
+      .format = VK_FORMAT_R32G32B32_SFLOAT,
+      .offset = 0,
+  });
+  vertex_attribs.push_back({
+      .location = 1,
+      .binding = 0,
+      .format = VK_FORMAT_R32G32B32_SFLOAT,
+      .offset = offsetof(Mesh::Vertex, normal),
   });
 
-  for (std::size_t i = 0; i < device_count; i++) {
-    check_device_suitability(devices[i]);
-    QueueSuitability queue_info = find_queue_families(devices[i]);
-    return std::make_optional(std::make_pair(devices[i], queue_info));
+  auto static_pipeline =
+      s_Data.render_backend->create_graphics_pipeline()
+          .input_attribute_descriptions(vertex_attribs, sizeof(Mesh::Vertex))
+          .vertex_shader(static_vshader)
+          .fragment_shader(static_fshader)
+          .push_constant(VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(CameraData))
+          .build();
+
+  s_Data.pipeline_manager->add_graphics_pipeline("static", static_pipeline);
+}
+
+bool Renderer::start_frame() {
+  s_Data.swapchain = s_Data.render_backend->swapchain();
+  s_Data.default_target =
+      create_render_target(s_Data.swapchain->swap_extent().width,
+                           s_Data.swapchain->swap_extent().height, false, true);
+  s_Data.cmd_to_submit.clear();
+  vkWaitForFences(s_Data.render_backend->device(), 1,
+                  &s_Data.in_flight_fences[s_Data.current_frame], VK_TRUE,
+                  std::numeric_limits<std::uint64_t>::max());
+
+  auto idx = s_Data.swapchain->acquire_image(
+      s_Data.image_available_semaphores[s_Data.current_frame]);
+
+  if (!idx.has_value()) {
+    s_Data.render_backend->recreate_swapchain();
+    return false;
   }
+  vkResetFences(s_Data.render_backend->device(), 1,
+                &s_Data.in_flight_fences[s_Data.current_frame]);
 
-  return {};
-}
+  s_Data.image_index = idx.value();
+  s_Data.targets.clear();
+  s_Data.wait_stages = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
 
-void ashfault::Renderer::create_instance() {
-  VkApplicationInfo app_info{};
-  app_info.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
-  app_info.applicationVersion = VK_MAKE_VERSION(0, 1, 0);
-  app_info.apiVersion = VK_MAKE_API_VERSION(0, 1, 3, 0);
-  app_info.engineVersion = VK_MAKE_VERSION(0, 1, 0);
-  app_info.pApplicationName = "AshFault";
-  app_info.pEngineName = "AshFault";
-
-  std::vector<const char *> enabled_layers = {};
-  std::uint32_t layer_count;
-  vkEnumerateInstanceLayerProperties(&layer_count, nullptr);
-  std::vector<VkLayerProperties> layer_props = {};
-  layer_props.resize(layer_count);
-  vkEnumerateInstanceLayerProperties(&layer_count, layer_props.data());
-
-  for (std::size_t i = 0; i < layer_props.size(); i++) {
-    if (std::strcmp(layer_props[i].layerName, "VK_LAYER_KHRONOS_validation") ==
-        0) {
-      enabled_layers.push_back("VK_LAYER_KHRONOS_validation");
-      SPDLOG_INFO("Enabling validation layers");
-    }
-  }
-
-  std::vector<const char *> enabled_extensions =
-      this->m_Window->required_instance_extensions();
-  enabled_extensions.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
-  std::for_each(enabled_extensions.begin(), enabled_extensions.end(),
-                  [](const char *name) {
-                    SPDLOG_DEBUG("Required instance extension: {}", name);
-                  });
-
-  VkInstanceCreateInfo instance_info{};
-  instance_info.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
-  instance_info.pApplicationInfo = &app_info;
-  instance_info.ppEnabledLayerNames = enabled_layers.data();
-  instance_info.enabledLayerCount = enabled_layers.size();
-  instance_info.ppEnabledExtensionNames = enabled_extensions.data();
-  instance_info.enabledExtensionCount = enabled_extensions.size();
-
-  if (vkCreateInstance(&instance_info, nullptr, &this->m_Instance) !=
-      VK_SUCCESS) {
-    throw std::runtime_error("Failed to create vulkan instance");
-  }
-}
-
-void ashfault::Renderer::create_device() {
-  auto [physical_device, queue_info] = choose_physical_device().value();
-  this->m_QueueFamilies = queue_info;
-  this->m_PhysicalDevice = physical_device;
-  VkPhysicalDeviceProperties props;
-  vkGetPhysicalDeviceProperties(physical_device, &props);
-  SPDLOG_INFO("Picked physical device: {}", props.deviceName);
-
-  VkSampleCountFlags counts = props.limits.framebufferColorSampleCounts &
-                              props.limits.framebufferDepthSampleCounts;
-
-  VkSampleCountFlagBits msaa_samples = VK_SAMPLE_COUNT_1_BIT;
-  if (counts & VK_SAMPLE_COUNT_8_BIT)
-    msaa_samples = VK_SAMPLE_COUNT_8_BIT;
-  else if (counts & VK_SAMPLE_COUNT_4_BIT)
-    msaa_samples = VK_SAMPLE_COUNT_4_BIT;
-  else if (counts & VK_SAMPLE_COUNT_2_BIT)
-    msaa_samples = VK_SAMPLE_COUNT_2_BIT;
-  this->m_MsaaSamples = msaa_samples;
-  SPDLOG_INFO("MSAA Samples: {}", (int)msaa_samples);
-
-  float queue_prios = 1.0f;
-
-  VkDeviceQueueCreateInfo graphics_queue_create_info{};
-  graphics_queue_create_info.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
-  graphics_queue_create_info.queueCount = 1;
-  graphics_queue_create_info.queueFamilyIndex =
-      queue_info.graphics_queue.value();
-  graphics_queue_create_info.pQueuePriorities = &queue_prios;
-
-  VkPhysicalDeviceVulkan12Features features_12{};
-  features_12.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES;
-  features_12.runtimeDescriptorArray = VK_TRUE;
-
-  VkPhysicalDeviceVulkan13Features features_13{};
-  features_13.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_3_FEATURES;
-  features_13.dynamicRendering = VK_TRUE;
-  features_13.pNext = &features_12;
-
-  VkDeviceCreateInfo device_info{};
-  device_info.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
-  device_info.pNext = &features_13;
-  device_info.pQueueCreateInfos = &graphics_queue_create_info;
-  device_info.queueCreateInfoCount = 1;
-  device_info.enabledExtensionCount = this->s_DeviceExtensions.size();
-  device_info.ppEnabledExtensionNames = this->s_DeviceExtensions.data();
-
-  if (vkCreateDevice(physical_device, &device_info, nullptr, &this->m_Device) !=
-      VK_SUCCESS) {
-    throw std::runtime_error("Failed to create Vulkan device");
-  }
-
-  vkGetDeviceQueue(this->m_Device, queue_info.graphics_queue.value(), 0,
-                   &this->m_GraphicsQueue);
-  vkGetDeviceQueue(this->m_Device, queue_info.present_queue.value(), 0,
-                   &this->m_PresentQueue);
-}
-
-void ashfault::Renderer::create_allocator() {
-  VmaAllocatorCreateInfo allocator_info{};
-  allocator_info.device = this->m_Device;
-  allocator_info.physicalDevice = this->m_PhysicalDevice;
-  allocator_info.instance = this->m_Instance;
-  allocator_info.vulkanApiVersion = VK_API_VERSION_1_3;
-
-  vmaCreateAllocator(&allocator_info, &this->m_Allocator);
-}
-
-void ashfault::Renderer::create_surface() {
-  this->m_Surface = this->m_Window->create_surface(this->m_Instance);
-}
-
-VkSurfaceFormatKHR Renderer::select_surface_format(
-    const std::vector<VkSurfaceFormatKHR> &formats) {
-  for (const auto &format : formats) {
-    if (format.colorSpace == VK_COLORSPACE_SRGB_NONLINEAR_KHR &&
-        format.format == VK_FORMAT_B8G8R8A8_SRGB) {
-      return format;
-    }
-  }
-
-  return formats[0];
-}
-
-int present_mode_ranking(VkPresentModeKHR mode) {
-  switch (mode) {
-  case VK_PRESENT_MODE_MAILBOX_KHR:
-    return 1;
-  case VK_PRESENT_MODE_IMMEDIATE_KHR:
-    return 2;
-  case VK_PRESENT_MODE_FIFO_KHR:
-    return 3;
-  default:
-    return 4;
-  }
-}
-
-VkPresentModeKHR
-Renderer::select_present_mode(const std::vector<VkPresentModeKHR> &formats) {
-  auto preference_order = formats;
-  std::sort(preference_order.begin(), preference_order.end(),
-              [](VkPresentModeKHR a, VkPresentModeKHR b) {
-                return present_mode_ranking(a) < present_mode_ranking(b);
-              });
-
-  return preference_order[0];
-}
-
-VkExtent2D Renderer::choose_swap_extent(VkSurfaceCapabilitiesKHR capabilities) {
-  if (capabilities.currentExtent.width !=
-      std::numeric_limits<std::uint32_t>::max()) {
-    return capabilities.currentExtent;
-  }
-
-  WindowDims dims = this->m_Window->current_size();
-  VkExtent2D extent = {dims.width, dims.height};
-
-  extent.width = std::clamp(extent.width, capabilities.minImageExtent.width,
-                            capabilities.maxImageExtent.width);
-  extent.height = std::clamp(extent.height, capabilities.minImageExtent.height,
-                             capabilities.maxImageExtent.height);
-
-  return extent;
-}
-
-void ashfault::Renderer::setup_swapchain() {
-  SwapchainSupportDetails swapchain_support =
-      this->query_swapchain_support(this->m_PhysicalDevice);
-  VkSurfaceFormatKHR swapchain_surface_format =
-      select_surface_format(swapchain_support.formats);
-  VkPresentModeKHR swapchain_present_mode =
-      select_present_mode(swapchain_support.present_modes);
-  SPDLOG_INFO("Selected present mode {}", (int)swapchain_present_mode);
-
-  VkExtent2D swap_extent = choose_swap_extent(swapchain_support.capabilities);
-
-  std::uint32_t image_count = swapchain_support.capabilities.minImageCount + 1;
-  SPDLOG_INFO("Built swapchain with extent: {}, {}", swap_extent.width,
-              swap_extent.height);
-  this->m_Swapchain = new Swapchain(
-      swapchain_surface_format, swapchain_present_mode, image_count,
-      swap_extent, this->m_Surface, swapchain_support, this->m_Device);
-
-  SPDLOG_DEBUG("Swapchain image count: {}", image_count);
-
-  this->m_SurfaceFormat = swapchain_surface_format;
-  this->m_SwapExtent = swap_extent;
-  this->m_PresentMode = swapchain_present_mode;
-
-  SPDLOG_INFO("Created swapchain");
-}
-
-void Renderer::setup_synchronization() {
-  std::size_t image_count = std::max<std::size_t>(
-      this->m_Swapchain->image_count(), MAX_FRAMES_IN_FLIGHT);
-
-  this->m_ImageAvailableSemaphores.resize(image_count);
-  this->m_RenderFinishedSemaphores.resize(image_count);
-  this->m_InFlightFences.resize(image_count);
-
-  VkSemaphoreCreateInfo semaphore_info{};
-  semaphore_info.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
-  VkFenceCreateInfo fence_info{};
-  fence_info.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
-  fence_info.flags = VK_FENCE_CREATE_SIGNALED_BIT;
-
-  for (std::uint32_t i = 0; i < image_count; i++) {
-    if (vkCreateSemaphore(this->m_Device, &semaphore_info, nullptr,
-                          &this->m_ImageAvailableSemaphores[i]) != VK_SUCCESS ||
-        vkCreateSemaphore(this->m_Device, &semaphore_info, nullptr,
-                          &this->m_RenderFinishedSemaphores[i]) != VK_SUCCESS ||
-        vkCreateFence(this->m_Device, &fence_info, nullptr,
-                      &this->m_InFlightFences[i]) != VK_SUCCESS) {
-      throw std::runtime_error("Failed to setup synchronization");
-    }
-  }
-}
-
-void Renderer::setup_command_buffers() {
-  VkCommandPoolCreateInfo pool_info{};
-  pool_info.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
-  pool_info.queueFamilyIndex = this->m_QueueFamilies.graphics_queue.value();
-  pool_info.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
-
-  if (vkCreateCommandPool(this->m_Device, &pool_info, nullptr,
-                          &this->m_CommandPool) != VK_SUCCESS) {
-    throw std::runtime_error("Failed to create command pool");
-  }
-}
-
-void Renderer::command_buffer(std::function<void(VkCommandBuffer)> op) {
-  VkCommandBufferAllocateInfo alloc_info{};
-  alloc_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
-  alloc_info.commandBufferCount = 1;
-  alloc_info.commandPool = this->m_CommandPool;
-  alloc_info.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-
-  VkCommandBuffer cmd;
-  if (vkAllocateCommandBuffers(this->m_Device, &alloc_info, &cmd) !=
-      VK_SUCCESS) {
-    throw std::runtime_error("Failed to allocate command buffer");
-  }
+  VkCommandBuffer cmd =
+      s_Data.default_target->command_buffer(s_Data.current_frame);
+  vkResetCommandBuffer(cmd, 0);
 
   VkCommandBufferBeginInfo begin_info{};
   begin_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-  begin_info.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
-
-  vkResetCommandBuffer(cmd, 0);
   vkBeginCommandBuffer(cmd, &begin_info);
-  op(cmd);
+
+  s_Data.default_target->begin_rendering(s_Data.image_index,
+                                         s_Data.current_frame);
+  return true;
+}
+
+void Renderer::end_frame() {
+  s_Data.default_target->end_rendering(s_Data.image_index, s_Data.current_frame,
+                                       true);
+  VkCommandBuffer cmd =
+      s_Data.default_target->command_buffer(s_Data.current_frame);
   vkEndCommandBuffer(cmd);
-
-  VkSubmitInfo submit_info{};
-  submit_info.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-  submit_info.commandBufferCount = 1;
-  submit_info.pCommandBuffers = &cmd;
-
-  vkQueueSubmit(this->m_GraphicsQueue, 1, &submit_info, VK_NULL_HANDLE);
-  vkQueueWaitIdle(this->m_GraphicsQueue);
-  vkFreeCommandBuffers(this->m_Device, this->m_CommandPool, 1, &cmd);
+  s_Data.cmd_to_submit.push_back(
+      s_Data.default_target->command_buffer(s_Data.current_frame));
 }
 
-std::optional<Frame> Renderer::start_frame() {
-  vkWaitForFences(this->m_Device, 1,
-                  &this->m_InFlightFences[this->m_CurrentFrame], VK_TRUE,
-                  std::numeric_limits<std::uint64_t>::max());
+void Renderer::init(std::shared_ptr<Window> window) {
+  s_Data.render_backend = std::make_shared<VulkanRenderer>();
+  s_Data.render_backend->init(window);
+  s_Data.swapchain = s_Data.render_backend->swapchain();
+  s_Data.pipeline_manager = std::make_unique<PipelineManager>();
+  s_Data.current_frame = 0;
+  s_Data.default_target = create_render_target(
+      s_Data.render_backend->swapchain()->swap_extent().width,
+      s_Data.render_backend->swapchain()->swap_extent().height, false, true);
+  s_Data.cmd_to_submit = {};
 
-  auto result = this->m_Swapchain->acquire_image(
-      this->m_ImageAvailableSemaphores[this->m_CurrentFrame]);
+  s_Data.image_available_semaphores =
+      s_Data.render_backend->create_semaphores(s_Data.swapchain->image_count());
+  s_Data.render_finished_semaphores =
+      s_Data.render_backend->create_semaphores(s_Data.swapchain->image_count());
+  s_Data.in_flight_fences =
+      s_Data.render_backend->create_fences(s_Data.swapchain->image_count());
 
-  if (!result.has_value()) {
-    this->m_Resized = true;
-    this->recreate_swapchain();
-    return {};
+  s_Data.imgui_command_buffers =
+      s_Data.render_backend->allocate_command_buffers(
+          s_Data.swapchain->image_count());
+  s_Data.command_buffers = s_Data.render_backend->allocate_command_buffers(
+      s_Data.swapchain->image_count());
+
+  Renderer::create_pipelines();
+}
+
+void Renderer::submit_imgui_data(ImDrawData* draw_data) {
+  if (draw_data) {
+    ImGui_ImplVulkan_RenderDrawData(
+        draw_data, s_Data.default_target->command_buffer(s_Data.current_frame));
   }
-
-  vkResetFences(this->m_Device, 1,
-                &this->m_InFlightFences[this->m_CurrentFrame]);
-
-  FrameData data{};
-  data.swapchain = this->m_Swapchain;
-  data.current_frame = this->m_CurrentFrame;
-  data.render_finished_semaphores = this->m_RenderFinishedSemaphores;
-  data.image_available_semaphores = this->m_ImageAvailableSemaphores;
-  data.in_flight_fences = this->m_InFlightFences;
-  data.image_index = result.value();
-  data.present_queue = this->m_PresentQueue;
-  data.graphics_queue = this->m_GraphicsQueue;
-
-  this->m_CurrentFrame = (this->m_CurrentFrame + 1) % MAX_FRAMES_IN_FLIGHT;
-
-  return Frame(data);
 }
 
-void Renderer::setup_imgui() {
-  IMGUI_CHECKVERSION();
+void Renderer::push_render_target(std::shared_ptr<RenderTarget> target) {
+  s_Data.targets.push_back(target);
+  VkCommandBuffer cmd = render_target().command_buffer(s_Data.current_frame);
+  vkResetCommandBuffer(cmd, 0);
 
-  ImGui::CreateContext();
-  ImGuiIO &io = ImGui::GetIO();
-  io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
-  io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;
-  io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
+  VkCommandBufferBeginInfo begin_info{};
+  begin_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+  vkBeginCommandBuffer(cmd, &begin_info);
 
-  VkPipelineRenderingCreateInfo rendering_info{};
-  rendering_info.sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO;
-  rendering_info.colorAttachmentCount = 1;
-  rendering_info.pColorAttachmentFormats = &this->m_SurfaceFormat.format;
-  rendering_info.depthAttachmentFormat = VK_FORMAT_D32_SFLOAT;
-
-  ImGui_ImplGlfw_InitForVulkan(this->m_Window->handle(), true);
-  ImGui_ImplVulkan_InitInfo init_info = {};
-  init_info.Instance = this->m_Instance;
-  init_info.PhysicalDevice = this->m_PhysicalDevice;
-  init_info.Device = this->m_Device;
-  init_info.QueueFamily = this->m_QueueFamilies.graphics_queue.value();
-  init_info.Queue = this->m_GraphicsQueue;
-  init_info.DescriptorPoolSize =
-      IMGUI_IMPL_VULKAN_MINIMUM_IMAGE_SAMPLER_POOL_SIZE;
-  init_info.MinImageCount = this->m_Swapchain->image_count();
-  init_info.ImageCount = this->m_Swapchain->image_count();
-  init_info.PipelineInfoMain.PipelineRenderingCreateInfo = rendering_info;
-  init_info.PipelineInfoMain.MSAASamples = VK_SAMPLE_COUNT_1_BIT;
-  init_info.UseDynamicRendering = true;
-  ImGui_ImplVulkan_Init(&init_info);
+  target->begin_rendering(s_Data.image_index, s_Data.current_frame);
 }
 
-void ashfault::Renderer::init(std::shared_ptr<Window> window) {
-  this->m_Window = window;
-
-  this->m_Window->set_resize_callback([&](Window &window, WindowDims) {
-    this->m_Resized = true;
-    this->recreate_swapchain();
-  });
-
-  this->m_Resized = false;
-  this->m_CurrentFrame = 0;
-  this->create_instance();
-  this->create_surface();
-  this->create_device();
-  this->create_allocator();
-  this->setup_swapchain();
-  this->setup_synchronization();
-  this->setup_command_buffers();
-  this->setup_imgui();
+void Renderer::pop_render_target() {
+  render_target().end_rendering(s_Data.image_index, s_Data.current_frame,
+                                false);
+  vkEndCommandBuffer(render_target().command_buffer(s_Data.current_frame));
+  s_Data.cmd_to_submit.push_back(
+      render_target().command_buffer(s_Data.current_frame));
+  s_Data.targets.pop_back();
 }
 
-std::shared_ptr<VulkanShader>
-Renderer::create_shader(const std::string &path) const {
-  return std::make_shared<VulkanShader>(this->m_Device, path);
+RenderTarget& Renderer::render_target() {
+  return *(s_Data.targets.empty() ? s_Data.default_target
+                                  : s_Data.targets.back());
 }
 
-GraphicsPipelineBuilder Renderer::create_graphics_pipeline() const {
-  std::array<std::uint32_t, 2> window_dims;
-  WindowDims dims = this->m_Window->current_size();
-  window_dims[0] = dims.width;
-  window_dims[1] = dims.height;
-  return GraphicsPipelineBuilder(this->m_Device, this->m_SurfaceFormat.format,
-                                 std::move(window_dims), this->m_MsaaSamples);
-}
-
-std::pair<VkImage, VmaAllocation>
-Renderer::create_image(uint32_t width, uint32_t height,
-                       VkSampleCountFlagBits samples, VkFormat format,
-                       VkImageTiling tiling, VkImageUsageFlags usage,
-                       VmaAllocationCreateInfo allocation_info) {
-  VkImageCreateInfo image_info{};
-  image_info.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
-  image_info.imageType = VK_IMAGE_TYPE_2D;
-  image_info.format = format;
-  image_info.usage = usage;
-  image_info.tiling = tiling;
-  image_info.extent.width = width;
-  image_info.extent.height = height;
-  image_info.extent.depth = 1;
-  image_info.arrayLayers = 1;
-  image_info.mipLevels = 1;
-  image_info.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-  image_info.samples = samples;
-  image_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-
-  VkImage image;
-  VmaAllocation allocation;
-  if (vmaCreateImage(this->m_Allocator, &image_info, &allocation_info, &image,
-                     &allocation, nullptr) != VK_SUCCESS) {
-    throw std::runtime_error("Failed to create image");
-  }
-
-  return std::make_pair(image, allocation);
-}
-
-VkImageView Renderer::create_image_view(VkImage image, VkFormat format,
-                                        VkImageAspectFlags imageAspect) {
-  VkImageViewCreateInfo create_info{};
-  create_info.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
-  create_info.format = format;
-  create_info.image = image;
-  create_info.viewType = VK_IMAGE_VIEW_TYPE_2D;
-  create_info.subresourceRange.aspectMask = imageAspect;
-  create_info.subresourceRange.baseArrayLayer = 0;
-  create_info.subresourceRange.layerCount = 1;
-  create_info.subresourceRange.baseMipLevel = 0;
-  create_info.subresourceRange.levelCount = 1;
-
-  VkImageView view;
-  if (vkCreateImageView(this->m_Device, &create_info, nullptr, &view) !=
-      VK_SUCCESS) {
-    throw std::runtime_error("Failed to create image view");
-  }
-
-  return view;
-}
-
-std::pair<VkBuffer, VmaAllocation>
-Renderer::create_buffer(std::size_t size, VkBufferUsageFlags usage,
-                        VmaAllocationCreateInfo alloc_info) {
-  VkBufferCreateInfo create_info{};
-  create_info.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
-  create_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-  create_info.size = size;
-  create_info.usage = usage;
-
-  VkBuffer buffer;
-  VmaAllocation allocation;
-  if (vmaCreateBuffer(this->m_Allocator, &create_info, &alloc_info, &buffer,
-                      &allocation, nullptr) != VK_SUCCESS) {
-    throw std::runtime_error("Failed to create buffer");
-  }
-
-  return std::make_pair(buffer, allocation);
-}
-
-void Renderer::copy_buffer(VkBuffer dst, VkBuffer src, std::size_t size) {
-  VkBufferCopy region{};
-  region.size = size;
-  region.srcOffset = 0;
-  region.dstOffset = 0;
-
-  this->command_buffer(
-      [&](VkCommandBuffer cmd) { vkCmdCopyBuffer(cmd, src, dst, 1, &region); });
-}
-
-void Renderer::recreate_swapchain() {
-  SPDLOG_WARN("Rebuilding swapchain");
-  WindowDims dims = this->m_Window->current_size();
-  while (dims.width == 0 || dims.height == 0) {
-    dims = this->m_Window->current_size();
-    this->m_Window->wait_events();
-  }
-
-  vkDeviceWaitIdle(this->m_Device);
-  this->cleanup_swapchain();
-  this->setup_swapchain();
+std::shared_ptr<RenderTarget> Renderer::create_render_target(
+    std::uint32_t width, std::uint32_t height, bool msaa, bool swapchain) {
+  auto image_count = s_Data.swapchain->image_count();
+  auto cmd_buffers =
+      s_Data.render_backend->allocate_command_buffers(image_count);
 
   VmaAllocationCreateInfo alloc_info{};
-  alloc_info.requiredFlags = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
   alloc_info.usage = VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE;
-}
+  alloc_info.requiredFlags = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
+  std::vector<VkImage> images(image_count);
+  std::vector<VmaAllocation> allocs(image_count);
+  std::vector<VkImageView> views(image_count);
 
-void Renderer::cleanup_swapchain() { this->m_Swapchain->cleanup(); }
+  std::pair<VkImage, VmaAllocation> depth_image =
+      s_Data.render_backend->create_image(
+          width, height,
+          msaa ? s_Data.render_backend->msaa_samples() : VK_SAMPLE_COUNT_1_BIT,
+          VK_FORMAT_D32_SFLOAT, VK_IMAGE_TILING_OPTIMAL,
+          VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT, alloc_info);
+  VkImageView depth_view = s_Data.render_backend->create_image_view(
+      depth_image.first, VK_FORMAT_D32_SFLOAT, VK_IMAGE_ASPECT_DEPTH_BIT);
 
-Renderer::~Renderer() {
-  ImGui_ImplVulkan_Shutdown();
-  ImGui_ImplGlfw_Shutdown();
-  ImGui::DestroyContext();
+  for (std::size_t i = 0; i < image_count; i++) {
+    if (swapchain) {
+      images[i] = s_Data.swapchain->image(i);
+      views[i] = s_Data.swapchain->image_view(i);
+    } else {
+      auto image = s_Data.render_backend->create_image(
+          width, height,
+          msaa ? s_Data.render_backend->msaa_samples() : VK_SAMPLE_COUNT_1_BIT,
+          s_Data.swapchain->surface_format().format, VK_IMAGE_TILING_OPTIMAL,
+          VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
+          alloc_info);
+      images[i] = image.first;
+      allocs[i] = image.second;
 
-  SPDLOG_INFO("Renderer shutting down...");
-
-  vkDeviceWaitIdle(this->m_Device);
-  vkQueueWaitIdle(this->m_GraphicsQueue);
-  vkQueueWaitIdle(this->m_PresentQueue);
-
-  this->cleanup_swapchain();
-
-  vkDestroyCommandPool(this->m_Device, this->m_CommandPool, nullptr);
-
-  for (std::size_t i = 0; i < this->m_ImageAvailableSemaphores.size(); i++) {
-    vkDestroySemaphore(this->m_Device, this->m_ImageAvailableSemaphores[i],
-                       nullptr);
-    vkDestroySemaphore(this->m_Device, this->m_RenderFinishedSemaphores[i],
-                       nullptr);
-    vkDestroyFence(this->m_Device, this->m_InFlightFences[i], nullptr);
+      auto view = s_Data.render_backend->create_image_view(
+          image.first, s_Data.swapchain->surface_format().format,
+          VK_IMAGE_ASPECT_COLOR_BIT);
+      views[i] = view;
+    }
   }
 
-  vmaDestroyAllocator(this->m_Allocator);
-  vkDestroyDevice(this->m_Device, nullptr);
-  vkDestroySurfaceKHR(this->m_Instance, this->m_Surface, nullptr);
-  vkDestroyInstance(this->m_Instance, nullptr);
+  VkRect2D render_area = {.offset = {.x = 0, .y = 0},
+                          .extent = {.width = width, .height = height}};
+
+  return std::make_shared<RenderTarget>(
+      s_Data.render_backend, depth_image, depth_view, images, views,
+      swapchain ? std::optional<std::vector<VmaAllocation>>()
+                : std::make_optional(allocs),
+      cmd_buffers, render_area);
 }
 
-bool QueueSuitability::complete() const {
-  return this->present_queue.has_value() && this->graphics_queue.has_value();
+void Renderer::submit_and_wait() {
+  VkSubmitInfo submit_info{};
+  submit_info.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+  submit_info.commandBufferCount = s_Data.cmd_to_submit.size();
+  submit_info.pCommandBuffers = s_Data.cmd_to_submit.data();
+  submit_info.waitSemaphoreCount = 1;
+  submit_info.pWaitSemaphores =
+      &s_Data.image_available_semaphores[s_Data.current_frame];
+  submit_info.signalSemaphoreCount = 1;
+  submit_info.pSignalSemaphores =
+      &s_Data.render_finished_semaphores[s_Data.image_index];
+  submit_info.pWaitDstStageMask = &s_Data.wait_stages;
+
+  vkQueueSubmit(s_Data.render_backend->graphics_queue(), 1, &submit_info,
+                s_Data.in_flight_fences[s_Data.current_frame]);
+
+  std::vector<VkSemaphore> wait_semaphores{};
+  wait_semaphores.push_back(
+      s_Data.render_finished_semaphores[s_Data.image_index]);
+  s_Data.swapchain->present(s_Data.render_backend->present_queue(),
+                            wait_semaphores, s_Data.image_index);
+  s_Data.current_frame = s_Data.current_frame % s_Data.swapchain->image_count();
 }
 
-VulkanDescriptorSetBuilder Renderer::create_descriptor_sets() const {
-  return VulkanDescriptorSetBuilder(this->m_Device);
+void Renderer::submit_mesh(Mesh& mesh) {
+  auto cmd = render_target().command_buffer(s_Data.current_frame);
+  GraphicsPipeline* pipeline = nullptr;
+  switch (mesh.type()) {
+    case Mesh::Static:
+      pipeline = s_Data.pipeline_manager->get_graphics_pipeline("static");
+
+      break;
+  }
+
+  auto data = s_Data.camera_data.value_or<CameraData>(
+      {.projection = glm::identity<glm::mat4>(),
+       .view = glm::identity<glm::mat4>(),
+       .model = glm::identity<glm::mat4>()});
+  data.model = glm::identity<glm::mat4>();
+  vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline->handle());
+  vkCmdPushConstants(cmd, pipeline->layout(), VK_SHADER_STAGE_VERTEX_BIT, 0,
+                     sizeof(CameraData), &data);
+  VkDeviceSize offset = 0;
+  vkCmdBindVertexBuffers(cmd, 0, 1, &mesh.vertex_buffer()->handle(), &offset);
+  vkCmdDraw(cmd, mesh.vertex_buffer()->count(), 1, 0, 0);
 }
 
-VkDevice Renderer::device() { return this->m_Device; }
-
-VmaAllocator Renderer::allocator() { return this->m_Allocator; }
-
-std::vector<VkCommandBuffer>
-Renderer::allocate_command_buffers(std::uint32_t count) {
-  std::vector<VkCommandBuffer> ret;
-  ret.resize(count);
-
-  VkCommandBufferAllocateInfo alloc_info{};
-  alloc_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
-  alloc_info.commandBufferCount = count;
-  alloc_info.commandPool = this->m_CommandPool;
-  alloc_info.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-
-  VK_CHECK_RESULT(
-      vkAllocateCommandBuffers(this->m_Device, &alloc_info, ret.data()));
-  return ret;
+void Renderer::shutdown() {
+  vkDeviceWaitIdle(s_Data.render_backend->device());
+  s_Data.default_target.reset();
+  s_Data.targets.clear();
+  s_Data.render_backend->shutdown();
 }
 
-Swapchain *Renderer::swapchain() { return this->m_Swapchain; }
+VulkanRenderer& Renderer::vulkan_backend() { return *s_Data.render_backend; }
 
-VkSampler Renderer::create_sampler() {
-  VkSamplerCreateInfo create_info{};
-  create_info.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
-  create_info.addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT;
-  create_info.addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT;
-  create_info.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT;
-  create_info.anisotropyEnable = VK_FALSE;
+std::uint32_t Renderer::swapchain_image_index() { return s_Data.image_index; }
 
-  VkSampler ret;
-  VK_CHECK_RESULT(vkCreateSampler(this->m_Device, &create_info, nullptr, &ret));
-  return ret;
+std::shared_ptr<Mesh> Renderer::create_mesh(
+    Mesh::MeshType type, const std::vector<Mesh::Vertex>& vertices,
+    const std::vector<std::uint32_t>& indices) {
+  auto vertex_buffer = s_Data.render_backend->create_vertex_buffer(vertices);
+  auto index_buffer = s_Data.render_backend->create_index_buffer(indices);
+  return std::make_shared<Mesh>(type, vertex_buffer, index_buffer);
 }
 
-VkSampleCountFlagBits Renderer::msaa_samples() const {
-  return this->m_MsaaSamples;
+void Renderer::begin_scene(Camera& camera) {
+  CameraData data = {.projection = camera.projection(), .view = camera.view()};
+
+  s_Data.camera_data = data;
 }
-} // namespace ashfault
+
+void Renderer::end_scene() { s_Data.camera_data = std::optional<CameraData>(); }
+
+std::uint32_t Renderer::frame_index() { return s_Data.current_frame; }
+}  // namespace ashfault

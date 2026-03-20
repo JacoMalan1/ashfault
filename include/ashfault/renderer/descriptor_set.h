@@ -1,20 +1,21 @@
 #ifndef ASHFAULT_DESCRIPTOR_SET_H
 #define ASHFAULT_DESCRIPTOR_SET_H
 
-#include <ashfault/renderer/buffer.hpp>
-#include <cstdint>
+#include <ashfault/ashfault.h>
 #include <vulkan/vulkan.h>
 #include <vulkan/vulkan_core.h>
+
+#include <ashfault/renderer/buffer.hpp>
+#include <cstdint>
 #include <memory>
 #include <vector>
-#include <ashfault/ashfault.h>
 
 namespace ashfault {
 class VulkanDescriptorSet;
 class VulkanDescriptorPool;
 
 class ASHFAULT_API VulkanDescriptorSetBuilder {
-public:
+ public:
   explicit VulkanDescriptorSetBuilder(VkDevice device);
 
   /// @brief Adds a binding to the descriptor set being built.
@@ -23,7 +24,7 @@ public:
   /// @param stage_flags The shader stages that will use this binding.
   /// @param descriptor_count How many descriptors to create.
   /// @param binding The binding index.
-  VulkanDescriptorSetBuilder &add_binding(VkDescriptorType type,
+  VulkanDescriptorSetBuilder& add_binding(VkDescriptorType type,
                                           VkShaderStageFlags stage_flags,
                                           std::uint32_t descriptor_count,
                                           std::uint32_t binding);
@@ -33,24 +34,24 @@ public:
             std::shared_ptr<VulkanDescriptorPool>>
   build();
 
-private:
+ private:
   std::vector<VkDescriptorSetLayoutBinding> m_Bindings;
   VkDevice m_Device;
 };
 
 class ASHFAULT_API VulkanDescriptorSet {
-public:
+ public:
   VulkanDescriptorSet(VkDevice device, VkDescriptorSet descriptor_set,
                       VkDescriptorSetLayout layout);
 
-  VkDescriptorSetLayout &layout();
-  const VkDescriptorSetLayout &layout() const;
+  VkDescriptorSetLayout& layout();
+  const VkDescriptorSetLayout& layout() const;
 
-  const VkDescriptorSet &handle() const;
-  VkDescriptorSet &handle();
+  const VkDescriptorSet& handle() const;
+  VkDescriptorSet& handle();
 
-  VulkanDescriptorSet(const VulkanDescriptorSet &) = delete;
-  VulkanDescriptorSet &operator=(const VulkanDescriptorSet &) = delete;
+  VulkanDescriptorSet(const VulkanDescriptorSet&) = delete;
+  VulkanDescriptorSet& operator=(const VulkanDescriptorSet&) = delete;
   ~VulkanDescriptorSet();
 
   template <class T>
@@ -73,7 +74,7 @@ public:
     vkUpdateDescriptorSets(this->m_Device, 1, &write, 0, nullptr);
   }
 
-private:
+ private:
   VmaAllocator m_Allocator;
   VkDevice m_Device;
   VkDescriptorSet m_DescriptorSet;
@@ -81,17 +82,17 @@ private:
 };
 
 class ASHFAULT_API VulkanDescriptorPool {
-public:
+ public:
   VulkanDescriptorPool(VkDevice device, VkDescriptorPool pool);
 
-  VulkanDescriptorPool(const VulkanDescriptorPool &) = delete;
-  VulkanDescriptorPool &operator=(const VulkanDescriptorPool &) = delete;
+  VulkanDescriptorPool(const VulkanDescriptorPool&) = delete;
+  VulkanDescriptorPool& operator=(const VulkanDescriptorPool&) = delete;
   ~VulkanDescriptorPool();
 
-private:
+ private:
   VkDescriptorPool m_Pool;
   VkDevice m_Device;
 };
-} // namespace ashfault
+}  // namespace ashfault
 
 #endif

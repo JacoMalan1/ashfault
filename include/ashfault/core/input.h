@@ -1,17 +1,18 @@
 #ifndef ASHFAULT_INPUT_H
 #define ASHFAULT_INPUT_H
 
-#include <ashfault/core/window.h>
 #include <ashfault/ashfault.h>
-#include <memory>
+#include <ashfault/core/window.h>
+
 #include <array>
+#include <memory>
 
 namespace ashfault {
 typedef int Key;
 typedef int MouseButton;
 
 class ASHFAULT_API Input {
-public:
+ public:
   Input(std::shared_ptr<Window> window);
 
   bool is_key_down(Key key_code);
@@ -19,10 +20,10 @@ public:
 
   void frame_start();
 
-private:
+ private:
   std::shared_ptr<Window> m_Window;
   std::array<bool, GLFW_KEY_LAST> m_Keys;
 };
-}
+}  // namespace ashfault
 
 #endif

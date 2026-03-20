@@ -1,20 +1,21 @@
 #ifndef ASHFAULT_ENTITY_H
 #define ASHFAULT_ENTITY_H
 
-#include <cstdint>
 #include <ashfault/ashfault.h>
+
+#include <cstdint>
 
 namespace ashfault {
 class ASHFAULT_API Entity {
-public:
+ public:
   using id_type = std::uint64_t;
   friend class Scene;
   id_type handle() const;
 
-private:
+ private:
   Entity(std::uint64_t handle);
   id_type m_Handle;
 };
-} // namespace ashfault
+}  // namespace ashfault
 
 #endif
