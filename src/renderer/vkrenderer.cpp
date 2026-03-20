@@ -1,21 +1,21 @@
-#include <algorithm>
-#include <ashfault/renderer/buffer.hpp>
 #include <ashfault/renderer/descriptor_set.h>
-#include <ashfault/renderer/frame.h>
 #include <ashfault/renderer/pipeline.h>
-#include <ashfault/renderer/vkrenderer.h>
 #include <ashfault/renderer/shader.h>
 #include <ashfault/renderer/swapchain.h>
-#include <cstdint>
-#include <cstring>
+#include <ashfault/renderer/vkrenderer.h>
 #include <imgui.h>
 #include <imgui_impl_glfw.h>
 #include <imgui_impl_vulkan.h>
+#include <spdlog/spdlog.h>
+#include <vulkan/vulkan_core.h>
+
+#include <algorithm>
+#include <ashfault/renderer/buffer.hpp>
+#include <cstdint>
+#include <cstring>
 #include <limits>
 #include <set>
-#include <spdlog/spdlog.h>
 #include <stdexcept>
-#include <vulkan/vulkan_core.h>
 
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
@@ -24,14 +24,14 @@ namespace ashfault {
 
 int device_type_ranking(VkPhysicalDeviceType type) {
   switch (type) {
-  case VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU:
-    return 0;
-  case VK_PHYSICAL_DEVICE_TYPE_INTEGRATED_GPU:
-    return 1;
-  case VK_PHYSICAL_DEVICE_TYPE_CPU:
-    return 2;
-  default:
-    return 3;
+    case VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU:
+      return 0;
+    case VK_PHYSICAL_DEVICE_TYPE_INTEGRATED_GPU:
+      return 1;
+    case VK_PHYSICAL_DEVICE_TYPE_CPU:
+      return 2;
+    default:
+      return 3;
   }
 }
 
@@ -78,7 +78,7 @@ bool VulkanRenderer::check_device_extension_support(VkPhysicalDevice device) {
   std::set<std::string> required_extensions = {this->s_DeviceExtensions.begin(),
                                                this->s_DeviceExtensions.end()};
 
-  for (const auto &extension : props) {
+  for (const auto& extension : props) {
     required_extensions.erase(extension.extensionName);
   }
 
@@ -99,8 +99,8 @@ bool VulkanRenderer::check_device_suitability(VkPhysicalDevice device) {
   return queue_families.complete() && extension_support && swapchain_adequate;
 }
 
-SwapchainSupportDetails
-VulkanRenderer::query_swapchain_support(VkPhysicalDevice device) {
+SwapchainSupportDetails VulkanRenderer::query_swapchain_support(
+    VkPhysicalDevice device) {
   SwapchainSupportDetails details{};
 
   std::uint32_t format_count;
@@ -137,15 +137,15 @@ VulkanRenderer::choose_physical_device() {
   vkEnumeratePhysicalDevices(this->m_Instance, &device_count, devices.data());
 
   std::sort(devices.begin(), devices.end(),
-              [](VkPhysicalDevice a, VkPhysicalDevice b) {
-                VkPhysicalDeviceProperties a_props;
-                VkPhysicalDeviceProperties b_props;
-                vkGetPhysicalDeviceProperties(a, &a_props);
-                vkGetPhysicalDeviceProperties(b, &b_props);
+            [](VkPhysicalDevice a, VkPhysicalDevice b) {
+              VkPhysicalDeviceProperties a_props;
+              VkPhysicalDeviceProperties b_props;
+              vkGetPhysicalDeviceProperties(a, &a_props);
+              vkGetPhysicalDeviceProperties(b, &b_props);
 
-                return device_type_ranking(b_props.deviceType) >
-                       device_type_ranking(a_props.deviceType);
-              });
+              return device_type_ranking(b_props.deviceType) >
+                     device_type_ranking(a_props.deviceType);
+            });
 
   std::for_each(devices.begin(), devices.end(), [](VkPhysicalDevice device) {
     VkPhysicalDeviceProperties props;
@@ -171,7 +171,7 @@ void ashfault::VulkanRenderer::create_instance() {
   app_info.pApplicationName = "AshFault";
   app_info.pEngineName = "AshFault";
 
-  std::vector<const char *> enabled_layers = {};
+  std::vector<const char*> enabled_layers = {};
   std::uint32_t layer_count;
   vkEnumerateInstanceLayerProperties(&layer_count, nullptr);
   std::vector<VkLayerProperties> layer_props = {};
@@ -186,13 +186,13 @@ void ashfault::VulkanRenderer::create_instance() {
     }
   }
 
-  std::vector<const char *> enabled_extensions =
+  std::vector<const char*> enabled_extensions =
       this->m_Window->required_instance_extensions();
   enabled_extensions.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
   std::for_each(enabled_extensions.begin(), enabled_extensions.end(),
-                  [](const char *name) {
-                    SPDLOG_DEBUG("Required instance extension: {}", name);
-                  });
+                [](const char* name) {
+                  SPDLOG_DEBUG("Required instance extension: {}", name);
+                });
 
   VkInstanceCreateInfo instance_info{};
   instance_info.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
@@ -281,8 +281,8 @@ void ashfault::VulkanRenderer::create_surface() {
 }
 
 VkSurfaceFormatKHR VulkanRenderer::select_surface_format(
-    const std::vector<VkSurfaceFormatKHR> &formats) {
-  for (const auto &format : formats) {
+    const std::vector<VkSurfaceFormatKHR>& formats) {
+  for (const auto& format : formats) {
     if (format.colorSpace == VK_COLORSPACE_SRGB_NONLINEAR_KHR &&
         format.format == VK_FORMAT_B8G8R8A8_SRGB) {
       return format;
@@ -294,29 +294,30 @@ VkSurfaceFormatKHR VulkanRenderer::select_surface_format(
 
 int present_mode_ranking(VkPresentModeKHR mode) {
   switch (mode) {
-  case VK_PRESENT_MODE_MAILBOX_KHR:
-    return 1;
-  case VK_PRESENT_MODE_IMMEDIATE_KHR:
-    return 2;
-  case VK_PRESENT_MODE_FIFO_KHR:
-    return 3;
-  default:
-    return 4;
+    case VK_PRESENT_MODE_MAILBOX_KHR:
+      return 1;
+    case VK_PRESENT_MODE_IMMEDIATE_KHR:
+      return 2;
+    case VK_PRESENT_MODE_FIFO_KHR:
+      return 3;
+    default:
+      return 4;
   }
 }
 
-VkPresentModeKHR
-VulkanRenderer::select_present_mode(const std::vector<VkPresentModeKHR> &formats) {
+VkPresentModeKHR VulkanRenderer::select_present_mode(
+    const std::vector<VkPresentModeKHR>& formats) {
   auto preference_order = formats;
   std::sort(preference_order.begin(), preference_order.end(),
-              [](VkPresentModeKHR a, VkPresentModeKHR b) {
-                return present_mode_ranking(a) < present_mode_ranking(b);
-              });
+            [](VkPresentModeKHR a, VkPresentModeKHR b) {
+              return present_mode_ranking(a) < present_mode_ranking(b);
+            });
 
   return preference_order[0];
 }
 
-VkExtent2D VulkanRenderer::choose_swap_extent(VkSurfaceCapabilitiesKHR capabilities) {
+VkExtent2D VulkanRenderer::choose_swap_extent(
+    VkSurfaceCapabilitiesKHR capabilities) {
   if (capabilities.currentExtent.width !=
       std::numeric_limits<std::uint32_t>::max()) {
     return capabilities.currentExtent;
@@ -430,43 +431,11 @@ void VulkanRenderer::command_buffer(std::function<void(VkCommandBuffer)> op) {
   vkFreeCommandBuffers(this->m_Device, this->m_CommandPool, 1, &cmd);
 }
 
-std::optional<Frame> VulkanRenderer::start_frame() {
-  vkWaitForFences(this->m_Device, 1,
-                  &this->m_InFlightFences[this->m_CurrentFrame], VK_TRUE,
-                  std::numeric_limits<std::uint64_t>::max());
-
-  auto result = this->m_Swapchain->acquire_image(
-      this->m_ImageAvailableSemaphores[this->m_CurrentFrame]);
-
-  if (!result.has_value()) {
-    this->m_Resized = true;
-    this->recreate_swapchain();
-    return {};
-  }
-
-  vkResetFences(this->m_Device, 1,
-                &this->m_InFlightFences[this->m_CurrentFrame]);
-
-  FrameData data{};
-  data.swapchain = this->m_Swapchain;
-  data.current_frame = this->m_CurrentFrame;
-  data.render_finished_semaphores = this->m_RenderFinishedSemaphores;
-  data.image_available_semaphores = this->m_ImageAvailableSemaphores;
-  data.in_flight_fences = this->m_InFlightFences;
-  data.image_index = result.value();
-  data.present_queue = this->m_PresentQueue;
-  data.graphics_queue = this->m_GraphicsQueue;
-
-  this->m_CurrentFrame = (this->m_CurrentFrame + 1) % MAX_FRAMES_IN_FLIGHT;
-
-  return Frame(data);
-}
-
 void VulkanRenderer::setup_imgui() {
   IMGUI_CHECKVERSION();
 
   ImGui::CreateContext();
-  ImGuiIO &io = ImGui::GetIO();
+  ImGuiIO& io = ImGui::GetIO();
   io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
   io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;
   io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
@@ -497,7 +466,7 @@ void VulkanRenderer::setup_imgui() {
 void ashfault::VulkanRenderer::init(std::shared_ptr<Window> window) {
   this->m_Window = window;
 
-  this->m_Window->set_resize_callback([&](Window &window, WindowDims) {
+  this->m_Window->set_resize_callback([&](Window& window, WindowDims) {
     this->m_Resized = true;
     this->recreate_swapchain();
   });
@@ -514,8 +483,8 @@ void ashfault::VulkanRenderer::init(std::shared_ptr<Window> window) {
   this->setup_imgui();
 }
 
-std::shared_ptr<VulkanShader>
-VulkanRenderer::create_shader(const std::string &path) const {
+std::shared_ptr<VulkanShader> VulkanRenderer::create_shader(
+    const std::string& path) const {
   return std::make_shared<VulkanShader>(this->m_Device, path);
 }
 
@@ -528,11 +497,10 @@ GraphicsPipelineBuilder VulkanRenderer::create_graphics_pipeline() const {
                                  std::move(window_dims), this->m_MsaaSamples);
 }
 
-std::pair<VkImage, VmaAllocation>
-VulkanRenderer::create_image(uint32_t width, uint32_t height,
-                       VkSampleCountFlagBits samples, VkFormat format,
-                       VkImageTiling tiling, VkImageUsageFlags usage,
-                       VmaAllocationCreateInfo allocation_info) {
+std::pair<VkImage, VmaAllocation> VulkanRenderer::create_image(
+    uint32_t width, uint32_t height, VkSampleCountFlagBits samples,
+    VkFormat format, VkImageTiling tiling, VkImageUsageFlags usage,
+    VmaAllocationCreateInfo allocation_info) {
   VkImageCreateInfo image_info{};
   image_info.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
   image_info.imageType = VK_IMAGE_TYPE_2D;
@@ -559,7 +527,7 @@ VulkanRenderer::create_image(uint32_t width, uint32_t height,
 }
 
 VkImageView VulkanRenderer::create_image_view(VkImage image, VkFormat format,
-                                        VkImageAspectFlags imageAspect) {
+                                              VkImageAspectFlags imageAspect) {
   VkImageViewCreateInfo create_info{};
   create_info.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
   create_info.format = format;
@@ -580,9 +548,9 @@ VkImageView VulkanRenderer::create_image_view(VkImage image, VkFormat format,
   return view;
 }
 
-std::pair<VkBuffer, VmaAllocation>
-VulkanRenderer::create_buffer(std::size_t size, VkBufferUsageFlags usage,
-                        VmaAllocationCreateInfo alloc_info) {
+std::pair<VkBuffer, VmaAllocation> VulkanRenderer::create_buffer(
+    std::size_t size, VkBufferUsageFlags usage,
+    VmaAllocationCreateInfo alloc_info) {
   VkBufferCreateInfo create_info{};
   create_info.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
   create_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
@@ -669,8 +637,8 @@ VkDevice VulkanRenderer::device() { return this->m_Device; }
 
 VmaAllocator VulkanRenderer::allocator() { return this->m_Allocator; }
 
-std::vector<VkCommandBuffer>
-VulkanRenderer::allocate_command_buffers(std::uint32_t count) {
+std::vector<VkCommandBuffer> VulkanRenderer::allocate_command_buffers(
+    std::uint32_t count) {
   std::vector<VkCommandBuffer> ret;
   ret.resize(count);
 
@@ -685,7 +653,7 @@ VulkanRenderer::allocate_command_buffers(std::uint32_t count) {
   return ret;
 }
 
-Swapchain *VulkanRenderer::swapchain() { return this->m_Swapchain; }
+Swapchain* VulkanRenderer::swapchain() { return this->m_Swapchain; }
 
 VkSampler VulkanRenderer::create_sampler() {
   VkSamplerCreateInfo create_info{};
@@ -711,7 +679,8 @@ std::vector<VkSemaphore> VulkanRenderer::create_semaphores(std::size_t count) {
   create_info.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
 
   for (std::size_t i = 0; i < count; i++) {
-    VK_CHECK_RESULT(vkCreateSemaphore(m_Device, &create_info, nullptr, &result[i]));
+    VK_CHECK_RESULT(
+        vkCreateSemaphore(m_Device, &create_info, nullptr, &result[i]));
   }
 
   return result;
@@ -731,11 +700,7 @@ std::vector<VkFence> VulkanRenderer::create_fences(std::size_t count) {
   return result;
 }
 
-VkQueue &VulkanRenderer::graphics_queue() {
-  return m_GraphicsQueue;
-}
+VkQueue& VulkanRenderer::graphics_queue() { return m_GraphicsQueue; }
 
-VkQueue &VulkanRenderer::present_queue() {
-  return m_PresentQueue;
-}
-} // namespace ashfault
+VkQueue& VulkanRenderer::present_queue() { return m_PresentQueue; }
+}  // namespace ashfault

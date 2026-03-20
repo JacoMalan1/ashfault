@@ -3,17 +3,17 @@
 
 #include <ashfault/ashfault.h>
 #include <ashfault/core/window.h>
-#include <ashfault/renderer/buffer.hpp>
 #include <ashfault/renderer/descriptor_set.h>
-#include <ashfault/renderer/frame.h>
 #include <ashfault/renderer/pipeline.h>
 #include <ashfault/renderer/shader.h>
+#include <vk_mem_alloc.h>
+
+#include <ashfault/renderer/buffer.hpp>
 #include <cstdint>
 #include <cstring>
 #include <functional>
 #include <optional>
 #include <type_traits>
-#include <vk_mem_alloc.h>
 
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
@@ -21,14 +21,13 @@
 #include <vulkan/vulkan_core.h>
 
 #define MAX_FRAMES_IN_FLIGHT 3
-#define VK_CHECK_RESULT(x)                                                     \
-  if (x != VK_SUCCESS) {                                                       \
-    throw std::runtime_error(std::string("Vulkan error"));                     \
+#define VK_CHECK_RESULT(x)                                 \
+  if (x != VK_SUCCESS) {                                   \
+    throw std::runtime_error(std::string("Vulkan error")); \
   }
 
 namespace ashfault {
 class ASHFAULT_API Swapchain;
-class ASHFAULT_API Frame;
 
 struct ASHFAULT_API QueueSuitability {
   std::optional<std::uint32_t> graphics_queue;
@@ -44,16 +43,15 @@ struct ASHFAULT_API SwapchainSupportDetails {
 };
 
 class ASHFAULT_API VulkanRenderer {
-public:
+ public:
   VulkanRenderer() = default;
-  VulkanRenderer(const VulkanRenderer &) = delete;
-  VulkanRenderer &operator=(const VulkanRenderer &) = delete;
-  friend class Frame;
+  VulkanRenderer(const VulkanRenderer&) = delete;
+  VulkanRenderer& operator=(const VulkanRenderer&) = delete;
   void shutdown();
 
   std::uint32_t image_index() const;
 
-  Swapchain *swapchain();
+  Swapchain* swapchain();
   std::vector<VkCommandBuffer> allocate_command_buffers(std::uint32_t count);
 
   /// @brief Initializes the renderer.
@@ -61,7 +59,7 @@ public:
 
   /// @brief Creates a vulkan shader module object.
   /// @param path Path to the pre-compiled SPIR-V shader binary.
-  std::shared_ptr<VulkanShader> create_shader(const std::string &path) const;
+  std::shared_ptr<VulkanShader> create_shader(const std::string& path) const;
 
   /// @brief Returns a graphics pipeline builder.
   GraphicsPipelineBuilder create_graphics_pipeline() const;
@@ -87,8 +85,8 @@ public:
   std::vector<VkSemaphore> create_semaphores(std::size_t count);
   std::vector<VkFence> create_fences(std::size_t count);
 
-  VkQueue &graphics_queue();
-  VkQueue &present_queue();
+  VkQueue& graphics_queue();
+  VkQueue& present_queue();
 
   /// @brief Creates a vulkan image object.
   ///
@@ -99,10 +97,10 @@ public:
   /// @param usage The intended image usage.
   /// @param allocation_info Information about how to create the image's
   /// underlying memory store.
-  std::pair<VkImage, VmaAllocation>
-  create_image(uint32_t width, uint32_t height, VkSampleCountFlagBits samples,
-               VkFormat format, VkImageTiling tiling, VkImageUsageFlags usage,
-               VmaAllocationCreateInfo allocation_info);
+  std::pair<VkImage, VmaAllocation> create_image(
+      uint32_t width, uint32_t height, VkSampleCountFlagBits samples,
+      VkFormat format, VkImageTiling tiling, VkImageUsageFlags usage,
+      VmaAllocationCreateInfo allocation_info);
 
   /// @brief Creates a vulkan image view from the supplied image.
   ///
@@ -118,15 +116,9 @@ public:
   /// @param usage The intended buffer usage.
   /// @param alloc_info Information about how to allocate the buffer's backing
   /// storage.
-  std::pair<VkBuffer, VmaAllocation>
-  create_buffer(std::size_t size, VkBufferUsageFlags usage,
-                VmaAllocationCreateInfo alloc_info);
-
-  /// @brief Start recording a graphics queue command buffer.
-  ///
-  /// Acquires an image from the swapchain and starts recording a
-  /// command buffer for rendering.
-  std::optional<Frame> start_frame();
+  std::pair<VkBuffer, VmaAllocation> create_buffer(
+      std::size_t size, VkBufferUsageFlags usage,
+      VmaAllocationCreateInfo alloc_info);
 
   /// @brief Clenas up and rebuilds the swapchain.
   void recreate_swapchain();
@@ -149,7 +141,7 @@ public:
              (!std::is_pointer<T>::value) &&
              (!std::is_lvalue_reference<T>::value) &&
              (!std::is_rvalue_reference<T>::value)
-  std::shared_ptr<VulkanBuffer> create_uniform_buffer(const T &data) {
+  std::shared_ptr<VulkanBuffer> create_uniform_buffer(const T& data) {
     VmaAllocationCreateInfo alloc_info{};
     alloc_info.usage = VMA_MEMORY_USAGE_AUTO;
     alloc_info.requiredFlags = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
@@ -159,9 +151,9 @@ public:
     auto [staging_buffer, staging_alloc] = this->create_buffer(
         sizeof(T), VK_BUFFER_USAGE_TRANSFER_SRC_BIT, alloc_info);
 
-    T *mapping;
+    T* mapping;
     vmaMapMemory(this->m_Allocator, staging_alloc,
-                 reinterpret_cast<void **>(&mapping));
+                 reinterpret_cast<void**>(&mapping));
     std::memcpy(mapping, &data, sizeof(T));
     vmaUnmapMemory(this->m_Allocator, staging_alloc);
 
@@ -187,8 +179,8 @@ public:
   template <class T>
 
     requires std::is_integral<T>::value && std::is_unsigned<T>::value
-  std::shared_ptr<VulkanBuffer>
-  create_index_buffer(const std::vector<T> &indices) {
+  std::shared_ptr<VulkanBuffer> create_index_buffer(
+      const std::vector<T>& indices) {
     VmaAllocationCreateInfo alloc_info{};
     alloc_info.usage = VMA_MEMORY_USAGE_AUTO;
     alloc_info.requiredFlags = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
@@ -199,9 +191,9 @@ public:
         this->create_buffer(indices.size() * sizeof(T),
                             VK_BUFFER_USAGE_TRANSFER_SRC_BIT, alloc_info);
 
-    T *mapping;
+    T* mapping;
     vmaMapMemory(this->m_Allocator, staging_alloc,
-                 reinterpret_cast<void **>(&mapping));
+                 reinterpret_cast<void**>(&mapping));
     std::memcpy(mapping, indices.data(), indices.size() * sizeof(T));
     vmaUnmapMemory(this->m_Allocator, staging_alloc);
 
@@ -226,8 +218,8 @@ public:
              (!std::is_pointer<T>::value) &&
              (!std::is_lvalue_reference<T>::value) &&
              (!std::is_rvalue_reference<T>::value)
-  std::shared_ptr<VulkanBuffer>
-  create_vertex_buffer(const std::vector<T> &vertices) {
+  std::shared_ptr<VulkanBuffer> create_vertex_buffer(
+      const std::vector<T>& vertices) {
     VmaAllocationCreateInfo alloc_info{};
     alloc_info.usage = VMA_MEMORY_USAGE_AUTO;
     alloc_info.requiredFlags = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
@@ -238,9 +230,9 @@ public:
         this->create_buffer(vertices.size() * sizeof(T),
                             VK_BUFFER_USAGE_TRANSFER_SRC_BIT, alloc_info);
 
-    T *mapping;
+    T* mapping;
     vmaMapMemory(this->m_Allocator, staging_alloc,
-                 reinterpret_cast<void **>(&mapping));
+                 reinterpret_cast<void**>(&mapping));
     std::memcpy(mapping, vertices.data(), vertices.size() * sizeof(T));
     vmaUnmapMemory(this->m_Allocator, staging_alloc);
 
@@ -259,8 +251,8 @@ public:
                                           buffer, allocation, vertices.size());
   }
 
-private:
-  const std::vector<const char *> s_DeviceExtensions = {
+ private:
+  const std::vector<const char*> s_DeviceExtensions = {
       VK_KHR_SWAPCHAIN_EXTENSION_NAME};
 
   std::shared_ptr<Window> m_Window;
@@ -282,7 +274,7 @@ private:
   VkCommandPool m_CommandPool;
   VkSampleCountFlagBits m_MsaaSamples;
 
-  Swapchain *m_Swapchain;
+  Swapchain* m_Swapchain;
 
   bool m_Resized;
 
@@ -296,9 +288,9 @@ private:
   void cleanup_swapchain();
   void setup_imgui();
 
-  VkSurfaceFormatKHR
-  select_surface_format(const std::vector<VkSurfaceFormatKHR> &);
-  VkPresentModeKHR select_present_mode(const std::vector<VkPresentModeKHR> &);
+  VkSurfaceFormatKHR select_surface_format(
+      const std::vector<VkSurfaceFormatKHR>&);
+  VkPresentModeKHR select_present_mode(const std::vector<VkPresentModeKHR>&);
   VkExtent2D choose_swap_extent(VkSurfaceCapabilitiesKHR caps);
 
   bool check_device_suitability(VkPhysicalDevice device);
@@ -308,6 +300,6 @@ private:
   choose_physical_device();
   SwapchainSupportDetails query_swapchain_support(VkPhysicalDevice device);
 };
-} // namespace ashfault
+}  // namespace ashfault
 
 #endif

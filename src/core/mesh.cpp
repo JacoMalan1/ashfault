@@ -1,8 +1,9 @@
-#include <ashfault/renderer/renderer.h>
-#include <spdlog/spdlog.h>
 #include <ashfault/core/mesh.h>
 #include <ashfault/core/vertex.h>
+#include <ashfault/renderer/renderer.h>
+#include <spdlog/spdlog.h>
 #include <tiny_obj_loader.h>
+
 #include <vector>
 
 namespace ashfault {
@@ -20,7 +21,7 @@ std::shared_ptr<VulkanBuffer> Mesh::index_buffer() {
   return this->m_IndexBuffer;
 }
 
-std::shared_ptr<Mesh> Mesh::load_from_file(const std::string &path) {
+std::shared_ptr<Mesh> Mesh::load_from_file(const std::string& path) {
   tinyobj::attrib_t attribs;
   std::vector<tinyobj::shape_t> shapes;
   std::vector<tinyobj::material_t> materials;
@@ -53,4 +54,4 @@ std::shared_ptr<Mesh> Mesh::load_from_file(const std::string &path) {
   SPDLOG_INFO("Loaded {} indices", indices.size());
   return Renderer::create_mesh(Mesh::Static, vertices, indices);
 }
-} // namespace ashfault
+}  // namespace ashfault

@@ -1,13 +1,14 @@
 #include <ashfault/renderer/shader.h>
+#include <vulkan/vulkan_core.h>
+
 #include <cstdint>
 #include <cstring>
 #include <fstream>
 #include <stdexcept>
-#include <vulkan/vulkan_core.h>
 #include <vector>
 
 namespace ashfault {
-VulkanShader::VulkanShader(VkDevice device, const std::string &path)
+VulkanShader::VulkanShader(VkDevice device, const std::string& path)
     : m_Module(VK_NULL_HANDLE), m_Device(device) {
   std::ifstream fs(path.c_str(), std::ios_base::binary | std::ios_base::in);
 
@@ -46,4 +47,4 @@ VulkanShader::~VulkanShader() {
 }
 
 VkShaderModule VulkanShader::handle() const { return this->m_Module; }
-} // namespace ashfault
+}  // namespace ashfault

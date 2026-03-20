@@ -1,3 +1,4 @@
+#include <ashfault/core/event/viewport_resize.h>
 #include <ashfault/editor/ui_layer.h>
 #include <ashfault/renderer/renderer.h>
 #include <ashfault/renderer/swapchain.h>
@@ -6,19 +7,21 @@
 #include <spdlog/fmt/bundled/base.h>
 #include <spdlog/spdlog.h>
 #include <vulkan/vulkan_core.h>
-#include <ashfault/core/event/viewport_resize.h>
+
+#include <algorithm>
 
 namespace ashfault {
 EditorUiLayer::EditorUiLayer()
     : Layer(),
       m_ViewportTarget(Renderer::create_render_target(1, 1, false, false)),
-      m_ViewportTextures(), m_UpdateViewport(true) {}
+      m_ViewportTextures(),
+      m_UpdateViewport(true) {}
 
 EditorUiLayer::~EditorUiLayer() {}
 
-void EditorUiLayer::on_attach(LayerStack *stack) {
+void EditorUiLayer::on_attach(LayerStack* stack) {
   SPDLOG_INFO("Editor UI layer attach");
-  auto &renderer = Renderer::vulkan_backend();
+  auto& renderer = Renderer::vulkan_backend();
   m_LayerStack = stack;
   m_ViewportSampler = renderer.create_sampler();
 
@@ -30,9 +33,7 @@ void EditorUiLayer::on_attach(LayerStack *stack) {
   }
 }
 
-void EditorUiLayer::on_detach() {
-  m_LayerStack = nullptr;
-}
+void EditorUiLayer::on_detach() { m_LayerStack = nullptr; }
 
 void EditorUiLayer::on_update(float dt) {
   if (m_UpdateViewport) {
@@ -53,7 +54,7 @@ void EditorUiLayer::on_render() {
   Renderer::push_render_target(m_ViewportTarget);
 }
 
-void EditorUiLayer::on_event(Event &event) {}
+void EditorUiLayer::on_event(Event& event) {}
 
 void EditorUiLayer::on_imgui_render() {
   Renderer::pop_render_target();
@@ -71,7 +72,7 @@ void EditorUiLayer::on_imgui_render() {
 }
 
 void EditorUiLayer::recreate_textures() {
-  auto &renderer = Renderer::vulkan_backend();
+  auto& renderer = Renderer::vulkan_backend();
   for (std::size_t i = 0; i < renderer.swapchain()->image_count(); i++) {
     ImGui_ImplVulkan_RemoveTexture(m_ViewportTextures[i]);
     m_ViewportTextures[i] = ImGui_ImplVulkan_AddTexture(
@@ -79,4 +80,4 @@ void EditorUiLayer::recreate_textures() {
         VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
   }
 }
-} // namespace ashfault
+}  // namespace ashfault

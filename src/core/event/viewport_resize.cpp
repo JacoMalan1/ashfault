@@ -1,4 +1,5 @@
 #include <ashfault/core/event/viewport_resize.h>
+
 #include <cstdint>
 
 namespace ashfault {
@@ -14,11 +15,7 @@ Event::EventType ViewportResizeEvent::event_type() const {
   return Event::ViewportResize;
 }
 
-std::uint32_t ViewportResizeEvent::width() const {
-  return m_Width;
-}
+std::uint32_t ViewportResizeEvent::width() const { return m_Width; }
 
-std::uint32_t ViewportResizeEvent::height() const {
-  return m_Height;
-}
-} // namespace ashfault
+std::uint32_t ViewportResizeEvent::height() const { return m_Height; }
+}  // namespace ashfault

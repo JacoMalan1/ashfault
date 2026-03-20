@@ -22,4 +22,4 @@ jobs:
           sudo apt install clang
 
       - name: Run clang-format
-        run: find -type f -regextype egrep -regex '^\.\/(src|include)\/(\w*\/)*\w*\.(cpp|h)$' -exec clang-format --dry-run -Werror {} \;
+        run: find -type f -regextype egrep -regex '^\.\/(src|include)\/(\w*\/)*\w*\.(cpp|h)$' -exec sh -c 'clang-format --style=Google --dry-run -Werror "$@" || exit 1' sh {} +

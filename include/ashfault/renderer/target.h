@@ -3,40 +3,43 @@
 
 #include <ashfault/ashfault.h>
 #include <ashfault/renderer/vkrenderer.h>
-#include <cstdint>
-#include <memory>
-#include <optional>
-#include <vector>
 #include <vk_mem_alloc.h>
 #include <vulkan/vulkan.h>
 #include <vulkan/vulkan_core.h>
 
+#include <cstdint>
+#include <memory>
+#include <optional>
+#include <vector>
+
 namespace ashfault {
 class ASHFAULT_API RenderTarget {
-public:
+ public:
   RenderTarget(
       std::shared_ptr<VulkanRenderer> renderer,
-      const std::optional<std::pair<VkImage, VmaAllocation>> &depth_image,
-      std::optional<VkImageView> depth_view, const std::vector<VkImage> &images,
-      const std::vector<VkImageView> &image_views,
-      const std::optional<std::vector<VmaAllocation>> &allocations,
-      const std::vector<VkCommandBuffer> &command_buffers, VkRect2D render_area);
+      const std::optional<std::pair<VkImage, VmaAllocation>>& depth_image,
+      std::optional<VkImageView> depth_view, const std::vector<VkImage>& images,
+      const std::vector<VkImageView>& image_views,
+      const std::optional<std::vector<VmaAllocation>>& allocations,
+      const std::vector<VkCommandBuffer>& command_buffers,
+      VkRect2D render_area);
   ~RenderTarget();
 
-  VkCommandBuffer &command_buffer(std::uint32_t index);
+  VkCommandBuffer& command_buffer(std::uint32_t index);
   VkImage image(std::uint32_t index);
   VkImageView image_view(std::uint32_t index);
   void begin_rendering(std::uint32_t image_index, std::uint32_t current_frame);
   void end_rendering(std::uint32_t image_index, std::uint32_t current_frame,
                      bool present_source);
 
-  void
-  update_images(const std::vector<VkImage> &images,
-                const std::vector<VkImageView> &image_views,
-                const std::optional<std::vector<VmaAllocation>> &allocations);
-  void update_depth_image(std::pair<VkImage, VmaAllocation> image, VkImageView view);
+  void update_images(
+      const std::vector<VkImage>& images,
+      const std::vector<VkImageView>& image_views,
+      const std::optional<std::vector<VmaAllocation>>& allocations);
+  void update_depth_image(std::pair<VkImage, VmaAllocation> image,
+                          VkImageView view);
 
-private:
+ private:
   std::shared_ptr<VulkanRenderer> m_Renderer;
   std::vector<VkImage> m_Images;
   std::vector<VkImageView> m_ImageViews;
@@ -46,6 +49,6 @@ private:
   std::optional<VkImageView> m_DepthView;
   VkRect2D m_RenderArea;
 };
-} // namespace ashfault
+}  // namespace ashfault
 
 #endif

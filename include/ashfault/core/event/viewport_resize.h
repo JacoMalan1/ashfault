@@ -2,11 +2,12 @@
 #define ASHFAULT_EVENT_VIEWPORT_RESIZE_H
 
 #include <ashfault/core/event.h>
+
 #include <cstdint>
 
 namespace ashfault {
 class ViewportResizeEvent : public Event {
-public:
+ public:
   ViewportResizeEvent(std::uint32_t width, std::uint32_t height);
   ~ViewportResizeEvent() = default;
 
@@ -17,9 +18,9 @@ public:
   std::uint32_t width() const;
   std::uint32_t height() const;
 
-private:
+ private:
   std::uint32_t m_Width, m_Height;
 };
-}
+}  // namespace ashfault
 
 #endif

@@ -5,7 +5,7 @@
 
 namespace ashfault {
 class Camera {
-public:
+ public:
   Camera() = default;
   virtual ~Camera() = default;
 
@@ -14,26 +14,26 @@ public:
 };
 
 class PerspectiveCamera : public Camera {
-public:
+ public:
   PerspectiveCamera(float fov, float aspect_ratio);
   ~PerspectiveCamera();
 
   glm::mat4 projection() override;
   glm::mat4 view() override;
 
-private:
-  float m_FOV, m_AspectRatio; 
+ private:
+  float m_FOV, m_AspectRatio;
   glm::vec3 m_Position, m_Rotation;
 };
 
 class OrthoCamera : public Camera {
-public:
+ public:
   glm::mat4 projection() override;
   glm::mat4 view() override;
 
-private:
+ private:
   glm::vec3 m_Position, m_Rotation;
 };
-}
+}  // namespace ashfault
 
 #endif

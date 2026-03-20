@@ -1,19 +1,25 @@
-#include "ashfault/renderer/buffer.hpp"
 #include <ashfault/renderer/target.h>
-#include <memory>
 #include <vulkan/vulkan_core.h>
+
+#include <memory>
+
+#include "ashfault/renderer/buffer.hpp"
 
 namespace ashfault {
 RenderTarget::RenderTarget(
     std::shared_ptr<VulkanRenderer> renderer,
-    const std::optional<std::pair<VkImage, VmaAllocation>> &depth_image,
-    std::optional<VkImageView> depth_view, const std::vector<VkImage> &images,
-    const std::vector<VkImageView> &image_views,
-    const std::optional<std::vector<VmaAllocation>> &allocations,
-    const std::vector<VkCommandBuffer> &command_buffers, VkRect2D render_area)
-    : m_Renderer(renderer), m_Images(images), m_ImageViews(image_views),
-      m_ImageAllocations(allocations), m_CommandBuffers(command_buffers),
-      m_DepthImage(depth_image), m_DepthView(depth_view),
+    const std::optional<std::pair<VkImage, VmaAllocation>>& depth_image,
+    std::optional<VkImageView> depth_view, const std::vector<VkImage>& images,
+    const std::vector<VkImageView>& image_views,
+    const std::optional<std::vector<VmaAllocation>>& allocations,
+    const std::vector<VkCommandBuffer>& command_buffers, VkRect2D render_area)
+    : m_Renderer(renderer),
+      m_Images(images),
+      m_ImageViews(image_views),
+      m_ImageAllocations(allocations),
+      m_CommandBuffers(command_buffers),
+      m_DepthImage(depth_image),
+      m_DepthView(depth_view),
       m_RenderArea(render_area) {}
 
 RenderTarget::~RenderTarget() {
@@ -30,13 +36,13 @@ RenderTarget::~RenderTarget() {
                       m_ImageAllocations.value()[i]);
     }
 
-    for (auto &view : m_ImageViews) {
+    for (auto& view : m_ImageViews) {
       vkDestroyImageView(m_Renderer->device(), view, nullptr);
     }
   }
 }
 
-VkCommandBuffer &RenderTarget::command_buffer(std::uint32_t idx) {
+VkCommandBuffer& RenderTarget::command_buffer(std::uint32_t idx) {
   return this->m_CommandBuffers[idx];
 }
 
@@ -162,9 +168,9 @@ void RenderTarget::end_rendering(std::uint32_t image_index,
 }
 
 void RenderTarget::update_images(
-    const std::vector<VkImage> &images,
-    const std::vector<VkImageView> &image_views,
-    const std::optional<std::vector<VmaAllocation>> &allocations) {
+    const std::vector<VkImage>& images,
+    const std::vector<VkImageView>& image_views,
+    const std::optional<std::vector<VmaAllocation>>& allocations) {
   vkDeviceWaitIdle(m_Renderer->device());
   if (m_ImageAllocations.has_value()) {
     for (std::size_t i = 0; i < m_Images.size(); i++) {
@@ -190,4 +196,4 @@ void RenderTarget::update_depth_image(std::pair<VkImage, VmaAllocation> image,
   m_DepthImage = image;
   m_DepthView = view;
 }
-} // namespace ashfault
+}  // namespace ashfault

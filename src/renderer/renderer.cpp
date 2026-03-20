@@ -1,19 +1,19 @@
 #include <ashfault/core/camera.h>
 #include <ashfault/core/pipeline_manager.h>
-#include <ashfault/renderer/buffer.hpp>
 #include <ashfault/renderer/pipeline.h>
 #include <ashfault/renderer/renderer.h>
 #include <ashfault/renderer/swapchain.h>
 #include <ashfault/renderer/vkrenderer.h>
+#include <imgui_impl_vulkan.h>
+#include <vulkan/vulkan_core.h>
+
+#include <ashfault/renderer/buffer.hpp>
 #include <cstddef>
 #include <glm/ext/matrix_float4x4.hpp>
 #include <glm/ext/matrix_transform.hpp>
 #include <glm/fwd.hpp>
-#include <imgui_impl_vulkan.h>
 #include <limits>
 #include <memory>
-#include <unistd.h>
-#include <vulkan/vulkan_core.h>
 
 namespace ashfault {
 struct CameraData {
@@ -24,7 +24,7 @@ struct CameraData {
 
 struct RendererData {
   std::shared_ptr<VulkanRenderer> render_backend;
-  Swapchain *swapchain;
+  Swapchain* swapchain;
   std::unique_ptr<PipelineManager> pipeline_manager;
 
   std::vector<VkCommandBuffer> command_buffers;
@@ -150,7 +150,7 @@ void Renderer::init(std::shared_ptr<Window> window) {
   Renderer::create_pipelines();
 }
 
-void Renderer::submit_imgui_data(ImDrawData *draw_data) {
+void Renderer::submit_imgui_data(ImDrawData* draw_data) {
   if (draw_data) {
     ImGui_ImplVulkan_RenderDrawData(
         draw_data, s_Data.default_target->command_buffer(s_Data.current_frame));
@@ -178,14 +178,13 @@ void Renderer::pop_render_target() {
   s_Data.targets.pop_back();
 }
 
-RenderTarget &Renderer::render_target() {
+RenderTarget& Renderer::render_target() {
   return *(s_Data.targets.empty() ? s_Data.default_target
                                   : s_Data.targets.back());
 }
 
-std::shared_ptr<RenderTarget>
-Renderer::create_render_target(std::uint32_t width, std::uint32_t height,
-                               bool msaa, bool swapchain) {
+std::shared_ptr<RenderTarget> Renderer::create_render_target(
+    std::uint32_t width, std::uint32_t height, bool msaa, bool swapchain) {
   auto image_count = s_Data.swapchain->image_count();
   auto cmd_buffers =
       s_Data.render_backend->allocate_command_buffers(image_count);
@@ -261,20 +260,20 @@ void Renderer::submit_and_wait() {
   s_Data.current_frame = s_Data.current_frame % s_Data.swapchain->image_count();
 }
 
-void Renderer::submit_mesh(Mesh &mesh) {
+void Renderer::submit_mesh(Mesh& mesh) {
   auto cmd = render_target().command_buffer(s_Data.current_frame);
-  GraphicsPipeline *pipeline = nullptr;
+  GraphicsPipeline* pipeline = nullptr;
   switch (mesh.type()) {
-  case Mesh::Static:
-    pipeline = s_Data.pipeline_manager->get_graphics_pipeline("static");
+    case Mesh::Static:
+      pipeline = s_Data.pipeline_manager->get_graphics_pipeline("static");
 
-    break;
+      break;
   }
 
-  auto data =
-      s_Data.camera_data.value_or<CameraData>({.projection = glm::identity<glm::mat4>(),
-                                   .view = glm::identity<glm::mat4>(),
-                                   .model = glm::identity<glm::mat4>()});
+  auto data = s_Data.camera_data.value_or<CameraData>(
+      {.projection = glm::identity<glm::mat4>(),
+       .view = glm::identity<glm::mat4>(),
+       .model = glm::identity<glm::mat4>()});
   data.model = glm::identity<glm::mat4>();
   vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline->handle());
   vkCmdPushConstants(cmd, pipeline->layout(), VK_SHADER_STAGE_VERTEX_BIT, 0,
@@ -291,20 +290,19 @@ void Renderer::shutdown() {
   s_Data.render_backend->shutdown();
 }
 
-VulkanRenderer &Renderer::vulkan_backend() { return *s_Data.render_backend; }
+VulkanRenderer& Renderer::vulkan_backend() { return *s_Data.render_backend; }
 
 std::uint32_t Renderer::swapchain_image_index() { return s_Data.image_index; }
 
-std::shared_ptr<Mesh>
-Renderer::create_mesh(Mesh::MeshType type,
-                      const std::vector<Mesh::Vertex> &vertices,
-                      const std::vector<std::uint32_t> &indices) {
+std::shared_ptr<Mesh> Renderer::create_mesh(
+    Mesh::MeshType type, const std::vector<Mesh::Vertex>& vertices,
+    const std::vector<std::uint32_t>& indices) {
   auto vertex_buffer = s_Data.render_backend->create_vertex_buffer(vertices);
   auto index_buffer = s_Data.render_backend->create_index_buffer(indices);
   return std::make_shared<Mesh>(type, vertex_buffer, index_buffer);
 }
 
-void Renderer::begin_scene(Camera &camera) {
+void Renderer::begin_scene(Camera& camera) {
   CameraData data = {.projection = camera.projection(), .view = camera.view()};
 
   s_Data.camera_data = data;
@@ -313,4 +311,4 @@ void Renderer::begin_scene(Camera &camera) {
 void Renderer::end_scene() { s_Data.camera_data = std::optional<CameraData>(); }
 
 std::uint32_t Renderer::frame_index() { return s_Data.current_frame; }
-} // namespace ashfault
+}  // namespace ashfault

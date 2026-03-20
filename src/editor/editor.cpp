@@ -1,16 +1,17 @@
 #define SPDLOG_ACTIVE_LEVEL SPDLOG_LEVEL_TRACE
 
 #include <ashfault/core/event/key_press.h>
-#include <imgui.h>
-#include <imgui_impl_glfw.h>
-#include <imgui_impl_vulkan.h>
 #include <ashfault/core/layer/render_layer.h>
-#include <ashfault/core/timer.hpp>
 #include <ashfault/editor/editor.h>
 #include <ashfault/editor/editor_layer.h>
 #include <ashfault/editor/ui_layer.h>
 #include <ashfault/renderer/renderer.h>
+#include <imgui.h>
+#include <imgui_impl_glfw.h>
+#include <imgui_impl_vulkan.h>
 #include <spdlog/spdlog.h>
+
+#include <ashfault/core/timer.hpp>
 
 using namespace std::chrono_literals;
 
@@ -21,16 +22,15 @@ Editor::~Editor() {}
 
 void Editor::run() {
   Renderer::init(m_Window);
-  auto *ui_layer = new EditorUiLayer();
+  auto* ui_layer = new EditorUiLayer();
   m_LayerStack->push_layer(new RenderLayer());
   m_LayerStack->push_layer(new EditorLayer());
   m_LayerStack->push_overlay(ui_layer);
 
-  m_Window->set_key_callback([&](Window &, int key, int, int action, int) {
+  m_Window->set_key_callback([&](Window&, int key, int, int action, int) {
     KeyPressEvent ev(key, action);
     m_LayerStack->on_event(ev);
   });
-
 
   SPDLOG_INFO("Editor startup finished");
   while (!m_Window->should_close()) {
@@ -56,4 +56,4 @@ void Editor::run() {
   }
   Renderer::shutdown();
 }
-} // namespace ashfault::editor
+}  // namespace ashfault::editor
