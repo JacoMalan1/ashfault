@@ -12,12 +12,12 @@ class ASHFAULT_API Layer {
   Layer();
   virtual ~Layer() = default;
 
-  virtual void on_attach(LayerStack* layer_stack) {}
+  virtual void on_attach(LayerStack *layer_stack) {}
   virtual void on_detach() {}
 
   virtual void on_update(float dt) {}
   virtual void on_render() {}
-  virtual void on_event(Event& event) {}
+  virtual void on_event(Event &event) {}
   virtual void on_imgui_render() {}
 
   bool is_enabled() const;
@@ -25,7 +25,7 @@ class ASHFAULT_API Layer {
 
  protected:
   bool m_Enabled;
-  LayerStack* m_LayerStack;
+  LayerStack *m_LayerStack;
 };
 }  // namespace ashfault
 

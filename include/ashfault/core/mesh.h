@@ -24,7 +24,7 @@ class ASHFAULT_API Mesh {
   std::shared_ptr<VulkanBuffer> index_buffer();
   MeshType type() const;
 
-  static std::shared_ptr<Mesh> load_from_file(const std::string& path);
+  static std::shared_ptr<Mesh> load_from_file(const std::string &path);
 
  private:
   std::shared_ptr<VulkanBuffer> m_VertexBuffer, m_IndexBuffer;

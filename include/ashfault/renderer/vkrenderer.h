@@ -45,13 +45,15 @@ struct ASHFAULT_API SwapchainSupportDetails {
 class ASHFAULT_API VulkanRenderer {
  public:
   VulkanRenderer() = default;
-  VulkanRenderer(const VulkanRenderer&) = delete;
-  VulkanRenderer& operator=(const VulkanRenderer&) = delete;
+  VulkanRenderer(const VulkanRenderer &) = delete;
+  VulkanRenderer &operator=(const VulkanRenderer &) = delete;
   void shutdown();
 
   std::uint32_t image_index() const;
 
-  Swapchain* swapchain();
+  VkCommandPool &command_pool();
+
+  Swapchain *swapchain();
   std::vector<VkCommandBuffer> allocate_command_buffers(std::uint32_t count);
 
   /// @brief Initializes the renderer.
@@ -59,7 +61,7 @@ class ASHFAULT_API VulkanRenderer {
 
   /// @brief Creates a vulkan shader module object.
   /// @param path Path to the pre-compiled SPIR-V shader binary.
-  std::shared_ptr<VulkanShader> create_shader(const std::string& path) const;
+  std::shared_ptr<VulkanShader> create_shader(const std::string &path) const;
 
   /// @brief Returns a graphics pipeline builder.
   GraphicsPipelineBuilder create_graphics_pipeline() const;
@@ -85,8 +87,8 @@ class ASHFAULT_API VulkanRenderer {
   std::vector<VkSemaphore> create_semaphores(std::size_t count);
   std::vector<VkFence> create_fences(std::size_t count);
 
-  VkQueue& graphics_queue();
-  VkQueue& present_queue();
+  VkQueue &graphics_queue();
+  VkQueue &present_queue();
 
   /// @brief Creates a vulkan image object.
   ///
@@ -141,7 +143,7 @@ class ASHFAULT_API VulkanRenderer {
              (!std::is_pointer<T>::value) &&
              (!std::is_lvalue_reference<T>::value) &&
              (!std::is_rvalue_reference<T>::value)
-  std::shared_ptr<VulkanBuffer> create_uniform_buffer(const T& data) {
+  std::shared_ptr<VulkanBuffer> create_uniform_buffer(const T &data) {
     VmaAllocationCreateInfo alloc_info{};
     alloc_info.usage = VMA_MEMORY_USAGE_AUTO;
     alloc_info.requiredFlags = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
@@ -151,9 +153,9 @@ class ASHFAULT_API VulkanRenderer {
     auto [staging_buffer, staging_alloc] = this->create_buffer(
         sizeof(T), VK_BUFFER_USAGE_TRANSFER_SRC_BIT, alloc_info);
 
-    T* mapping;
+    T *mapping;
     vmaMapMemory(this->m_Allocator, staging_alloc,
-                 reinterpret_cast<void**>(&mapping));
+                 reinterpret_cast<void **>(&mapping));
     std::memcpy(mapping, &data, sizeof(T));
     vmaUnmapMemory(this->m_Allocator, staging_alloc);
 
@@ -180,7 +182,7 @@ class ASHFAULT_API VulkanRenderer {
 
     requires std::is_integral<T>::value && std::is_unsigned<T>::value
   std::shared_ptr<VulkanBuffer> create_index_buffer(
-      const std::vector<T>& indices) {
+      const std::vector<T> &indices) {
     VmaAllocationCreateInfo alloc_info{};
     alloc_info.usage = VMA_MEMORY_USAGE_AUTO;
     alloc_info.requiredFlags = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
@@ -191,9 +193,9 @@ class ASHFAULT_API VulkanRenderer {
         this->create_buffer(indices.size() * sizeof(T),
                             VK_BUFFER_USAGE_TRANSFER_SRC_BIT, alloc_info);
 
-    T* mapping;
+    T *mapping;
     vmaMapMemory(this->m_Allocator, staging_alloc,
-                 reinterpret_cast<void**>(&mapping));
+                 reinterpret_cast<void **>(&mapping));
     std::memcpy(mapping, indices.data(), indices.size() * sizeof(T));
     vmaUnmapMemory(this->m_Allocator, staging_alloc);
 
@@ -219,7 +221,7 @@ class ASHFAULT_API VulkanRenderer {
              (!std::is_lvalue_reference<T>::value) &&
              (!std::is_rvalue_reference<T>::value)
   std::shared_ptr<VulkanBuffer> create_vertex_buffer(
-      const std::vector<T>& vertices) {
+      const std::vector<T> &vertices) {
     VmaAllocationCreateInfo alloc_info{};
     alloc_info.usage = VMA_MEMORY_USAGE_AUTO;
     alloc_info.requiredFlags = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
@@ -230,9 +232,9 @@ class ASHFAULT_API VulkanRenderer {
         this->create_buffer(vertices.size() * sizeof(T),
                             VK_BUFFER_USAGE_TRANSFER_SRC_BIT, alloc_info);
 
-    T* mapping;
+    T *mapping;
     vmaMapMemory(this->m_Allocator, staging_alloc,
-                 reinterpret_cast<void**>(&mapping));
+                 reinterpret_cast<void **>(&mapping));
     std::memcpy(mapping, vertices.data(), vertices.size() * sizeof(T));
     vmaUnmapMemory(this->m_Allocator, staging_alloc);
 
@@ -252,7 +254,7 @@ class ASHFAULT_API VulkanRenderer {
   }
 
  private:
-  const std::vector<const char*> s_DeviceExtensions = {
+  const std::vector<const char *> s_DeviceExtensions = {
       VK_KHR_SWAPCHAIN_EXTENSION_NAME};
 
   std::shared_ptr<Window> m_Window;
@@ -274,7 +276,7 @@ class ASHFAULT_API VulkanRenderer {
   VkCommandPool m_CommandPool;
   VkSampleCountFlagBits m_MsaaSamples;
 
-  Swapchain* m_Swapchain;
+  Swapchain *m_Swapchain;
 
   bool m_Resized;
 
@@ -289,8 +291,8 @@ class ASHFAULT_API VulkanRenderer {
   void setup_imgui();
 
   VkSurfaceFormatKHR select_surface_format(
-      const std::vector<VkSurfaceFormatKHR>&);
-  VkPresentModeKHR select_present_mode(const std::vector<VkPresentModeKHR>&);
+      const std::vector<VkSurfaceFormatKHR> &);
+  VkPresentModeKHR select_present_mode(const std::vector<VkPresentModeKHR> &);
   VkExtent2D choose_swap_extent(VkSurfaceCapabilitiesKHR caps);
 
   bool check_device_suitability(VkPhysicalDevice device);

@@ -9,21 +9,21 @@
 #include <stdexcept>
 
 namespace ashfault {
-EditorCamera::EditorCamera(const glm::vec3& position, const glm::vec3& rotation)
+EditorCamera::EditorCamera(const glm::vec3 &position, const glm::vec3 &rotation)
     : m_Position(position), m_Rotation(rotation) {}
 
-PerspectiveEditorCamera::PerspectiveEditorCamera(const glm::vec3& position,
-                                                 const glm::vec3& rotation,
+PerspectiveEditorCamera::PerspectiveEditorCamera(const glm::vec3 &position,
+                                                 const glm::vec3 &rotation,
                                                  float fov, float aspect_ratio)
     : EditorCamera(position, rotation),
       m_Fov(fov),
       m_AspectRatio(aspect_ratio) {}
 
-void EditorCamera::rotate(const glm::vec3& rotation) {
+void EditorCamera::rotate(const glm::vec3 &rotation) {
   this->m_Rotation += rotation;
 }
 
-void EditorCamera::move(const glm::vec3& delta) {
+void EditorCamera::move(const glm::vec3 &delta) {
   glm::vec3 forward =
       glm::vec3(std::cos(this->m_Rotation.x) * std::sin(this->m_Rotation.y),
                 -std::sin(this->m_Rotation.x),
@@ -53,24 +53,24 @@ glm::mat4 PerspectiveEditorCamera::view() const {
 
 PerspectiveEditorCameraBuilder PerspectiveEditorCamera::builder() { return {}; }
 
-PerspectiveEditorCameraBuilder& PerspectiveEditorCameraBuilder::position(
-    const glm::vec3& position) {
+PerspectiveEditorCameraBuilder &PerspectiveEditorCameraBuilder::position(
+    const glm::vec3 &position) {
   this->m_Position = position;
   return *this;
 }
 
-PerspectiveEditorCameraBuilder& PerspectiveEditorCameraBuilder::rotation(
-    const glm::vec3& rotation) {
+PerspectiveEditorCameraBuilder &PerspectiveEditorCameraBuilder::rotation(
+    const glm::vec3 &rotation) {
   this->m_Rotation = rotation;
   return *this;
 }
 
-PerspectiveEditorCameraBuilder& PerspectiveEditorCameraBuilder::fov(float fov) {
+PerspectiveEditorCameraBuilder &PerspectiveEditorCameraBuilder::fov(float fov) {
   this->m_Fov = fov;
   return *this;
 }
 
-PerspectiveEditorCameraBuilder& PerspectiveEditorCameraBuilder::aspect_ratio(
+PerspectiveEditorCameraBuilder &PerspectiveEditorCameraBuilder::aspect_ratio(
     float aspect) {
   this->m_AspectRatio = aspect;
   return *this;
@@ -102,16 +102,16 @@ void PerspectiveCameraControls::resize(float width, float height) {
   this->m_Camera->m_AspectRatio = width / height;
 }
 
-void EditorCamera::set_rotation(const glm::vec3& rotation) {
+void EditorCamera::set_rotation(const glm::vec3 &rotation) {
   this->m_Rotation = rotation;
 }
 
-void EditorCamera::set_position(const glm::vec3& position) {
+void EditorCamera::set_position(const glm::vec3 &position) {
   this->m_Position = position;
 }
 
-OrthoEditorCamera::OrthoEditorCamera(const glm::vec3& position,
-                                     const glm::vec3& rotation, float left,
+OrthoEditorCamera::OrthoEditorCamera(const glm::vec3 &position,
+                                     const glm::vec3 &rotation, float left,
                                      float right, float top, float bottom,
                                      float z_near, float z_far)
     : EditorCamera(position, rotation),

@@ -78,7 +78,7 @@ bool VulkanRenderer::check_device_extension_support(VkPhysicalDevice device) {
   std::set<std::string> required_extensions = {this->s_DeviceExtensions.begin(),
                                                this->s_DeviceExtensions.end()};
 
-  for (const auto& extension : props) {
+  for (const auto &extension : props) {
     required_extensions.erase(extension.extensionName);
   }
 
@@ -171,7 +171,7 @@ void ashfault::VulkanRenderer::create_instance() {
   app_info.pApplicationName = "AshFault";
   app_info.pEngineName = "AshFault";
 
-  std::vector<const char*> enabled_layers = {};
+  std::vector<const char *> enabled_layers = {};
   std::uint32_t layer_count;
   vkEnumerateInstanceLayerProperties(&layer_count, nullptr);
   std::vector<VkLayerProperties> layer_props = {};
@@ -186,11 +186,11 @@ void ashfault::VulkanRenderer::create_instance() {
     }
   }
 
-  std::vector<const char*> enabled_extensions =
+  std::vector<const char *> enabled_extensions =
       this->m_Window->required_instance_extensions();
   enabled_extensions.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
   std::for_each(enabled_extensions.begin(), enabled_extensions.end(),
-                [](const char* name) {
+                [](const char *name) {
                   SPDLOG_DEBUG("Required instance extension: {}", name);
                 });
 
@@ -281,8 +281,8 @@ void ashfault::VulkanRenderer::create_surface() {
 }
 
 VkSurfaceFormatKHR VulkanRenderer::select_surface_format(
-    const std::vector<VkSurfaceFormatKHR>& formats) {
-  for (const auto& format : formats) {
+    const std::vector<VkSurfaceFormatKHR> &formats) {
+  for (const auto &format : formats) {
     if (format.colorSpace == VK_COLORSPACE_SRGB_NONLINEAR_KHR &&
         format.format == VK_FORMAT_B8G8R8A8_SRGB) {
       return format;
@@ -306,7 +306,7 @@ int present_mode_ranking(VkPresentModeKHR mode) {
 }
 
 VkPresentModeKHR VulkanRenderer::select_present_mode(
-    const std::vector<VkPresentModeKHR>& formats) {
+    const std::vector<VkPresentModeKHR> &formats) {
   auto preference_order = formats;
   std::sort(preference_order.begin(), preference_order.end(),
             [](VkPresentModeKHR a, VkPresentModeKHR b) {
@@ -435,7 +435,7 @@ void VulkanRenderer::setup_imgui() {
   IMGUI_CHECKVERSION();
 
   ImGui::CreateContext();
-  ImGuiIO& io = ImGui::GetIO();
+  ImGuiIO &io = ImGui::GetIO();
   io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
   io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;
   io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
@@ -466,7 +466,7 @@ void VulkanRenderer::setup_imgui() {
 void ashfault::VulkanRenderer::init(std::shared_ptr<Window> window) {
   this->m_Window = window;
 
-  this->m_Window->set_resize_callback([&](Window& window, WindowDims) {
+  this->m_Window->set_resize_callback([&](Window &window, WindowDims) {
     this->m_Resized = true;
     this->recreate_swapchain();
   });
@@ -484,7 +484,7 @@ void ashfault::VulkanRenderer::init(std::shared_ptr<Window> window) {
 }
 
 std::shared_ptr<VulkanShader> VulkanRenderer::create_shader(
-    const std::string& path) const {
+    const std::string &path) const {
   return std::make_shared<VulkanShader>(this->m_Device, path);
 }
 
@@ -653,7 +653,7 @@ std::vector<VkCommandBuffer> VulkanRenderer::allocate_command_buffers(
   return ret;
 }
 
-Swapchain* VulkanRenderer::swapchain() { return this->m_Swapchain; }
+Swapchain *VulkanRenderer::swapchain() { return this->m_Swapchain; }
 
 VkSampler VulkanRenderer::create_sampler() {
   VkSamplerCreateInfo create_info{};
@@ -700,7 +700,9 @@ std::vector<VkFence> VulkanRenderer::create_fences(std::size_t count) {
   return result;
 }
 
-VkQueue& VulkanRenderer::graphics_queue() { return m_GraphicsQueue; }
+VkQueue &VulkanRenderer::graphics_queue() { return m_GraphicsQueue; }
 
-VkQueue& VulkanRenderer::present_queue() { return m_PresentQueue; }
+VkQueue &VulkanRenderer::present_queue() { return m_PresentQueue; }
+
+VkCommandPool &VulkanRenderer::command_pool() { return m_CommandPool; }
 }  // namespace ashfault

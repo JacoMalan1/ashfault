@@ -9,7 +9,7 @@ namespace ashfault {
 VulkanDescriptorSetBuilder::VulkanDescriptorSetBuilder(VkDevice device)
     : m_Device(device) {}
 
-VulkanDescriptorSetBuilder& VulkanDescriptorSetBuilder::add_binding(
+VulkanDescriptorSetBuilder &VulkanDescriptorSetBuilder::add_binding(
     VkDescriptorType type, VkShaderStageFlags stage_flags,
     std::uint32_t descriptor_count, std::uint32_t binding) {
   VkDescriptorSetLayoutBinding el{};
@@ -27,7 +27,7 @@ VulkanDescriptorSetBuilder::build() {
   std::vector<VkDescriptorSetLayout> layouts;
   layouts.reserve(this->m_Bindings.size());
 
-  for (const auto& binding : this->m_Bindings) {
+  for (const auto &binding : this->m_Bindings) {
     VkDescriptorSetLayoutCreateInfo layout_info{};
     layout_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
     layout_info.bindingCount = 1;
@@ -46,7 +46,7 @@ VulkanDescriptorSetBuilder::build() {
 
   std::vector<VkDescriptorPoolSize> pool_sizes;
   pool_sizes.reserve(this->m_Bindings.size());
-  for (const auto& binding : this->m_Bindings) {
+  for (const auto &binding : this->m_Bindings) {
     VkDescriptorPoolSize el{};
     el.descriptorCount = binding.descriptorCount;
     el.type = binding.descriptorType;
@@ -112,15 +112,15 @@ VulkanDescriptorSet::~VulkanDescriptorSet() {
   vkDestroyDescriptorSetLayout(this->m_Device, this->m_Layout, nullptr);
 }
 
-VkDescriptorSetLayout& VulkanDescriptorSet::layout() { return this->m_Layout; }
+VkDescriptorSetLayout &VulkanDescriptorSet::layout() { return this->m_Layout; }
 
-const VkDescriptorSetLayout& VulkanDescriptorSet::layout() const {
+const VkDescriptorSetLayout &VulkanDescriptorSet::layout() const {
   return this->m_Layout;
 }
 
-const VkDescriptorSet& VulkanDescriptorSet::handle() const {
+const VkDescriptorSet &VulkanDescriptorSet::handle() const {
   return this->m_DescriptorSet;
 }
 
-VkDescriptorSet& VulkanDescriptorSet::handle() { return this->m_DescriptorSet; }
+VkDescriptorSet &VulkanDescriptorSet::handle() { return this->m_DescriptorSet; }
 }  // namespace ashfault

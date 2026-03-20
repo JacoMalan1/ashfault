@@ -1,3 +1,4 @@
+#include <ashfault/core/event/mouse_drag.h>
 #include <ashfault/core/event/viewport_resize.h>
 #include <ashfault/editor/ui_layer.h>
 #include <ashfault/renderer/renderer.h>
@@ -10,6 +11,8 @@
 
 #include <algorithm>
 
+#include "ashfault/core/event/mouse_scroll.h"
+
 namespace ashfault {
 EditorUiLayer::EditorUiLayer()
     : Layer(),
@@ -19,9 +22,9 @@ EditorUiLayer::EditorUiLayer()
 
 EditorUiLayer::~EditorUiLayer() {}
 
-void EditorUiLayer::on_attach(LayerStack* stack) {
+void EditorUiLayer::on_attach(LayerStack *stack) {
   SPDLOG_INFO("Editor UI layer attach");
-  auto& renderer = Renderer::vulkan_backend();
+  auto &renderer = Renderer::vulkan_backend();
   m_LayerStack = stack;
   m_ViewportSampler = renderer.create_sampler();
 
@@ -54,12 +57,13 @@ void EditorUiLayer::on_render() {
   Renderer::push_render_target(m_ViewportTarget);
 }
 
-void EditorUiLayer::on_event(Event& event) {}
+void EditorUiLayer::on_event(Event &event) {}
 
 void EditorUiLayer::on_imgui_render() {
   Renderer::pop_render_target();
   ImGui::DockSpaceOverViewport();
-  ImGui::Begin("Viewport");
+  ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
+  ImGui::Begin("Scene");
   auto size = ImGui::GetContentRegionAvail();
   if (m_PreviousViewportSize.has_value() &&
       (m_PreviousViewportSize.value().x != size.x ||
@@ -68,11 +72,38 @@ void EditorUiLayer::on_imgui_render() {
   }
   m_PreviousViewportSize = size;
   ImGui::Image(m_ViewportTextures[Renderer::swapchain_image_index()], size);
+
+  if (ImGui::IsItemHovered() && ImGui::IsMouseDragging(ImGuiMouseButton_Left)) {
+    auto delta = ImGui::GetIO().MouseDelta;
+    MouseDragEvent ev(MouseDragEvent::Left, delta.x, delta.y);
+    if (m_LayerStack) {
+      m_LayerStack->on_event(ev);
+    }
+  }
+
+  if (ImGui::IsItemHovered() &&
+      ImGui::IsMouseDragging(ImGuiMouseButton_Middle)) {
+    auto delta = ImGui::GetIO().MouseDelta;
+    MouseDragEvent ev(MouseDragEvent::Middle, delta.x, delta.y);
+    if (m_LayerStack) {
+      m_LayerStack->on_event(ev);
+    }
+  }
+
+  if (ImGui::IsItemHovered() && ImGui::GetIO().MouseWheel != 0) {
+    auto delta = ImGui::GetIO().MouseWheel;
+    MouseScrollEvent ev(delta);
+    if (m_LayerStack) {
+      m_LayerStack->on_event(ev);
+    }
+  }
+
   ImGui::End();
+  ImGui::PopStyleVar();
 }
 
 void EditorUiLayer::recreate_textures() {
-  auto& renderer = Renderer::vulkan_backend();
+  auto &renderer = Renderer::vulkan_backend();
   for (std::size_t i = 0; i < renderer.swapchain()->image_count(); i++) {
     ImGui_ImplVulkan_RemoveTexture(m_ViewportTextures[i]);
     m_ViewportTextures[i] = ImGui_ImplVulkan_AddTexture(

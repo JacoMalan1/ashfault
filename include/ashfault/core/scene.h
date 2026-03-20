@@ -3,6 +3,7 @@
 
 #include <ashfault/ashfault.h>
 #include <ashfault/core/entity.h>
+#include <ashfault/core/mesh.h>
 #include <vulkan/vulkan.h>
 
 #include <ashfault/core/registry.hpp>
@@ -15,8 +16,10 @@ class ASHFAULT_API Scene {
   Scene();
 
   Entity create_entity();
-  ComponentRegistry& component_registry();
-  const ComponentRegistry& component_registry() const;
+  ComponentRegistry &component_registry();
+  const ComponentRegistry &component_registry() const;
+
+  void draw_all();
 
  private:
   Entity::id_type m_NextEntityId;

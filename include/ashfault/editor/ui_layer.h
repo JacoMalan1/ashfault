@@ -16,11 +16,11 @@ class EditorUiLayer : public Layer {
   EditorUiLayer();
   ~EditorUiLayer();
 
-  void on_attach(LayerStack* layer_stack) override;
+  void on_attach(LayerStack *layer_stack) override;
   void on_detach() override;
   void on_update(float dt) override;
   void on_render() override;
-  void on_event(Event& event) override;
+  void on_event(Event &event) override;
   void on_imgui_render() override;
 
  private:
@@ -31,7 +31,7 @@ class EditorUiLayer : public Layer {
   std::vector<VkDescriptorSet> m_ViewportTextures;
   std::optional<ImVec2> m_PreviousViewportSize;
   bool m_UpdateViewport;
-  LayerStack* m_LayerStack;
+  LayerStack *m_LayerStack;
 };
 }  // namespace ashfault
 

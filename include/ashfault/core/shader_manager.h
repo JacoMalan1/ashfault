@@ -13,15 +13,15 @@ class ASHFAULT_API ShaderManager {
  public:
   ShaderManager();
 
-  void add_vertex_shader(VulkanRenderer* renderer, const std::string& path,
-                         const std::string& name);
-  void add_fragment_shader(VulkanRenderer* renderer, const std::string& path,
-                           const std::string& name);
+  void add_vertex_shader(VulkanRenderer *renderer, const std::string &path,
+                         const std::string &name);
+  void add_fragment_shader(VulkanRenderer *renderer, const std::string &path,
+                           const std::string &name);
 
   std::optional<std::shared_ptr<VulkanShader>> get_vertex_shader(
-      const std::string& name);
+      const std::string &name);
   std::optional<std::shared_ptr<VulkanShader>> get_fragment_shader(
-      const std::string& name);
+      const std::string &name);
 
  private:
   std::unordered_map<std::string, std::shared_ptr<VulkanShader>>

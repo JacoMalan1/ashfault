@@ -8,6 +8,7 @@
 #include <memory>
 
 #include "ashfault/core/layer_stack.h"
+#include "ashfault/core/scene.h"
 
 namespace ashfault {
 class EditorLayer : public Layer {
@@ -15,17 +16,18 @@ class EditorLayer : public Layer {
   EditorLayer();
   ~EditorLayer();
 
-  void on_attach(LayerStack* layer_stack) override;
+  void on_attach(LayerStack *layer_stack) override;
   void on_detach() override;
 
   void on_update(float dt) override;
   void on_render() override;
-  void on_event(Event& event) override;
+  void on_event(Event &event) override;
 
  private:
   std::shared_ptr<Mesh> m_Mesh;
   std::shared_ptr<PerspectiveCamera> m_PerspectiveCamera;
   std::shared_ptr<OrthoCamera> m_OrthoCamera;
+  std::shared_ptr<Scene> m_ActiveScene;
 };
 }  // namespace ashfault
 

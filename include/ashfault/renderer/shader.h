@@ -9,9 +9,9 @@
 namespace ashfault {
 class ASHFAULT_API VulkanShader {
  public:
-  VulkanShader(VkDevice device, const std::string& path);
-  VulkanShader(const VulkanShader&) = delete;
-  VulkanShader& operator=(const VulkanShader&) = delete;
+  VulkanShader(VkDevice device, const std::string &path);
+  VulkanShader(const VulkanShader &) = delete;
+  VulkanShader &operator=(const VulkanShader &) = delete;
   ~VulkanShader();
 
   VkShaderModule handle() const;

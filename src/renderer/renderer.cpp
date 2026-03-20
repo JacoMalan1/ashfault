@@ -24,10 +24,9 @@ struct CameraData {
 
 struct RendererData {
   std::shared_ptr<VulkanRenderer> render_backend;
-  Swapchain* swapchain;
+  Swapchain *swapchain;
   std::unique_ptr<PipelineManager> pipeline_manager;
 
-  std::vector<VkCommandBuffer> command_buffers;
   std::vector<VkCommandBuffer> imgui_command_buffers;
   std::vector<VkSemaphore> image_available_semaphores;
   std::vector<VkSemaphore> render_finished_semaphores;
@@ -48,8 +47,10 @@ struct RendererData {
 static RendererData s_Data;
 
 void Renderer::create_pipelines() {
-  auto static_vshader = s_Data.render_backend->create_shader("simple.vert.spv");
-  auto static_fshader = s_Data.render_backend->create_shader("simple.frag.spv");
+  auto static_vshader =
+      s_Data.render_backend->create_shader("blinn_phong.vert.spv");
+  auto static_fshader =
+      s_Data.render_backend->create_shader("blinn_phong.frag.spv");
 
   std::vector<VkVertexInputAttributeDescription> vertex_attribs{};
   vertex_attribs.push_back({
@@ -73,7 +74,8 @@ void Renderer::create_pipelines() {
           .push_constant(VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(CameraData))
           .build();
 
-  s_Data.pipeline_manager->add_graphics_pipeline("static", static_pipeline);
+  s_Data.pipeline_manager->add_graphics_pipeline("blinn_phong",
+                                                 static_pipeline);
 }
 
 bool Renderer::start_frame() {
@@ -144,13 +146,10 @@ void Renderer::init(std::shared_ptr<Window> window) {
   s_Data.imgui_command_buffers =
       s_Data.render_backend->allocate_command_buffers(
           s_Data.swapchain->image_count());
-  s_Data.command_buffers = s_Data.render_backend->allocate_command_buffers(
-      s_Data.swapchain->image_count());
-
   Renderer::create_pipelines();
 }
 
-void Renderer::submit_imgui_data(ImDrawData* draw_data) {
+void Renderer::submit_imgui_data(ImDrawData *draw_data) {
   if (draw_data) {
     ImGui_ImplVulkan_RenderDrawData(
         draw_data, s_Data.default_target->command_buffer(s_Data.current_frame));
@@ -178,7 +177,7 @@ void Renderer::pop_render_target() {
   s_Data.targets.pop_back();
 }
 
-RenderTarget& Renderer::render_target() {
+RenderTarget &Renderer::render_target() {
   return *(s_Data.targets.empty() ? s_Data.default_target
                                   : s_Data.targets.back());
 }
@@ -260,12 +259,16 @@ void Renderer::submit_and_wait() {
   s_Data.current_frame = s_Data.current_frame % s_Data.swapchain->image_count();
 }
 
-void Renderer::submit_mesh(Mesh& mesh) {
+void Renderer::submit_mesh(Mesh &mesh) {
+  submit_mesh(mesh, glm::identity<glm::mat4>());
+}
+
+void Renderer::submit_mesh(Mesh &mesh, const glm::mat4 &transform) {
   auto cmd = render_target().command_buffer(s_Data.current_frame);
-  GraphicsPipeline* pipeline = nullptr;
+  GraphicsPipeline *pipeline = nullptr;
   switch (mesh.type()) {
     case Mesh::Static:
-      pipeline = s_Data.pipeline_manager->get_graphics_pipeline("static");
+      pipeline = s_Data.pipeline_manager->get_graphics_pipeline("blinn_phong");
 
       break;
   }
@@ -274,7 +277,7 @@ void Renderer::submit_mesh(Mesh& mesh) {
       {.projection = glm::identity<glm::mat4>(),
        .view = glm::identity<glm::mat4>(),
        .model = glm::identity<glm::mat4>()});
-  data.model = glm::identity<glm::mat4>();
+  data.model = transform;
   vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline->handle());
   vkCmdPushConstants(cmd, pipeline->layout(), VK_SHADER_STAGE_VERTEX_BIT, 0,
                      sizeof(CameraData), &data);
@@ -290,19 +293,19 @@ void Renderer::shutdown() {
   s_Data.render_backend->shutdown();
 }
 
-VulkanRenderer& Renderer::vulkan_backend() { return *s_Data.render_backend; }
+VulkanRenderer &Renderer::vulkan_backend() { return *s_Data.render_backend; }
 
 std::uint32_t Renderer::swapchain_image_index() { return s_Data.image_index; }
 
 std::shared_ptr<Mesh> Renderer::create_mesh(
-    Mesh::MeshType type, const std::vector<Mesh::Vertex>& vertices,
-    const std::vector<std::uint32_t>& indices) {
+    Mesh::MeshType type, const std::vector<Mesh::Vertex> &vertices,
+    const std::vector<std::uint32_t> &indices) {
   auto vertex_buffer = s_Data.render_backend->create_vertex_buffer(vertices);
   auto index_buffer = s_Data.render_backend->create_index_buffer(indices);
   return std::make_shared<Mesh>(type, vertex_buffer, index_buffer);
 }
 
-void Renderer::begin_scene(Camera& camera) {
+void Renderer::begin_scene(Camera &camera) {
   CameraData data = {.projection = camera.projection(), .view = camera.view()};
 
   s_Data.camera_data = data;

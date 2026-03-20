@@ -24,7 +24,7 @@ class ASHFAULT_API VulkanDescriptorSetBuilder {
   /// @param stage_flags The shader stages that will use this binding.
   /// @param descriptor_count How many descriptors to create.
   /// @param binding The binding index.
-  VulkanDescriptorSetBuilder& add_binding(VkDescriptorType type,
+  VulkanDescriptorSetBuilder &add_binding(VkDescriptorType type,
                                           VkShaderStageFlags stage_flags,
                                           std::uint32_t descriptor_count,
                                           std::uint32_t binding);
@@ -44,14 +44,14 @@ class ASHFAULT_API VulkanDescriptorSet {
   VulkanDescriptorSet(VkDevice device, VkDescriptorSet descriptor_set,
                       VkDescriptorSetLayout layout);
 
-  VkDescriptorSetLayout& layout();
-  const VkDescriptorSetLayout& layout() const;
+  VkDescriptorSetLayout &layout();
+  const VkDescriptorSetLayout &layout() const;
 
-  const VkDescriptorSet& handle() const;
-  VkDescriptorSet& handle();
+  const VkDescriptorSet &handle() const;
+  VkDescriptorSet &handle();
 
-  VulkanDescriptorSet(const VulkanDescriptorSet&) = delete;
-  VulkanDescriptorSet& operator=(const VulkanDescriptorSet&) = delete;
+  VulkanDescriptorSet(const VulkanDescriptorSet &) = delete;
+  VulkanDescriptorSet &operator=(const VulkanDescriptorSet &) = delete;
   ~VulkanDescriptorSet();
 
   template <class T>
@@ -85,8 +85,8 @@ class ASHFAULT_API VulkanDescriptorPool {
  public:
   VulkanDescriptorPool(VkDevice device, VkDescriptorPool pool);
 
-  VulkanDescriptorPool(const VulkanDescriptorPool&) = delete;
-  VulkanDescriptorPool& operator=(const VulkanDescriptorPool&) = delete;
+  VulkanDescriptorPool(const VulkanDescriptorPool &) = delete;
+  VulkanDescriptorPool &operator=(const VulkanDescriptorPool &) = delete;
   ~VulkanDescriptorPool();
 
  private:

@@ -12,7 +12,7 @@ class ASHFAULT_API Event {
   Event();
   virtual ~Event() = default;
 
-  enum EventType { KeyPress, ViewportResize };
+  enum EventType { KeyPress, ViewportResize, MouseDrag, MouseScroll };
 
   virtual EventType event_type() const = 0;
 
@@ -27,9 +27,9 @@ class Dispatcher {
  public:
   template <typename T>
     requires std::is_base_of<Event, T>::value
-  void dispatch(Event& event, std::function<void(T&)> f) {
+  void dispatch(Event &event, std::function<void(T &)> f) {
     if (event.event_type() == T::static_type()) {
-      f(static_cast<T&>(event));
+      f(static_cast<T &>(event));
     }
   }
 };

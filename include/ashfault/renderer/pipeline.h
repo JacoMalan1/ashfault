@@ -19,17 +19,17 @@ class ASHFAULT_API GraphicsPipelineBuilder {
                           std::array<std::uint32_t, 2> window_dims,
                           VkSampleCountFlagBits msaaSamples);
 
-  GraphicsPipelineBuilder& vertex_shader(std::shared_ptr<VulkanShader> shader);
-  GraphicsPipelineBuilder& fragment_shader(
+  GraphicsPipelineBuilder &vertex_shader(std::shared_ptr<VulkanShader> shader);
+  GraphicsPipelineBuilder &fragment_shader(
       std::shared_ptr<VulkanShader> shader);
-  GraphicsPipelineBuilder& descriptor_sets(
-      const std::vector<std::shared_ptr<VulkanDescriptorSet>>& dsets);
-  GraphicsPipelineBuilder& input_attribute_descriptions(
-      const std::vector<VkVertexInputAttributeDescription>& descriptions,
+  GraphicsPipelineBuilder &descriptor_sets(
+      const std::vector<std::shared_ptr<VulkanDescriptorSet>> &dsets);
+  GraphicsPipelineBuilder &input_attribute_descriptions(
+      const std::vector<VkVertexInputAttributeDescription> &descriptions,
       std::uint32_t stride);
-  GraphicsPipelineBuilder& input_assembly_state(
+  GraphicsPipelineBuilder &input_assembly_state(
       VkPipelineInputAssemblyStateCreateInfo assembly_state);
-  GraphicsPipelineBuilder& push_constant(VkShaderStageFlags stage,
+  GraphicsPipelineBuilder &push_constant(VkShaderStageFlags stage,
                                          VkDeviceSize offset,
                                          VkDeviceSize size);
 
@@ -54,13 +54,13 @@ class ASHFAULT_API GraphicsPipeline {
   GraphicsPipeline(VkDevice device, VkPipelineLayout layout,
                    VkPipeline pipeline);
 
-  GraphicsPipeline(const GraphicsPipeline&) = delete;
-  GraphicsPipeline& operator=(const GraphicsPipeline&) = delete;
+  GraphicsPipeline(const GraphicsPipeline &) = delete;
+  GraphicsPipeline &operator=(const GraphicsPipeline &) = delete;
   ~GraphicsPipeline();
 
   VkPipeline handle() const;
-  const VkPipelineLayout& layout() const;
-  VkPipelineLayout& layout();
+  const VkPipelineLayout &layout() const;
+  VkPipelineLayout &layout();
 
  private:
   VkPipelineLayout m_Layout;

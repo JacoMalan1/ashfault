@@ -21,7 +21,7 @@ std::shared_ptr<VulkanBuffer> Mesh::index_buffer() {
   return this->m_IndexBuffer;
 }
 
-std::shared_ptr<Mesh> Mesh::load_from_file(const std::string& path) {
+std::shared_ptr<Mesh> Mesh::load_from_file(const std::string &path) {
   tinyobj::attrib_t attribs;
   std::vector<tinyobj::shape_t> shapes;
   std::vector<tinyobj::material_t> materials;

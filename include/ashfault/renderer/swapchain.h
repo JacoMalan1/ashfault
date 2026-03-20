@@ -15,8 +15,8 @@ class ASHFAULT_API Swapchain {
   Swapchain(VkSurfaceFormatKHR format, VkPresentModeKHR present_mode,
             std::uint32_t image_count, VkExtent2D extent, VkSurfaceKHR surface,
             SwapchainSupportDetails support, VkDevice device);
-  Swapchain(const Swapchain&) = delete;
-  Swapchain& operator=(const Swapchain&) = delete;
+  Swapchain(const Swapchain &) = delete;
+  Swapchain &operator=(const Swapchain &) = delete;
 
   std::uint32_t image_count() const;
   VkImage image(std::size_t index);
@@ -24,10 +24,10 @@ class ASHFAULT_API Swapchain {
 
   void cleanup();
 
-  void present(VkQueue queue, const std::vector<VkSemaphore>& wait_semaphores,
+  void present(VkQueue queue, const std::vector<VkSemaphore> &wait_semaphores,
                std::uint32_t image_index);
   VkSurfaceFormatKHR surface_format();
-  VkExtent2D& swap_extent();
+  VkExtent2D &swap_extent();
 
   std::optional<std::uint32_t> acquire_image(VkSemaphore semaphore);
   void build(VkExtent2D swap_extent);
