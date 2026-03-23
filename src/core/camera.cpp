@@ -1,12 +1,11 @@
 #include <ashfault/core/camera.h>
+#include <iso646.h>
 
 #include <glm/ext/matrix_clip_space.hpp>
 #include <glm/ext/matrix_transform.hpp>
 #include <glm/ext/quaternion_float.hpp>
+#include <glm/ext/quaternion_trigonometric.hpp>
 #include <glm/fwd.hpp>
-
-#include "glm/ext/quaternion_trigonometric.hpp"
-#include "glm/gtc/quaternion.hpp"
 
 namespace ashfault {
 PerspectiveCamera::PerspectiveCamera(float fov, float aspect_ratio)
@@ -83,5 +82,21 @@ void PerspectiveCamera::set_position(const glm::vec3 &position) {
 
 void PerspectiveCamera::set_rotation(const glm::vec3 &rotation) {
   m_Rotation = rotation;
+}
+
+float PerspectiveCamera::radius() const { return m_Radius; }
+
+void PerspectiveCamera::set_radius(float radius) { m_Radius = radius; }
+
+void PerspectiveCamera::set_orientation(glm::quat orientation) {
+  m_Orientation = orientation;
+}
+
+glm::mat4 OrthoCamera::projection() {
+  return glm::identity<glm::mat4>();
+}
+
+glm::mat4 OrthoCamera::view() {
+  return glm::identity<glm::mat4>();
 }
 }  // namespace ashfault

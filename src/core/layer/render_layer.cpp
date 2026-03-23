@@ -3,7 +3,7 @@
 #include <ashfault/renderer/vkrenderer.h>
 #include <spdlog/spdlog.h>
 
-#include "ashfault/core/layer_stack.h"
+#include <ashfault/core/layer_stack.h>
 
 namespace ashfault {
 RenderLayer::RenderLayer() : Layer() {}

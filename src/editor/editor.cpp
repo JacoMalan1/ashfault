@@ -1,17 +1,24 @@
-#define SPDLOG_ACTIVE_LEVEL SPDLOG_LEVEL_TRACE
-
+#include <ashfault/core/asset/mesh_loader.h>
+#include <ashfault/core/asset/script_loader.h>
 #include <ashfault/core/event/key_press.h>
 #include <ashfault/core/layer/render_layer.h>
 #include <ashfault/editor/editor.h>
 #include <ashfault/editor/editor_layer.h>
+#include <ashfault/editor/event/state_change.h>
+#include <ashfault/editor/state.h>
 #include <ashfault/editor/ui_layer.h>
 #include <ashfault/renderer/renderer.h>
 #include <imgui.h>
+#include <ImGuizmo.h>
 #include <imgui_impl_glfw.h>
 #include <imgui_impl_vulkan.h>
 #include <spdlog/spdlog.h>
 
 #include <ashfault/core/timer.hpp>
+#include <memory>
+
+#include <ashfault/core/layer/script_layer.hpp>
+#include <ashfault/core/event_bus.hpp>
 
 using namespace std::chrono_literals;
 
@@ -22,10 +29,31 @@ Editor::~Editor() {}
 
 void Editor::run() {
   Renderer::init(m_Window);
-  auto *ui_layer = new EditorUiLayer();
+  m_AssetManager->register_loader<Mesh>(std::make_shared<MeshLoader>());
+  m_AssetManager->register_loader<Script>(std::make_shared<ScriptLoader>());
+
+  EditorContext context{};
+  context.active_scene = nullptr;
+
+  auto *ui_layer = new EditorUiLayer(&context, m_AssetManager);
+  auto *script_layer = new ScriptLayer(m_AssetManager, &context);
+  script_layer->set_enabled(false);
+
   m_LayerStack->push_layer(new RenderLayer());
-  m_LayerStack->push_layer(new EditorLayer());
+  m_LayerStack->push_layer(script_layer);
+  m_LayerStack->push_layer(new EditorLayer(&context, m_AssetManager));
   m_LayerStack->push_overlay(ui_layer);
+
+  EventBus<StateChangeEvent>::get().subscribe([&](const StateChangeEvent &ev) {
+    switch (ev.state()) {
+      case State::Play:
+        script_layer->set_enabled(true);
+        break;
+      case State::Edit:
+        script_layer->set_enabled(false);
+        break;
+    }
+  });
 
   m_Window->set_key_callback([&](Window &, int key, int, int action, int) {
     KeyPressEvent ev(key, action);
@@ -33,18 +61,22 @@ void Editor::run() {
   });
 
   SPDLOG_INFO("Editor startup finished");
+  Timer<std::chrono::high_resolution_clock> timer{};
+  timer.start();
   while (!m_Window->should_close()) {
     if (!Renderer::start_frame()) {
       SPDLOG_WARN("Couldn't start frame");
       continue;
     }
 
-    m_LayerStack->on_update(1000.0f / 60.0f);
+    float delta = timer.reset();
+    m_LayerStack->on_update(delta / 1000.0f);
     m_LayerStack->on_render();
 
     ImGui_ImplVulkan_NewFrame();
     ImGui_ImplGlfw_NewFrame();
     ImGui::NewFrame();
+    ImGuizmo::BeginFrame();
     m_LayerStack->on_imgui_render();
     ImGui::EndFrame();
     ImGui::Render();

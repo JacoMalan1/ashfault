@@ -1,10 +1,11 @@
 #ifndef ASHFAULT_EVENT_MOUSE_DRAG_H
 #define ASHFAULT_EVENT_MOUSE_DRAG_H
 
+#include <ashfault/ashfault.h>
 #include <ashfault/core/event.h>
 
 namespace ashfault {
-class MouseDragEvent : public Event {
+class ASHFAULT_API MouseDragEvent : public Event {
  public:
   enum MouseButton { Left, Right, Middle };
 

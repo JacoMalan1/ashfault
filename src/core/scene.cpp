@@ -6,8 +6,9 @@
 #include <ashfault/core/registry.hpp>
 #include <ashfault/renderer/buffer.hpp>
 #include <glm/ext/matrix_transform.hpp>
+#include <optional>
 
-#include "ashfault/renderer/renderer.h"
+#include <ashfault/renderer/renderer.h>
 
 namespace ashfault {
 Scene::Scene() : m_NextEntityId(0), m_ComponentRegistry(), m_Entities() {}
@@ -51,8 +52,30 @@ void Scene::draw_all() {
         model_mat = T * R * S;
       }
 
-      Renderer::submit_mesh(*mesh.value()->mesh, model_mat);
+      Renderer::submit_mesh(*mesh.value()->mesh.get(), model_mat);
     }
   }
+}
+
+const std::vector<Entity> &Scene::entities() const { return m_Entities; }
+
+void Scene::delete_entity(Entity e) {
+  for (auto it = m_Entities.begin(); it != m_Entities.end(); it++) {
+    if (*it == e) {
+      m_Entities.erase(it);
+      m_ComponentRegistry.delete_entity(*it);
+      return;
+    }
+  }
+}
+
+std::optional<Entity> Scene::get_entity(Entity::id_type id) {
+  for (auto &e : m_Entities) {
+    if (e.handle() == id) {
+      return e;
+    }
+  }
+
+  return std::optional<Entity>();
 }
 }  // namespace ashfault

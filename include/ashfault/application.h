@@ -6,6 +6,7 @@
 #include <ashfault/core/layer_stack.h>
 
 #include <memory>
+#include <ashfault/core/asset_manager.hpp>
 
 namespace ashfault {
 class ASHFAULT_API Application {
@@ -19,6 +20,7 @@ class ASHFAULT_API Application {
   std::shared_ptr<Window> m_Window;
   std::shared_ptr<Input> m_Input;
   std::unique_ptr<LayerStack> m_LayerStack;
+  std::shared_ptr<AssetManager> m_AssetManager;
 };
 }  // namespace ashfault
 

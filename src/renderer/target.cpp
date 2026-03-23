@@ -3,7 +3,7 @@
 
 #include <memory>
 
-#include "ashfault/renderer/buffer.hpp"
+#include <ashfault/renderer/buffer.hpp>
 
 namespace ashfault {
 RenderTarget::RenderTarget(

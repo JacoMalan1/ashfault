@@ -8,23 +8,30 @@
 
 namespace ashfault {
 class ASHFAULT_API Event {
- public:
+public:
   Event();
   virtual ~Event() = default;
 
-  enum EventType { KeyPress, ViewportResize, MouseDrag, MouseScroll };
+  enum EventType {
+    KeyPress,
+    ViewportResize,
+    MouseDrag,
+    MouseScroll,
+    ScriptAttach,
+    StateChange
+  };
 
   virtual EventType event_type() const = 0;
 
   bool is_handled() const;
   void set_handled();
 
- private:
+private:
   bool m_Handled;
 };
 
-class Dispatcher {
- public:
+class ASHFAULT_API Dispatcher {
+public:
   template <typename T>
     requires std::is_base_of<Event, T>::value
   void dispatch(Event &event, std::function<void(T &)> f) {

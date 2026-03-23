@@ -16,10 +16,14 @@ class ASHFAULT_API Scene {
   Scene();
 
   Entity create_entity();
+  void delete_entity(Entity e);
   ComponentRegistry &component_registry();
   const ComponentRegistry &component_registry() const;
 
   void draw_all();
+  const std::vector<Entity> &entities() const;
+
+  std::optional<Entity> get_entity(Entity::id_type id);
 
  private:
   Entity::id_type m_NextEntityId;
