@@ -1,6 +1,7 @@
 #include <ashfault/core/script.h>
 #include <spdlog/spdlog.h>
 
+#include <functional>
 #include <optional>
 #include <sol/forward.hpp>
 #include <sol/object.hpp>
@@ -9,8 +10,7 @@
 
 namespace ashfault {
 Script::Script(const std::string &source)
-    : m_Initialized(false),
-      m_Source(source) {}
+    : m_Initialized(false), m_Source(source) {}
 
 Script::~Script() {}
 
@@ -29,6 +29,9 @@ void Script::init(sol::state &lua) {
     throw std::runtime_error("Invalid script!");
   }
 
+  if (m_Environment["OnSceneStart"].valid()) {
+    m_OnSceneStart = m_Environment["OnSceneStart"];
+  }
   m_OnUpdate = m_Environment["OnUpdate"];
   m_Environment.set_on(m_OnUpdate);
   m_Initialized = true;
@@ -36,17 +39,37 @@ void Script::init(sol::state &lua) {
 
 bool Script::is_initialized() const { return m_Initialized; }
 
+void Script::on_scene_start(std::optional<Entity> entity) {
+  try {
+    if (m_OnSceneStart.has_value()) {
+      m_Environment.clear();
+      m_Environment.set_function("GetEntity", [&]() {
+        sol::lua_value v =
+            entity
+                ? sol::make_object(m_Environment.lua_state(), entity->handle())
+                : sol::make_object(m_Environment.lua_state(), sol::nil);
+        return v;
+      });
+      m_Environment.set_on(m_OnUpdate);
+      std::invoke(m_OnSceneStart.value());
+    }
+  } catch (sol::error &e) {
+    SPDLOG_ERROR("Error executing update function from lua script: {}",
+                 e.what());
+  }
+}
+
 void Script::on_update(float dt, std::optional<Entity> entity) {
   try {
     m_Environment.clear();
     m_Environment.set_function("GetEntity", [&]() {
-      sol::lua_value v = entity
-              ? sol::make_object(m_Environment.lua_state(), entity->handle())
-              : sol::make_object(m_Environment.lua_state(), sol::nil);
+      sol::lua_value v =
+          entity ? sol::make_object(m_Environment.lua_state(), entity->handle())
+                 : sol::make_object(m_Environment.lua_state(), sol::nil);
       return v;
     });
     m_Environment.set_on(m_OnUpdate);
-    m_OnUpdate(dt);
+    std::invoke(m_OnUpdate, dt);
   } catch (sol::error &e) {
     SPDLOG_ERROR("Error executing update function from lua script: {}",
                  e.what());

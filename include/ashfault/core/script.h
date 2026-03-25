@@ -15,6 +15,7 @@ public:
 
   void init(sol::state &lua);
 
+  void on_scene_start(std::optional<Entity> entity);
   void on_update(float dt, std::optional<Entity> entity);
   bool is_initialized() const;
 
@@ -22,6 +23,7 @@ private:
   bool m_Initialized;
   std::string m_Source;
   sol::environment m_Environment;
+  std::optional<sol::function> m_OnSceneStart;
   sol::function m_OnUpdate;
 };
 }  // namespace ashfault

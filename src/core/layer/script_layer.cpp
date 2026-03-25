@@ -3,12 +3,17 @@
 #include <ashfault/core/component/transform.h>
 #include <ashfault/core/event.h>
 #include <ashfault/core/event/script_attach.h>
+#include <ashfault/core/event/scene_start.h>
 #include <ashfault/core/layer/script_layer.hpp>
 #include <ashfault/editor/context.h>
 #include <spdlog/spdlog.h>
 
+#include <iterator>
 #include <memory>
 #include <sol/forward.hpp>
+#include <sol/object.hpp>
+#include <sol/state_view.hpp>
+#include <sol/types.hpp>
 
 namespace ashfault {
 ScriptLayer::ScriptLayer(std::shared_ptr<AssetManager> asset_manager,
@@ -19,51 +24,8 @@ ScriptLayer::ScriptLayer(std::shared_ptr<AssetManager> asset_manager,
       m_Context(context) {}
 
 void ScriptLayer::on_attach(LayerStack *) {
-  m_LuaState.open_libraries(sol::lib::base, sol::lib::table, sol::lib::math);
-  m_LuaState.set_function(
-      "print", [](const std::string &s) { SPDLOG_INFO("SCRIPT: {}", s); });
-  m_SceneTable = m_LuaState.create_named_table("Scene");
-
-  sol::usertype<glm::vec3> vec3 =
-      m_LuaState.new_usertype<glm::vec<3, float>>("Vec3");
-  vec3["x"] = sol::property([](const glm::vec3 &x) { return x.x; },
-                            [](glm::vec3 &x, float val) { x.x = val; });
-  vec3["y"] = sol::property([](const glm::vec3 &x) { return x.y; },
-                            [](glm::vec3 &x, float val) { x.y = val; });
-  vec3["z"] = sol::property([](const glm::vec3 &x) { return x.z; },
-                            [](glm::vec3 &x, float val) { x.z = val; });
-
-  sol::usertype<TransformComponent> transform =
-      m_LuaState.new_usertype<TransformComponent>("Transform");
-  transform["position"] = sol::property(
-      [](const TransformComponent &x) { return x.position; },
-      [](TransformComponent &x, glm::vec3 val) { x.position = val; });
-  transform["rotation"] = sol::property(
-      [](const TransformComponent &x) { return x.rotation; },
-      [](TransformComponent &x, glm::vec3 val) { x.rotation = val; });
-  transform["scale"] = sol::property(
-      [](const TransformComponent &x) { return x.scale; },
-      [](TransformComponent &x, glm::vec3 val) { x.scale = val; });
-
-  sol::usertype<TagComponent> tag =
-      m_LuaState.new_usertype<TagComponent>("Tag");
-  tag["tag"] =
-      sol::property([](const TagComponent &x) { return x.tag; },
-                    [](TagComponent &x, std::string val) { x.tag = val; });
-
-  register_ecs_component<TransformComponent>("Transform");
-  register_ecs_component<TagComponent>("Tag");
-  m_SceneTable.set_function(
-      "GetComponent",
-      [&](sol::this_state ts, Entity::id_type e,
-          sol::table type_table) -> sol::object {
-        sol::state_view lua(ts);
-        auto *key = type_table.pointer();
-        auto it = m_EcsMappings.find(key);
-        if (it == m_EcsMappings.end() || !m_Context->active_scene)
-          return sol::nil;
-        return it->second(m_Context->active_scene, lua, e);
-      });
+  m_ScriptLogger = spdlog::default_logger()->clone("script");
+  bind_engine_functions();
 }
 
 void ScriptLayer::on_detach() {}
@@ -93,7 +55,82 @@ void ScriptLayer::on_event(Event &event) {
     m_Context->active_scene->component_registry().add_component(ev.entity(),
                                                                 component);
   });
+
+  dispatcher.dispatch<SceneStartEvent>(event, [&](SceneStartEvent &ev) {
+    auto *scene = ev.scene();
+    for (auto e : scene->entities()) {
+      auto script =
+          scene->component_registry().get_component<ScriptComponent>(e);
+      if (script.has_value()) {
+	if (!script.value()->script.get()->is_initialized()) {
+	  script.value()->script.get()->init(m_LuaState);
+	}
+        script.value()->script.get()->on_scene_start(e);
+      }
+    }
+  });
 }
 
-void ScriptLayer::bind_engine_functions() {}
+void ScriptLayer::bind_engine_functions() {
+  m_LuaState.open_libraries(sol::lib::base, sol::lib::table, sol::lib::math,
+                            sol::lib::string);
+  m_LuaState.set_function(
+      "print", [&](const std::string &s) { m_ScriptLogger->info(s); });
+  m_SceneTable = m_LuaState.create_named_table("Scene");
+
+  m_LuaState.new_usertype<glm::vec3>(
+      "Vec3", sol::constructors<glm::vec3(), glm::vec3(float, float, float)>(),
+      "x", &glm::vec3::x, "y", &glm::vec3::y, "z", &glm::vec3::z);
+  m_LuaState.new_usertype<TransformComponent>(
+      "Transform", sol::constructors<TransformComponent()>(), "position",
+      &TransformComponent::position, "rotation", &TransformComponent::rotation,
+      "scale", &TransformComponent::scale);
+  m_LuaState.new_usertype<TagComponent>(
+      "Tag", sol::constructors<TagComponent()>(), "tag", &TagComponent::tag);
+
+  register_ecs_component<TransformComponent>("Transform");
+  register_ecs_component<TagComponent>("Tag");
+  m_SceneTable.set_function(
+      "GetComponent",
+      [&](sol::this_state ts, Entity::id_type e,
+          sol::table type_table) -> sol::object {
+        sol::state_view lua(ts);
+        auto *key = type_table.pointer();
+        auto it = m_EcsGetters.find(key);
+        if (it == m_EcsGetters.end() || !m_Context->active_scene)
+          return sol::nil;
+        return it->second(m_Context->active_scene, lua, e);
+      });
+  m_SceneTable.set_function(
+      "AddComponent", [&](sol::this_state ts, Entity::id_type e,
+                          sol::table type_table, sol::object component) {
+        sol::state_view lua(ts);
+        auto *key = type_table.pointer();
+        auto it = m_EcsAdders.find(key);
+        if (it == m_EcsAdders.end() || !m_Context->active_scene) return;
+        it->second(m_Context->active_scene, lua, e, component);
+      });
+  m_SceneTable.set_function(
+      "GetEntities", [&](sol::this_state ts) -> sol::object {
+        sol::state_view lua(ts);
+        if (m_Context->active_scene) {
+          std::vector<Entity::id_type> entities{};
+          entities.reserve(m_Context->active_scene->entities().size());
+          std::transform(m_Context->active_scene->entities().begin(),
+                         m_Context->active_scene->entities().end(),
+                         std::back_inserter(entities),
+                         [](Entity e) { return e.handle(); });
+          return sol::make_object(lua, entities);
+        }
+        return sol::make_object(lua, sol::nil);
+      });
+  m_SceneTable.set_function(
+      "CreateEntity", [&](sol::this_state ts) -> sol::object {
+        sol::state_view lua(ts);
+        return m_Context->active_scene
+                   ? sol::make_object(lua,
+                                      m_Context->active_scene->create_entity())
+                   : sol::make_object(lua, sol::nil);
+      });
+}
 }  // namespace ashfault

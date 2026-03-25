@@ -3,7 +3,9 @@
 #include <spdlog/spdlog.h>
 
 int main() {
-  spdlog::set_pattern("[%Y-%m-%d %H:%M:%S] %^%l%$: {%s:%#} -> %v");
+  auto default_logger = spdlog::default_logger()->clone("engine");
+  spdlog::default_logger()->swap(*default_logger);
+  spdlog::set_pattern("[%Y-%m-%d %H:%M:%S] %^%l%$: {%s:%#} %n -> %v");
   spdlog::set_level((spdlog::level::level_enum)SPDLOG_ACTIVE_LEVEL);
 
   auto window = std::make_shared<ashfault::Window>(1280, 720);

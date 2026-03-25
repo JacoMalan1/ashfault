@@ -18,7 +18,8 @@ public:
     MouseDrag,
     MouseScroll,
     ScriptAttach,
-    StateChange
+    StateChange,
+    SceneStart
   };
 
   virtual EventType event_type() const = 0;

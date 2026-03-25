@@ -37,7 +37,6 @@
 		spirv-tools
 		clang-tools
 		xwayland
-		clang_18
               ];
 
 	      env = {

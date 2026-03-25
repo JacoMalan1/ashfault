@@ -37,13 +37,9 @@ void EditorLayer::on_attach(LayerStack *) {
   auto e = m_ActiveScene->create_entity();
   m_Context->selected_entity = e;
   MeshComponent mesh_component = {.mesh = mesh};
-  TransformComponent transform = {.position = glm::vec3(0.0f),
-                                  .rotation = glm::vec3(0.0f, 0.0f, 0.0f),
-                                  .scale = glm::vec3(1.0f)};
   TagComponent tag = {.tag = "Monkey"};
 
   m_ActiveScene->component_registry().add_component(e, mesh_component);
-  m_ActiveScene->component_registry().add_component(e, transform);
   m_ActiveScene->component_registry().add_component(e, tag);
 
   EventBus<StateChangeEvent>::get().subscribe([&](const StateChangeEvent &ev) {

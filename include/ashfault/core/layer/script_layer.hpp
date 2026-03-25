@@ -12,6 +12,7 @@
 #include <unordered_map>
 #include <ashfault/editor/context.h>
 #include <ashfault/core/script.h>
+#include <spdlog/logger.h>
 
 namespace ashfault {
 class ASHFAULT_API ScriptLayer : public Layer {
@@ -31,9 +32,9 @@ public:
 
   template <typename T>
   void register_ecs_component(const std::string &name) {
-    sol::table type_table = m_LuaState.create_named_table(name);
+    sol::table type_table = m_LuaState[name];
     auto *key = type_table.pointer();
-    m_EcsMappings.insert(std::make_pair(
+    m_EcsGetters.insert(std::make_pair(
         key,
         [](Scene *scene, sol::state_view lua,
            Entity::id_type e) -> sol::object {
@@ -44,6 +45,14 @@ public:
           return component ? sol::make_object(lua, std::ref(*component.value()))
                            : sol::make_object(lua, sol::nil);
         }));
+    m_EcsAdders.emplace(key, [](Scene *scene, sol::state_view,
+                                Entity::id_type e, sol::object component) {
+      T c = component.as<T>();
+
+      auto entity = scene->get_entity(e);
+      if (!entity.has_value()) return;
+      scene->component_registry().add_component(entity.value(), c);
+    });
   }
 
 private:
@@ -53,10 +62,15 @@ private:
   std::shared_ptr<AssetManager> m_AssetManager;
   RuntimeContext *m_Context;
   sol::table m_SceneTable;
+  std::shared_ptr<spdlog::logger> m_ScriptLogger;
   std::unordered_map<const void *,
                      std::function<sol::object(Scene *scene, sol::state_view,
                                                Entity::id_type)>>
-      m_EcsMappings;
+      m_EcsGetters;
+  std::unordered_map<const void *,
+                     std::function<void(Scene *scene, sol::state_view,
+                                        Entity::id_type, sol::object)>>
+      m_EcsAdders;
 };
 }  // namespace ashfault
 

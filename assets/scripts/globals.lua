@@ -10,9 +10,8 @@
 ---@return Entity?
 function GetEntity() end
 
----@param fmt string
----@param ... any
-function print(fmt, ...) end
+---@param msg string
+function print(msg) end
 
 ---@class Scene
 Scene = {}
@@ -23,9 +22,15 @@ Scene = {}
 ---@field scale Vec3
 Transform = {}
 
+---@return Transform
+function Transform.new() end
+
 ---@class Tag
 ---@field tag string
 Tag = {}
+
+---@return Tag
+function Tag.new() end
 
 ---Returns the entity the currently executing script is bound to, if any.
 ---
@@ -44,3 +49,14 @@ Tag = {}
 ---@param type T
 ---@return T|nil 
 function Scene.GetComponent(entity, type) end
+
+---Adds a component to an existing entity.
+---
+---@generic T
+---@param entity Entity
+---@param type T
+---@param component T
+function Scene.AddComponent(entity, type, component) end
+
+---@return Entity[]|nil
+function Scene.GetEntities() end
