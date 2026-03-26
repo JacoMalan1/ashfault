@@ -105,6 +105,23 @@ void Window::set_key_callback(
   });
 }
 
+void Window::set_mouse_callback(
+    std::function<void(Window &, int, int, int)> callback) {
+  if (glfwGetWindowUserPointer(this->m_Handle) == nullptr) {
+    this->attach_pointer();
+  }
+
+  glfwSetMouseButtonCallback(this->m_Handle, [](GLFWwindow *window, int button,
+                                                int action, int mods) {
+    Window *window_ptr =
+        reinterpret_cast<Window *>(glfwGetWindowUserPointer(window));
+    if (!window_ptr) return;
+    if (window_ptr->m_MouseCallback.has_value()) {
+      window_ptr->m_MouseCallback.value()(*window_ptr, button, action, mods);
+    }
+  });
+}
+
 void Window::attach_pointer() {
   glfwSetWindowUserPointer(this->m_Handle, this);
 }
