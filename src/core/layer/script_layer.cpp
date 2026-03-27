@@ -1,3 +1,4 @@
+#include <ashfault/core/component/light.h>
 #include <ashfault/core/component/script.h>
 #include <ashfault/core/component/tag.h>
 #include <ashfault/core/component/transform.h>
@@ -62,9 +63,9 @@ void ScriptLayer::on_event(Event &event) {
       auto script =
           scene->component_registry().get_component<ScriptComponent>(e);
       if (script.has_value()) {
-	if (!script.value()->script.get()->is_initialized()) {
-	  script.value()->script.get()->init(m_LuaState);
-	}
+        if (!script.value()->script.get()->is_initialized()) {
+          script.value()->script.get()->init(m_LuaState);
+        }
         script.value()->script.get()->on_scene_start(e);
       }
     }
@@ -87,9 +88,19 @@ void ScriptLayer::bind_engine_functions() {
       "scale", &TransformComponent::scale);
   m_LuaState.new_usertype<TagComponent>(
       "Tag", sol::constructors<TagComponent()>(), "tag", &TagComponent::tag);
+  m_LuaState.new_usertype<DirectionalLightComponent>(
+      "DirectionalLight", sol::constructors<DirectionalLightComponent()>(),
+      "direction", &DirectionalLightComponent::direction, "color",
+      &DirectionalLightComponent::color);
+  m_LuaState.new_usertype<PointLightComponent>(
+      "PointLight", sol::constructors<PointLightComponent()>(),
+      "position", &PointLightComponent::position, "color",
+      &PointLightComponent::color);
 
   register_ecs_component<TransformComponent>("Transform");
   register_ecs_component<TagComponent>("Tag");
+  register_ecs_component<DirectionalLightComponent>("DirectionalLight");
+  register_ecs_component<PointLightComponent>("PointLight");
   m_SceneTable.set_function(
       "GetComponent",
       [&](sol::this_state ts, Entity::id_type e,

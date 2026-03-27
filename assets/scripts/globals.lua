@@ -32,6 +32,23 @@ Tag = {}
 ---@return Tag
 function Tag.new() end
 
+---@class PointLight
+---@field position Vec3
+---@field color Vec3
+PointLight = {}
+
+---@return PointLight
+function PointLight.new() end
+
+---@class DirectionalLight
+---@field direction Vec3
+---@field color Vec3
+DirectionalLight = {}
+
+---@return DirectionalLight
+function DirectionalLight.new() end
+
+
 ---Returns the entity the currently executing script is bound to, if any.
 ---
 ---@example
