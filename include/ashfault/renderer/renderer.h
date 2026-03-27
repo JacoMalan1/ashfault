@@ -5,10 +5,13 @@
 #include <ashfault/core/camera.h>
 #include <ashfault/core/mesh.h>
 #include <ashfault/core/window.h>
+#include <ashfault/renderer/light.h>
 #include <ashfault/renderer/target.h>
 #include <imgui.h>
 
 #include <memory>
+
+#define ASHFAULT_MAX_LIGHTS 128
 
 namespace ashfault {
 class ASHFAULT_API Renderer {
@@ -32,6 +35,7 @@ class ASHFAULT_API Renderer {
 
   static void submit_mesh(Mesh &mesh, const glm::mat4 &transform);
   static void submit_mesh(Mesh &mesh);
+  static void add_light(const Light &light);
 
   static std::shared_ptr<Mesh> create_mesh(
       Mesh::MeshType type, const std::vector<Mesh::Vertex> &vertices,

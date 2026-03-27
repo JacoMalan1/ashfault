@@ -1,6 +1,8 @@
 #include <ashfault/core/component/mesh.h>
 #include <ashfault/core/component/transform.h>
+#include <ashfault/core/component/light.h>
 #include <ashfault/core/scene.h>
+#include <ashfault/renderer/light.h>
 #include <vulkan/vulkan_core.h>
 
 #include <ashfault/core/registry.hpp>
@@ -30,8 +32,31 @@ ComponentRegistry &Scene::component_registry() {
 void Scene::draw_all() {
   for (auto &entity : m_Entities) {
     auto mesh = m_ComponentRegistry.get_component<MeshComponent>(entity);
+    auto directional_light =
+        m_ComponentRegistry.get_component<DirectionalLightComponent>(entity);
+    auto point_light =
+        m_ComponentRegistry.get_component<PointLightComponent>(entity);
     auto transform =
         m_ComponentRegistry.get_component<TransformComponent>(entity);
+
+    if (directional_light.has_value()) {
+      Light light{};
+      light.direction = glm::vec4(directional_light.value()->direction, 0.0f);
+      light.color = glm::vec4(directional_light.value()->color, 0.0f);
+      light.position = glm::vec4(0);
+      light.position.w = 1.0f;
+      Renderer::add_light(light);
+    }
+
+    if (point_light.has_value()) {
+      Light light{};
+      light.position = glm::vec4(0.0f, 0.0f, 0.0f, 2.0f);
+      light.color = glm::vec4(point_light.value()->color, 0.0f);
+      if (transform.has_value()) {
+	light.position += glm::vec4(transform.value()->position, 0.0f);
+      }
+      Renderer::add_light(light);
+    }
 
     if (mesh.has_value()) {
       auto model_mat = glm::identity<glm::mat4>();

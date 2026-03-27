@@ -4,7 +4,9 @@
 #include <ashfault/renderer/renderer.h>
 #include <ashfault/renderer/swapchain.h>
 #include <ashfault/renderer/vkrenderer.h>
+#include <ashfault/renderer/light.h>
 #include <imgui_impl_vulkan.h>
+#include <spdlog/spdlog.h>
 #include <vulkan/vulkan_core.h>
 
 #include <ashfault/renderer/buffer.hpp>
@@ -42,11 +44,35 @@ struct RendererData {
   std::vector<std::shared_ptr<RenderTarget>> targets;
 
   std::optional<CameraData> camera_data;
+  VkPipelineLayout pipeline_layout;
+  std::vector<VkDescriptorSetLayout> set_layouts;
+  std::pair<VkBuffer, VmaAllocation> light_buffer;
+  void *light_buffer_mapping;
+  std::array<Light, ASHFAULT_MAX_LIGHTS> lights;
+  std::int32_t light_count;
 };
 
 static RendererData s_Data;
+static PFN_vkCmdPushDescriptorSetKHR vkCmdPushDescriptorSetKHR;
 
 void Renderer::create_pipelines() {
+  std::array<VkDescriptorSetLayoutBinding, 1> bindings{};
+  bindings[0] = {.binding = 0,
+                 .descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+                 .descriptorCount = 1,
+                 .stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT};
+
+  VkDescriptorSetLayoutCreateInfo layout_info{};
+  layout_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+  layout_info.bindingCount = bindings.size();
+  layout_info.pBindings = bindings.data();
+  layout_info.flags = VK_DESCRIPTOR_SET_LAYOUT_CREATE_PUSH_DESCRIPTOR_BIT;
+
+  s_Data.set_layouts.resize(1);
+  VK_CHECK_RESULT(vkCreateDescriptorSetLayout(s_Data.render_backend->device(),
+                                              &layout_info, nullptr,
+                                              s_Data.set_layouts.data()));
+
   auto static_vshader =
       s_Data.render_backend->create_shader("blinn_phong.vert.spv");
   auto static_fshader =
@@ -72,10 +98,11 @@ void Renderer::create_pipelines() {
           .vertex_shader(static_vshader)
           .fragment_shader(static_fshader)
           .push_constant(VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(CameraData))
-          .build();
+          .build(s_Data.set_layouts);
 
   s_Data.pipeline_manager->add_graphics_pipeline("blinn_phong",
                                                  static_pipeline);
+  s_Data.pipeline_layout = static_pipeline->layout();
 }
 
 bool Renderer::start_frame() {
@@ -112,14 +139,35 @@ bool Renderer::start_frame() {
 
   s_Data.default_target->begin_rendering(s_Data.image_index,
                                          s_Data.current_frame);
+  std::memcpy(s_Data.light_buffer_mapping, s_Data.lights.data(),
+              sizeof(Light) * s_Data.lights.size());
+  std::memcpy(reinterpret_cast<char *>(s_Data.light_buffer_mapping) +
+                  sizeof(Light) * ASHFAULT_MAX_LIGHTS,
+              &s_Data.light_count, sizeof(std::uint32_t));
+
+  VkDescriptorBufferInfo buffer_info{};
+  buffer_info.buffer = s_Data.light_buffer.first;
+  buffer_info.offset = 0;
+  buffer_info.range = sizeof(Light) * ASHFAULT_MAX_LIGHTS + sizeof(int);
+
+  VkWriteDescriptorSet write{};
+  write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+  write.descriptorCount = 1;
+  write.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+  write.dstBinding = 0;
+  write.dstSet = 0;
+  write.pBufferInfo = &buffer_info;
+  vkCmdPushDescriptorSetKHR(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS,
+                            s_Data.pipeline_layout, 0, 1, &write);
   return true;
 }
 
 void Renderer::end_frame() {
-  s_Data.default_target->end_rendering(s_Data.image_index, s_Data.current_frame,
-                                       true);
   VkCommandBuffer cmd =
       s_Data.default_target->command_buffer(s_Data.current_frame);
+
+  s_Data.default_target->end_rendering(s_Data.image_index, s_Data.current_frame,
+                                       true);
   vkEndCommandBuffer(cmd);
   s_Data.cmd_to_submit.push_back(
       s_Data.default_target->command_buffer(s_Data.current_frame));
@@ -128,6 +176,12 @@ void Renderer::end_frame() {
 void Renderer::init(std::shared_ptr<Window> window) {
   s_Data.render_backend = std::make_shared<VulkanRenderer>();
   s_Data.render_backend->init(window);
+
+  vkCmdPushDescriptorSetKHR =
+      (PFN_vkCmdPushDescriptorSetKHR)vkGetDeviceProcAddr(
+          s_Data.render_backend->device(), "vkCmdPushDescriptorSetKHR");
+  SPDLOG_DEBUG("Loaded `vkCmdPushDescriptorSetKHR` ({})", (void *)vkCmdPushDescriptorSetKHR);
+
   s_Data.swapchain = s_Data.render_backend->swapchain();
   s_Data.pipeline_manager = std::make_unique<PipelineManager>();
   s_Data.current_frame = 0;
@@ -146,7 +200,19 @@ void Renderer::init(std::shared_ptr<Window> window) {
   s_Data.imgui_command_buffers =
       s_Data.render_backend->allocate_command_buffers(
           s_Data.swapchain->image_count());
+  VmaAllocationCreateInfo alloc_info{};
+  alloc_info.flags = VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT |
+                     VMA_ALLOCATION_CREATE_MAPPED_BIT;
+  alloc_info.requiredFlags = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
+                             VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
+  alloc_info.usage = VMA_MEMORY_USAGE_AUTO;
+
+  s_Data.light_buffer = s_Data.render_backend->create_buffer(
+      sizeof(Light) * ASHFAULT_MAX_LIGHTS + sizeof(int),
+      VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, alloc_info);
   Renderer::create_pipelines();
+  vmaMapMemory(s_Data.render_backend->allocator(), s_Data.light_buffer.second,
+               &s_Data.light_buffer_mapping);
 }
 
 void Renderer::submit_imgui_data(ImDrawData *draw_data) {
@@ -166,6 +232,28 @@ void Renderer::push_render_target(std::shared_ptr<RenderTarget> target) {
   vkBeginCommandBuffer(cmd, &begin_info);
 
   target->begin_rendering(s_Data.image_index, s_Data.current_frame);
+
+  std::memcpy(s_Data.light_buffer_mapping, s_Data.lights.data(),
+              sizeof(Light) * s_Data.lights.size());
+  std::memcpy(reinterpret_cast<char *>(s_Data.light_buffer_mapping) +
+                  sizeof(Light) * ASHFAULT_MAX_LIGHTS,
+              &s_Data.light_count, sizeof(std::int32_t));
+
+  VkDescriptorBufferInfo buffer_info{};
+  buffer_info.buffer = s_Data.light_buffer.first;
+  buffer_info.offset = 0;
+  buffer_info.range = sizeof(Light) * ASHFAULT_MAX_LIGHTS + sizeof(int);
+
+  VkWriteDescriptorSet write{};
+  write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+  write.descriptorCount = 1;
+  write.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+  write.dstBinding = 0;
+  write.dstSet = 0;
+  write.pBufferInfo = &buffer_info;
+  vkCmdPushDescriptorSetKHR(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS,
+                            s_Data.pipeline_layout, 0, 1, &write);
+  s_Data.light_count = 0;
 }
 
 void Renderer::pop_render_target() {
@@ -314,4 +402,10 @@ void Renderer::begin_scene(Camera &camera) {
 void Renderer::end_scene() { s_Data.camera_data = std::optional<CameraData>(); }
 
 std::uint32_t Renderer::frame_index() { return s_Data.current_frame; }
+
+void Renderer::add_light(const Light &light) {
+  if (s_Data.light_count < ASHFAULT_MAX_LIGHTS) {
+    s_Data.lights[s_Data.light_count++] = light;
+  }
+}
 }  // namespace ashfault

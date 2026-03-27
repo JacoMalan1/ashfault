@@ -43,7 +43,7 @@ struct ASHFAULT_API SwapchainSupportDetails {
 };
 
 class ASHFAULT_API VulkanRenderer {
- public:
+public:
   VulkanRenderer() = default;
   VulkanRenderer(const VulkanRenderer &) = delete;
   VulkanRenderer &operator=(const VulkanRenderer &) = delete;
@@ -253,9 +253,9 @@ class ASHFAULT_API VulkanRenderer {
                                           buffer, allocation, vertices.size());
   }
 
- private:
+private:
   const std::vector<const char *> s_DeviceExtensions = {
-      VK_KHR_SWAPCHAIN_EXTENSION_NAME};
+      VK_KHR_SWAPCHAIN_EXTENSION_NAME, VK_KHR_PUSH_DESCRIPTOR_EXTENSION_NAME};
 
   std::shared_ptr<Window> m_Window;
   VkInstance m_Instance;

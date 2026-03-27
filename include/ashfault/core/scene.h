@@ -9,6 +9,7 @@
 #include <ashfault/core/registry.hpp>
 #include <glm/glm.hpp>
 #include <vector>
+#include <ashfault/renderer/descriptor_set.h>
 
 namespace ashfault {
 class ASHFAULT_API Scene {

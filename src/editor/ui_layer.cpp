@@ -1,4 +1,5 @@
 #include <ashfault/core/component/script.h>
+#include <ashfault/core/component/light.h>
 #include <ashfault/core/event/mouse_drag.h>
 #include <ashfault/core/event/mouse_scroll.h>
 #include <ashfault/core/event/scene_start.h>
@@ -219,14 +220,12 @@ void render_directory(const std::filesystem::path &path,
                         flags)) {
     for (auto it = begin; it != end; it++) {
       auto path = it->path();
-      if (path.has_filename() &&
-          path.filename().string().starts_with(".")) {
+      if (path.has_filename() && path.filename().string().starts_with(".")) {
         continue;
       }
       if (it->is_directory()) {
         render_directory(path);
-      } else if (path.has_extension() &&
-                 path.extension().string() == ".obj") {
+      } else if (path.has_extension() && path.extension().string() == ".obj") {
         if (ImGui::TreeNodeEx(
                 reinterpret_cast<const char *>(path.filename().c_str()),
                 ImGuiTreeNodeFlags_Leaf)) {
@@ -330,6 +329,11 @@ void EditorUiLayer::render_component_window() {
         scene->component_registry().get_component<MeshComponent>(entity);
     auto script =
         scene->component_registry().get_component<ScriptComponent>(entity);
+    auto directional_light =
+        scene->component_registry().get_component<DirectionalLightComponent>(
+            entity);
+    auto point_light =
+        scene->component_registry().get_component<PointLightComponent>(entity);
     if (ImGui::BeginMenuBar()) {
       if (ImGui::BeginMenu("Add Component")) {
         if (!tag.has_value() && ImGui::MenuItem("Tag")) {
@@ -353,6 +357,25 @@ void EditorUiLayer::render_component_window() {
           ScriptComponent script{
               .script = m_AssetManager->load<Script>("script", "script.lua")};
           scene->component_registry().add_component(entity, script);
+        }
+        if (!directional_light.has_value() &&
+            ImGui::MenuItem("Directional Light")) {
+          DirectionalLightComponent light{
+              .direction = glm::vec3(0.0f, 0.0f, 1.0f),
+              .color = glm::vec3(1.0f)};
+          scene->component_registry().add_component(entity, light);
+        }
+        if (!point_light.has_value() && ImGui::MenuItem("Point Light")) {
+          PointLightComponent light{.position = glm::vec3(0.0f),
+                                    .color = glm::vec3(1.0f)};
+
+          scene->component_registry().add_component(entity, light);
+          if (!transform.has_value()) {
+            TransformComponent transform{.position = glm::vec3(0),
+                                         .rotation = glm::vec3(0),
+                                         .scale = glm::vec3(1)};
+            scene->component_registry().add_component(entity, transform);
+          }
         }
         ImGui::EndMenu();
       }
@@ -438,6 +461,36 @@ void EditorUiLayer::render_component_window() {
         scene->component_registry().remove_component<ScriptComponent>(entity);
       }
     }
+
+    if (directional_light.has_value()) {
+      ImGui::SeparatorText("Directional Light");
+      ImGui::DragFloat3(
+          "Direction##directional_light",
+          reinterpret_cast<float *>(&directional_light.value()->direction),
+          0.01f, -1.0f, 1.0f);
+      ImGui::ColorPicker3(
+          "Color##directional_light",
+          reinterpret_cast<float *>(&directional_light.value()->color),
+          ImGuiColorEditFlags_DisplayHSV | ImGuiColorEditFlags_Float |
+              ImGuiColorEditFlags_InputRGB);
+      if (ImGui::Button("Delete Component##directional_light")) {
+        scene->component_registry().remove_component<DirectionalLightComponent>(
+            entity);
+      }
+    }
+
+    if (point_light.has_value()) {
+      ImGui::SeparatorText("Point Light");
+      ImGui::ColorPicker3(
+          "Color##point_light",
+          reinterpret_cast<float *>(&point_light.value()->color),
+          ImGuiColorEditFlags_DisplayHSV | ImGuiColorEditFlags_Float |
+              ImGuiColorEditFlags_InputRGB);
+      if (ImGui::Button("Delete Component##point_light")) {
+        scene->component_registry().remove_component<PointLightComponent>(
+            entity);
+      }
+    }
   }
   ImGui::End();
 }
@@ -453,8 +506,8 @@ void EditorUiLayer::render_toolbar() {
       EventBus<StateChangeEvent>::get().dispatch(ev);
       m_RuntimeState = State::Play;
       if (m_LayerStack && m_EditorContext->active_scene) {
-	SceneStartEvent ev(m_EditorContext->active_scene);
-	m_LayerStack->on_event(ev);
+        SceneStartEvent ev(m_EditorContext->active_scene);
+        m_LayerStack->on_event(ev);
       }
     }
   } else if (m_RuntimeState == State::Play) {

@@ -22,7 +22,6 @@ GraphicsPipelineBuilder::GraphicsPipelineBuilder(
     VkSampleCountFlagBits msaa_samples)
     : m_VertexShader(),
       m_FragmentShader(),
-      m_DescriptorSets(),
       m_Device(device),
       m_ImageFormat(swapchain_image_format),
       m_MsaaSamples(msaa_samples),
@@ -39,14 +38,8 @@ GraphicsPipelineBuilder &GraphicsPipelineBuilder::push_constant(
   return *this;
 }
 
-std::shared_ptr<GraphicsPipeline> GraphicsPipelineBuilder::build() {
-  std::vector<VkDescriptorSetLayout> dset_layouts;
-  dset_layouts.reserve(this->m_DescriptorSets.size());
-  std::for_each(m_DescriptorSets.begin(), m_DescriptorSets.end(),
-                [&](std::shared_ptr<VulkanDescriptorSet> set) {
-                  dset_layouts.push_back(set->layout());
-                });
-
+std::shared_ptr<GraphicsPipeline> GraphicsPipelineBuilder::build(
+    const std::vector<VkDescriptorSetLayout> &dset_layouts) {
   VkPipelineLayoutCreateInfo pipeline_layout_info{};
   pipeline_layout_info.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
   pipeline_layout_info.setLayoutCount = dset_layouts.size();
@@ -227,15 +220,6 @@ GraphicsPipelineBuilder &GraphicsPipelineBuilder::fragment_shader(
 }
 
 VkPipeline GraphicsPipeline::handle() const { return this->m_Pipeline; }
-
-GraphicsPipelineBuilder &GraphicsPipelineBuilder::descriptor_sets(
-    const std::vector<std::shared_ptr<VulkanDescriptorSet>> &dsets) {
-  std::for_each(dsets.begin(), dsets.end(),
-                [&](std::shared_ptr<VulkanDescriptorSet> set) {
-                  this->m_DescriptorSets.push_back(set);
-                });
-  return *this;
-}
 
 const VkPipelineLayout &GraphicsPipeline::layout() const {
   return this->m_Layout;
