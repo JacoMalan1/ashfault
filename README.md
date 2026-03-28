@@ -17,7 +17,7 @@
   <img src="https://img.shields.io/badge/Status-Active%20Development-success?style=flat-square"/>
   <img src="https://img.shields.io/badge/License-MIT-green?style=flat-square"/>
   <img src="https://img.shields.io/github/v/release/JacoMalan1/ashfault?include_prereleases&style=flat-square" alt="Latest Version"/>
-  <img src="https://github.com/JacoMalan1/ashfault/actions/workflows/push.yml/badge.svg"/>
+  <img src="https://img.shields.io/github/actions/workflow/status/JacoMalan1/ashfault/push.yml?branch=main&style=flat-square&label=Build"/>
 </p>
 
 ## 🛠️ Build Instructions
