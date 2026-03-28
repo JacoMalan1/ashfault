@@ -2,13 +2,24 @@
 #define ASHFAULT_REGISTRY_H
 
 #include <ashfault/core/entity.h>
+#include <spdlog/spdlog.h>
+
 #include <memory>
 #include <optional>
 #include <typeindex>
 #include <unordered_map>
 
+#include <ashfault/ashfault.h>
+
 namespace ashfault {
-template <typename C> class ComponentPool {
+class ASHFAULT_API IComponentPool {
+public:
+  virtual ~IComponentPool() = default;
+  virtual void remove(Entity e) = 0;
+};
+
+template <typename C>
+class ASHFAULT_API ComponentPool : public IComponentPool {
 public:
   ComponentPool() {}
 
@@ -32,41 +43,69 @@ public:
     return m_Components[e.handle()];
   }
 
+  void remove(Entity e) override {
+    SPDLOG_INFO("Removing entity {} from registry {}", e.handle(),
+                typeid(C).name());
+    if (!m_Components.count(e.handle())) {
+      return;
+    }
+
+    auto it = m_Components.find(e.handle());
+    m_Components.erase(it);
+  }
+
 private:
   std::unordered_map<Entity::id_type, C> m_Components;
 };
 
-class ComponentRegistry {
+class ASHFAULT_API ComponentRegistry {
 public:
-  template <typename C> ComponentPool<C> &get_pool() {
+  template <typename C>
+  ComponentPool<C> &get_pool() {
     std::type_index index(typeid(C));
     if (!m_ComponentPools.count(index)) {
       auto pool = std::make_shared<ComponentPool<C>>();
-      m_ComponentPools[index] = std::static_pointer_cast<void>(pool);
+      m_ComponentPools[index] = std::static_pointer_cast<IComponentPool>(pool);
       return *pool;
     }
 
     return *std::static_pointer_cast<ComponentPool<C>>(m_ComponentPools[index]);
   }
 
-  template <typename C> void add_component(Entity e, const C &component) {
+  template <typename C>
+  void add_component(Entity e, const C &component) {
     ComponentPool<C> &pool = this->get_pool<C>();
     pool.add(e, component);
   }
 
-  template <typename C> std::optional<C *> get_component(Entity e) {
+  template <typename C>
+  std::optional<C *> get_component(Entity e) {
     ComponentPool<C> &pool = this->get_pool<C>();
     return pool.get(e);
   }
 
-  template <typename C> std::optional<const C *> get_component(Entity e) const {
+  template <typename C>
+  std::optional<const C *> get_component(Entity e) const {
     ComponentPool<C> &pool = this->get_pool<C>();
     return pool.get(e);
+  }
+
+  template <typename C>
+  void remove_component(Entity e) {
+    ComponentPool<C> &pool = this->get_pool<C>();
+    pool.remove(e);
+  }
+
+  void delete_entity(Entity e) {
+    for (auto x : m_ComponentPools) {
+      x.second->remove(e);
+    }
   }
 
 private:
-  std::unordered_map<std::type_index, std::shared_ptr<void>> m_ComponentPools;
+  std::unordered_map<std::type_index, std::shared_ptr<IComponentPool>>
+      m_ComponentPools;
 };
-} // namespace ashfault
+}  // namespace ashfault
 
 #endif

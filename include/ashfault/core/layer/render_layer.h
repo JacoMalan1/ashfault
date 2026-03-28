@@ -9,14 +9,14 @@
 
 namespace ashfault {
 class ASHFAULT_API RenderLayer : public Layer {
- public:
+public:
   RenderLayer();
 
-  void on_attach(LayerStack*) override;
+  void on_attach(LayerStack *) override;
   void on_detach() override;
   void on_update(float dt) override;
   void on_render() override;
-  void on_event(Event& event) override;
+  void on_event(Event &event) override;
 };
 }  // namespace ashfault
 

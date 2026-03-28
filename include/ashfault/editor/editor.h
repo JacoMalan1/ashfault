@@ -13,9 +13,8 @@
 
 namespace ashfault::editor {
 class ASHFAULT_API Editor : public Application {
- public:
+public:
   Editor(std::shared_ptr<Window> window);
-  ~Editor();
   void run() override;
 };
 }  // namespace ashfault::editor

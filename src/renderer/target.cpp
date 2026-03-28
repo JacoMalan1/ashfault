@@ -3,16 +3,16 @@
 
 #include <memory>
 
-#include "ashfault/renderer/buffer.hpp"
+#include <ashfault/renderer/buffer.hpp>
 
 namespace ashfault {
 RenderTarget::RenderTarget(
     std::shared_ptr<VulkanRenderer> renderer,
-    const std::optional<std::pair<VkImage, VmaAllocation>>& depth_image,
-    std::optional<VkImageView> depth_view, const std::vector<VkImage>& images,
-    const std::vector<VkImageView>& image_views,
-    const std::optional<std::vector<VmaAllocation>>& allocations,
-    const std::vector<VkCommandBuffer>& command_buffers, VkRect2D render_area)
+    const std::optional<std::pair<VkImage, VmaAllocation>> &depth_image,
+    std::optional<VkImageView> depth_view, const std::vector<VkImage> &images,
+    const std::vector<VkImageView> &image_views,
+    const std::optional<std::vector<VmaAllocation>> &allocations,
+    const std::vector<VkCommandBuffer> &command_buffers, VkRect2D render_area)
     : m_Renderer(renderer),
       m_Images(images),
       m_ImageViews(image_views),
@@ -22,7 +22,7 @@ RenderTarget::RenderTarget(
       m_DepthView(depth_view),
       m_RenderArea(render_area) {}
 
-RenderTarget::~RenderTarget() {
+void RenderTarget::destroy() {
   vkDeviceWaitIdle(m_Renderer->device());
   if (m_DepthImage.has_value()) {
     vkDestroyImageView(m_Renderer->device(), m_DepthView.value(), nullptr);
@@ -36,13 +36,16 @@ RenderTarget::~RenderTarget() {
                       m_ImageAllocations.value()[i]);
     }
 
-    for (auto& view : m_ImageViews) {
+    for (auto &view : m_ImageViews) {
       vkDestroyImageView(m_Renderer->device(), view, nullptr);
     }
   }
+
+  vkFreeCommandBuffers(m_Renderer->device(), m_Renderer->command_pool(),
+                       m_CommandBuffers.size(), m_CommandBuffers.data());
 }
 
-VkCommandBuffer& RenderTarget::command_buffer(std::uint32_t idx) {
+VkCommandBuffer &RenderTarget::command_buffer(std::uint32_t idx) {
   return this->m_CommandBuffers[idx];
 }
 
@@ -58,7 +61,7 @@ void RenderTarget::begin_rendering(std::uint32_t image_index,
 
   VkRenderingAttachmentInfo color_attachment{};
   color_attachment.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
-  color_attachment.clearValue.color = {{0.0f, 0.0f, 0.0f, 1.0f}};
+  color_attachment.clearValue.color = {{0.03f, 0.03f, 0.03f, 1.0f}};
   color_attachment.imageView = image_view(image_index);
   color_attachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
   color_attachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
@@ -75,7 +78,7 @@ void RenderTarget::begin_rendering(std::uint32_t image_index,
 
   if (m_DepthImage.has_value()) {
     depth_attachment.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
-    depth_attachment.clearValue.depthStencil = {1.0f, 0};
+    depth_attachment.clearValue.depthStencil = {1.0f, 1};
     depth_attachment.imageLayout = VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL;
     depth_attachment.imageView = m_DepthView.value();
     depth_attachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
@@ -168,9 +171,9 @@ void RenderTarget::end_rendering(std::uint32_t image_index,
 }
 
 void RenderTarget::update_images(
-    const std::vector<VkImage>& images,
-    const std::vector<VkImageView>& image_views,
-    const std::optional<std::vector<VmaAllocation>>& allocations) {
+    const std::vector<VkImage> &images,
+    const std::vector<VkImageView> &image_views,
+    const std::optional<std::vector<VmaAllocation>> &allocations) {
   vkDeviceWaitIdle(m_Renderer->device());
   if (m_ImageAllocations.has_value()) {
     for (std::size_t i = 0; i < m_Images.size(); i++) {

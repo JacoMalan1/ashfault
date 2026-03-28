@@ -1,0 +1,32 @@
+#ifndef ASHFAULT_SCRIPT_H
+#define ASHFAULT_SCRIPT_H
+
+#include <ashfault/ashfault.h>
+#include <ashfault/core/entity.h>
+#include <ashfault/core/asset_manager.hpp>
+#include <optional>
+#include <string>
+#include <sol/sol.hpp>
+
+namespace ashfault {
+class ASHFAULT_API Script : public IAsset {
+public:
+  Script(const std::string &source);
+  void destroy() override;
+
+  void init(sol::state &lua);
+
+  void on_scene_start(std::optional<Entity> entity);
+  void on_update(float dt, std::optional<Entity> entity);
+  bool is_initialized() const;
+
+private:
+  bool m_Initialized;
+  std::string m_Source;
+  sol::environment m_Environment;
+  std::optional<sol::function> m_OnSceneStart;
+  sol::function m_OnUpdate;
+};
+}  // namespace ashfault
+
+#endif

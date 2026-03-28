@@ -8,7 +8,7 @@
 #include <vector>
 
 namespace ashfault {
-VulkanShader::VulkanShader(VkDevice device, const std::string& path)
+VulkanShader::VulkanShader(VkDevice device, const std::string &path)
     : m_Module(VK_NULL_HANDLE), m_Device(device) {
   std::ifstream fs(path.c_str(), std::ios_base::binary | std::ios_base::in);
 

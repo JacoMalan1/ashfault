@@ -10,7 +10,7 @@ GraphicsPipeline::GraphicsPipeline(VkDevice device, VkPipelineLayout layout,
                                    VkPipeline pipeline)
     : m_Layout(layout), m_Pipeline(pipeline), m_Device(device) {}
 
-GraphicsPipeline::~GraphicsPipeline() {
+void GraphicsPipeline::destroy() {
   vkDeviceWaitIdle(this->m_Device);
   vkDestroyPipeline(this->m_Device, this->m_Pipeline, nullptr);
   vkDestroyPipelineLayout(this->m_Device, this->m_Layout, nullptr);
@@ -22,13 +22,12 @@ GraphicsPipelineBuilder::GraphicsPipelineBuilder(
     VkSampleCountFlagBits msaa_samples)
     : m_VertexShader(),
       m_FragmentShader(),
-      m_DescriptorSets(),
       m_Device(device),
       m_ImageFormat(swapchain_image_format),
       m_MsaaSamples(msaa_samples),
       m_WindowDims(std::move(window_dims)) {}
 
-GraphicsPipelineBuilder& GraphicsPipelineBuilder::push_constant(
+GraphicsPipelineBuilder &GraphicsPipelineBuilder::push_constant(
     VkShaderStageFlags stage, VkDeviceSize offset, VkDeviceSize size) {
   VkPushConstantRange range{};
   range.stageFlags = stage;
@@ -39,14 +38,8 @@ GraphicsPipelineBuilder& GraphicsPipelineBuilder::push_constant(
   return *this;
 }
 
-std::shared_ptr<GraphicsPipeline> GraphicsPipelineBuilder::build() {
-  std::vector<VkDescriptorSetLayout> dset_layouts;
-  dset_layouts.reserve(this->m_DescriptorSets.size());
-  std::for_each(m_DescriptorSets.begin(), m_DescriptorSets.end(),
-                [&](std::shared_ptr<VulkanDescriptorSet> set) {
-                  dset_layouts.push_back(set->layout());
-                });
-
+std::shared_ptr<GraphicsPipeline> GraphicsPipelineBuilder::build(
+    const std::vector<VkDescriptorSetLayout> &dset_layouts) {
   VkPipelineLayoutCreateInfo pipeline_layout_info{};
   pipeline_layout_info.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
   pipeline_layout_info.setLayoutCount = dset_layouts.size();
@@ -141,7 +134,7 @@ std::shared_ptr<GraphicsPipeline> GraphicsPipelineBuilder::build() {
 
   VkPipelineRasterizationStateCreateInfo rasterizer{};
   rasterizer.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
-  rasterizer.cullMode = VK_CULL_MODE_BACK_BIT;
+  rasterizer.cullMode = VK_CULL_MODE_NONE;
   rasterizer.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
   rasterizer.polygonMode = VK_POLYGON_MODE_FILL;
   rasterizer.lineWidth = 1.0f;
@@ -196,8 +189,8 @@ std::shared_ptr<GraphicsPipeline> GraphicsPipelineBuilder::build() {
                                             pipeline);
 }
 
-GraphicsPipelineBuilder& GraphicsPipelineBuilder::input_attribute_descriptions(
-    const std::vector<VkVertexInputAttributeDescription>& descriptions,
+GraphicsPipelineBuilder &GraphicsPipelineBuilder::input_attribute_descriptions(
+    const std::vector<VkVertexInputAttributeDescription> &descriptions,
     std::uint32_t stride) {
   this->m_VertexAttributes.reserve(descriptions.size());
   std::for_each(descriptions.begin(), descriptions.end(),
@@ -208,19 +201,19 @@ GraphicsPipelineBuilder& GraphicsPipelineBuilder::input_attribute_descriptions(
   return *this;
 }
 
-GraphicsPipelineBuilder& GraphicsPipelineBuilder::input_assembly_state(
+GraphicsPipelineBuilder &GraphicsPipelineBuilder::input_assembly_state(
     VkPipelineInputAssemblyStateCreateInfo assembly_state) {
   this->m_AssemblyState = assembly_state;
   return *this;
 }
 
-GraphicsPipelineBuilder& GraphicsPipelineBuilder::vertex_shader(
+GraphicsPipelineBuilder &GraphicsPipelineBuilder::vertex_shader(
     std::shared_ptr<VulkanShader> shader) {
   this->m_VertexShader = shader;
   return *this;
 }
 
-GraphicsPipelineBuilder& GraphicsPipelineBuilder::fragment_shader(
+GraphicsPipelineBuilder &GraphicsPipelineBuilder::fragment_shader(
     std::shared_ptr<VulkanShader> shader) {
   this->m_FragmentShader = shader;
   return *this;
@@ -228,18 +221,9 @@ GraphicsPipelineBuilder& GraphicsPipelineBuilder::fragment_shader(
 
 VkPipeline GraphicsPipeline::handle() const { return this->m_Pipeline; }
 
-GraphicsPipelineBuilder& GraphicsPipelineBuilder::descriptor_sets(
-    const std::vector<std::shared_ptr<VulkanDescriptorSet>>& dsets) {
-  std::for_each(dsets.begin(), dsets.end(),
-                [&](std::shared_ptr<VulkanDescriptorSet> set) {
-                  this->m_DescriptorSets.push_back(set);
-                });
-  return *this;
-}
-
-const VkPipelineLayout& GraphicsPipeline::layout() const {
+const VkPipelineLayout &GraphicsPipeline::layout() const {
   return this->m_Layout;
 }
 
-VkPipelineLayout& GraphicsPipeline::layout() { return this->m_Layout; }
+VkPipelineLayout &GraphicsPipeline::layout() { return this->m_Layout; }
 }  // namespace ashfault

@@ -6,7 +6,7 @@
 
 namespace ashfault {
 class ASHFAULT_API KeyPressEvent : public Event {
- public:
+public:
   KeyPressEvent(int key_code, int action);
   ~KeyPressEvent() = default;
 
@@ -17,7 +17,7 @@ class ASHFAULT_API KeyPressEvent : public Event {
   int key_code() const;
   int action() const;
 
- private:
+private:
   int m_KeyCode, m_Action;
 };
 }  // namespace ashfault

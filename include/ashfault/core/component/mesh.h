@@ -4,12 +4,12 @@
 #include <ashfault/ashfault.h>
 #include <ashfault/core/mesh.h>
 
+#include <ashfault/core/asset_manager.hpp>
 #include <ashfault/renderer/buffer.hpp>
-#include <memory>
 
 namespace ashfault {
 struct ASHFAULT_API MeshComponent {
-  std::shared_ptr<Mesh> mesh;
+  Asset<Mesh> mesh;
 };
 }  // namespace ashfault
 

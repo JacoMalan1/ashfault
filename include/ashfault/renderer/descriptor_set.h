@@ -15,7 +15,7 @@ class VulkanDescriptorSet;
 class VulkanDescriptorPool;
 
 class ASHFAULT_API VulkanDescriptorSetBuilder {
- public:
+public:
   explicit VulkanDescriptorSetBuilder(VkDevice device);
 
   /// @brief Adds a binding to the descriptor set being built.
@@ -24,7 +24,7 @@ class ASHFAULT_API VulkanDescriptorSetBuilder {
   /// @param stage_flags The shader stages that will use this binding.
   /// @param descriptor_count How many descriptors to create.
   /// @param binding The binding index.
-  VulkanDescriptorSetBuilder& add_binding(VkDescriptorType type,
+  VulkanDescriptorSetBuilder &add_binding(VkDescriptorType type,
                                           VkShaderStageFlags stage_flags,
                                           std::uint32_t descriptor_count,
                                           std::uint32_t binding);
@@ -34,24 +34,24 @@ class ASHFAULT_API VulkanDescriptorSetBuilder {
             std::shared_ptr<VulkanDescriptorPool>>
   build();
 
- private:
+private:
   std::vector<VkDescriptorSetLayoutBinding> m_Bindings;
   VkDevice m_Device;
 };
 
 class ASHFAULT_API VulkanDescriptorSet {
- public:
+public:
   VulkanDescriptorSet(VkDevice device, VkDescriptorSet descriptor_set,
                       VkDescriptorSetLayout layout);
 
-  VkDescriptorSetLayout& layout();
-  const VkDescriptorSetLayout& layout() const;
+  VkDescriptorSetLayout &layout();
+  const VkDescriptorSetLayout &layout() const;
 
-  const VkDescriptorSet& handle() const;
-  VkDescriptorSet& handle();
+  const VkDescriptorSet &handle() const;
+  VkDescriptorSet &handle();
 
-  VulkanDescriptorSet(const VulkanDescriptorSet&) = delete;
-  VulkanDescriptorSet& operator=(const VulkanDescriptorSet&) = delete;
+  VulkanDescriptorSet(const VulkanDescriptorSet &) = delete;
+  VulkanDescriptorSet &operator=(const VulkanDescriptorSet &) = delete;
   ~VulkanDescriptorSet();
 
   template <class T>
@@ -74,7 +74,7 @@ class ASHFAULT_API VulkanDescriptorSet {
     vkUpdateDescriptorSets(this->m_Device, 1, &write, 0, nullptr);
   }
 
- private:
+private:
   VmaAllocator m_Allocator;
   VkDevice m_Device;
   VkDescriptorSet m_DescriptorSet;
@@ -82,14 +82,14 @@ class ASHFAULT_API VulkanDescriptorSet {
 };
 
 class ASHFAULT_API VulkanDescriptorPool {
- public:
+public:
   VulkanDescriptorPool(VkDevice device, VkDescriptorPool pool);
 
-  VulkanDescriptorPool(const VulkanDescriptorPool&) = delete;
-  VulkanDescriptorPool& operator=(const VulkanDescriptorPool&) = delete;
+  VulkanDescriptorPool(const VulkanDescriptorPool &) = delete;
+  VulkanDescriptorPool &operator=(const VulkanDescriptorPool &) = delete;
   ~VulkanDescriptorPool();
 
- private:
+private:
   VkDescriptorPool m_Pool;
   VkDevice m_Device;
 };

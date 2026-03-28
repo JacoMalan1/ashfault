@@ -3,22 +3,30 @@
 
 #include <ashfault/ashfault.h>
 #include <ashfault/core/entity.h>
+#include <ashfault/core/mesh.h>
 #include <vulkan/vulkan.h>
 
 #include <ashfault/core/registry.hpp>
 #include <glm/glm.hpp>
 #include <vector>
+#include <ashfault/renderer/descriptor_set.h>
 
 namespace ashfault {
 class ASHFAULT_API Scene {
- public:
+public:
   Scene();
 
   Entity create_entity();
-  ComponentRegistry& component_registry();
-  const ComponentRegistry& component_registry() const;
+  void delete_entity(Entity e);
+  ComponentRegistry &component_registry();
+  const ComponentRegistry &component_registry() const;
 
- private:
+  void draw_all();
+  const std::vector<Entity> &entities() const;
+
+  std::optional<Entity> get_entity(Entity::id_type id);
+
+private:
   Entity::id_type m_NextEntityId;
   ComponentRegistry m_ComponentRegistry;
   std::vector<Entity> m_Entities;
