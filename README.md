@@ -59,7 +59,7 @@ A helper script is provided to configure and build the project:
 
 #### Release build
 ```bash
-./scripts/build.sh --release
+./scripts/build.sh -r
 ```
 
 ---
