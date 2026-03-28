@@ -10,16 +10,19 @@ jobs:
   lint:
     name: clang-format
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        path:
+          - 'src'
+          - 'include'
     steps:
       - name: Checkout
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: Install dependencies
-        run: |
-          sudo apt update
-          sudo apt install clang
-
-      - name: Run clang-format
-        run: find -type f -regextype egrep -regex '^\.\/(src|include)\/(\w*\/)*\w*\.(cpp|h)$' -exec sh -c 'clang-format --style=file:.clang-format --dry-run -Werror "$@" || exit 1' sh {} +
+      - name: Check formatting
+        uses: jidicula/clang-format-check@v4.18.0
+        with:
+          clang-format-version: '22'
+          check-path: ${{ matrix.path }}

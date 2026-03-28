@@ -105,7 +105,7 @@ void Renderer::create_pipelines() {
   layout_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
   layout_info.bindingCount = bindings.size();
   layout_info.pBindings = bindings.data();
-  layout_info.flags = VK_DESCRIPTOR_SET_LAYOUT_CREATE_PUSH_DESCRIPTOR_BIT;
+  layout_info.flags = VK_DESCRIPTOR_SET_LAYOUT_CREATE_PUSH_DESCRIPTOR_BIT_KHR;
 
   s_Data.push_descriptor_layouts.resize(bindings.size());
   VK_CHECK_RESULT(vkCreateDescriptorSetLayout(

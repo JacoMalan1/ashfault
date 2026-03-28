@@ -33,9 +33,7 @@
     }                                                                      \
   }
 
-#ifdef ASHFAULT_VK_VALIDATION
 #include <spdlog/spdlog.h>
-#endif
 
 namespace ashfault {
 class ASHFAULT_API Swapchain;
@@ -315,10 +313,8 @@ private:
   choose_physical_device();
   SwapchainSupportDetails query_swapchain_support(VkPhysicalDevice device);
 
-#ifdef ASHFAULT_VK_VALIDATION
   std::shared_ptr<spdlog::logger> m_VkDebugLogger;
   VkDebugUtilsMessengerEXT m_DebugMessenger;
-#endif
 };
 }  // namespace ashfault
 
