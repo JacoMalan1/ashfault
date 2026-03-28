@@ -5,11 +5,8 @@
 namespace ashfault {
 class ASHFAULT_API State {
 public:
-  enum RuntimeState {
-    Edit = 0,
-    Play
-  };
+  enum RuntimeState { Edit = 0, Play };
 };
-}
+}  // namespace ashfault
 
 #endif

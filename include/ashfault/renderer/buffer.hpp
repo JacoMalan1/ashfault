@@ -10,23 +10,27 @@
 
 namespace ashfault {
 /// @private
-template <class I> class index_type;
+template <class I>
+class index_type;
 
 /// @private
-template <> class index_type<std::uint32_t> {
+template <>
+class index_type<std::uint32_t> {
 public:
   static const VkIndexType value = VK_INDEX_TYPE_UINT32;
 };
 
 /// @private
-template <> class index_type<std::uint16_t> {
+template <>
+class index_type<std::uint16_t> {
 public:
   static const VkIndexType value = VK_INDEX_TYPE_UINT16;
 };
 
 #ifdef VK_INDEX_TYPE_UINT8
 /// @private
-template <> class index_type<std::uint8_t> {
+template <>
+class index_type<std::uint8_t> {
 public:
   static const VkIndexType value = VK_INDEX_TYPE_UINT8;
 };
@@ -36,7 +40,11 @@ class ASHFAULT_API VulkanBuffer {
 public:
   VulkanBuffer(VkDevice device, VmaAllocator allocator, VkBuffer buffer,
                VmaAllocation allocation, std::size_t count)
-      : m_Device(device), m_Allocator(allocator), m_Buffer(buffer), m_Allocation(allocation), m_Count(count) {}
+      : m_Device(device),
+        m_Allocator(allocator),
+        m_Buffer(buffer),
+        m_Allocation(allocation),
+        m_Count(count) {}
 
   VulkanBuffer(const VulkanBuffer &) = delete;
   VulkanBuffer &operator=(const VulkanBuffer &) = delete;
@@ -64,6 +72,6 @@ private:
   VmaAllocation m_Allocation;
   std::size_t m_Count;
 };
-} // namespace ashfault
+}  // namespace ashfault
 
 #endif

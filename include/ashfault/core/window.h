@@ -18,7 +18,7 @@ struct ASHFAULT_API WindowDims {
 };
 
 class ASHFAULT_API Window {
- public:
+public:
   Window(std::uint32_t width, std::uint32_t height, bool fullscreen = true);
   Window(const Window &) = delete;
   Window &operator=(const Window &) = delete;
@@ -36,7 +36,7 @@ class ASHFAULT_API Window {
   void set_key_callback(
       std::function<void(Window &, int, int, int, int)> callback);
 
- private:
+private:
   void attach_pointer();
 
   GLFWwindow *m_Handle;

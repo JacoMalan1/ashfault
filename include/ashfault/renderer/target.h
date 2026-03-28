@@ -14,7 +14,7 @@
 
 namespace ashfault {
 class ASHFAULT_API RenderTarget {
- public:
+public:
   RenderTarget(
       std::shared_ptr<VulkanRenderer> renderer,
       const std::optional<std::pair<VkImage, VmaAllocation>> &depth_image,
@@ -40,7 +40,7 @@ class ASHFAULT_API RenderTarget {
   void update_depth_image(std::pair<VkImage, VmaAllocation> image,
                           VkImageView view);
 
- private:
+private:
   std::shared_ptr<VulkanRenderer> m_Renderer;
   std::vector<VkImage> m_Images;
   std::vector<VkImageView> m_ImageViews;

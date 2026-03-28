@@ -93,9 +93,8 @@ void ScriptLayer::bind_engine_functions() {
       "direction", &DirectionalLightComponent::direction, "color",
       &DirectionalLightComponent::color);
   m_LuaState.new_usertype<PointLightComponent>(
-      "PointLight", sol::constructors<PointLightComponent()>(),
-      "position", &PointLightComponent::position, "color",
-      &PointLightComponent::color);
+      "PointLight", sol::constructors<PointLightComponent()>(), "position",
+      &PointLightComponent::position, "color", &PointLightComponent::color);
 
   register_ecs_component<TransformComponent>("Transform");
   register_ecs_component<TagComponent>("Tag");

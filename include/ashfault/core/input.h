@@ -12,7 +12,7 @@ typedef int Key;
 typedef int MouseButton;
 
 class ASHFAULT_API Input {
- public:
+public:
   Input(std::shared_ptr<Window> window);
 
   bool is_key_down(Key key_code);
@@ -20,7 +20,7 @@ class ASHFAULT_API Input {
 
   void frame_start();
 
- private:
+private:
   std::shared_ptr<Window> m_Window;
   std::array<bool, GLFW_KEY_LAST> m_Keys;
 };

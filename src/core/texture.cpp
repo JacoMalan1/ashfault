@@ -3,9 +3,7 @@
 namespace ashfault {
 Texture::Texture(std::uint32_t index) : m_Index(index) {}
 
-std::uint32_t Texture::index() const {
-  return m_Index;
-}
+std::uint32_t Texture::index() const { return m_Index; }
 
-void Texture::destroy() { }
-}
+void Texture::destroy() {}
+}  // namespace ashfault

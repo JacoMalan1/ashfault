@@ -8,7 +8,8 @@
 namespace ashfault {
 class VulkanTexture {
 public:
-  VulkanTexture(std::pair<VkImage, VmaAllocation> image, VkImageView image_view, VkDevice device, VmaAllocator allocator);
+  VulkanTexture(std::pair<VkImage, VmaAllocation> image, VkImageView image_view,
+                VkDevice device, VmaAllocator allocator);
 
   void destroy();
 
@@ -21,6 +22,6 @@ private:
   VkDevice m_Device;
   VmaAllocator m_Allocator;
 };
-}
+}  // namespace ashfault
 
 #endif

@@ -9,7 +9,7 @@
 
 namespace ashfault {
 class ASHFAULT_API RenderLayer : public Layer {
- public:
+public:
   RenderLayer();
 
   void on_attach(LayerStack *) override;

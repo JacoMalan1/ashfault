@@ -6,7 +6,7 @@
 
 namespace ashfault {
 class ASHFAULT_API MouseDragEvent : public Event {
- public:
+public:
   enum MouseButton { Left, Right, Middle };
 
   MouseDragEvent(MouseButton button, float x, float y);
@@ -21,7 +21,7 @@ class ASHFAULT_API MouseDragEvent : public Event {
   float delta_x() const;
   float delta_y() const;
 
- private:
+private:
   float m_DeltaX, m_DeltaY;
   MouseButton m_Button;
 };

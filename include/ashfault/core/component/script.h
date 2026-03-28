@@ -9,6 +9,6 @@ namespace ashfault {
 struct ASHFAULT_API ScriptComponent {
   Asset<Script> script;
 };
-}
+}  // namespace ashfault
 
 #endif

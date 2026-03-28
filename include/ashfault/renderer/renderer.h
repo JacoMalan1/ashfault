@@ -53,7 +53,7 @@ public:
   static std::uint32_t frame_index();
 
   static int upload_texture(const char *pixels, std::uint32_t width,
-                                      std::uint32_t height);
+                            std::uint32_t height);
 
 private:
   static void create_pipelines();

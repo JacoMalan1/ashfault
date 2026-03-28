@@ -7,6 +7,6 @@ namespace ashfault {
 struct MaterialComponent {
   Material material;
 };
-}
+}  // namespace ashfault
 
 #endif

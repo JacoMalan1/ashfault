@@ -8,7 +8,7 @@ namespace ashfault {
 class LayerStack;
 
 class ASHFAULT_API Layer {
- public:
+public:
   Layer();
   virtual ~Layer() = default;
 
@@ -23,7 +23,7 @@ class ASHFAULT_API Layer {
   bool is_enabled() const;
   void set_enabled(bool enabled);
 
- protected:
+protected:
   bool m_Enabled;
   LayerStack *m_LayerStack;
 };

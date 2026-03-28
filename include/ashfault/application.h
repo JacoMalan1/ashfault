@@ -10,13 +10,13 @@
 
 namespace ashfault {
 class ASHFAULT_API Application {
- public:
+public:
   Application(std::shared_ptr<Window> window);
   virtual ~Application() = default;
 
   virtual void run();
 
- protected:
+protected:
   std::shared_ptr<Window> m_Window;
   std::shared_ptr<Input> m_Input;
   LayerStack *m_LayerStack;

@@ -22,4 +22,4 @@ std::shared_ptr<Script> ScriptLoader::read(const std::string &path) {
   fs.close();
   return std::make_shared<Script>(contents);
 }
-}
+}  // namespace ashfault

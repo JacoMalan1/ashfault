@@ -15,7 +15,7 @@ class VulkanDescriptorSet;
 class VulkanDescriptorPool;
 
 class ASHFAULT_API VulkanDescriptorSetBuilder {
- public:
+public:
   explicit VulkanDescriptorSetBuilder(VkDevice device);
 
   /// @brief Adds a binding to the descriptor set being built.
@@ -34,13 +34,13 @@ class ASHFAULT_API VulkanDescriptorSetBuilder {
             std::shared_ptr<VulkanDescriptorPool>>
   build();
 
- private:
+private:
   std::vector<VkDescriptorSetLayoutBinding> m_Bindings;
   VkDevice m_Device;
 };
 
 class ASHFAULT_API VulkanDescriptorSet {
- public:
+public:
   VulkanDescriptorSet(VkDevice device, VkDescriptorSet descriptor_set,
                       VkDescriptorSetLayout layout);
 
@@ -74,7 +74,7 @@ class ASHFAULT_API VulkanDescriptorSet {
     vkUpdateDescriptorSets(this->m_Device, 1, &write, 0, nullptr);
   }
 
- private:
+private:
   VmaAllocator m_Allocator;
   VkDevice m_Device;
   VkDescriptorSet m_DescriptorSet;
@@ -82,14 +82,14 @@ class ASHFAULT_API VulkanDescriptorSet {
 };
 
 class ASHFAULT_API VulkanDescriptorPool {
- public:
+public:
   VulkanDescriptorPool(VkDevice device, VkDescriptorPool pool);
 
   VulkanDescriptorPool(const VulkanDescriptorPool &) = delete;
   VulkanDescriptorPool &operator=(const VulkanDescriptorPool &) = delete;
   ~VulkanDescriptorPool();
 
- private:
+private:
   VkDescriptorPool m_Pool;
   VkDevice m_Device;
 };

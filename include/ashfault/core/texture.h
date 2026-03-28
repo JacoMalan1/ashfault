@@ -15,6 +15,6 @@ public:
 private:
   std::uint32_t m_Index;
 };
-}
+}  // namespace ashfault
 
 #endif

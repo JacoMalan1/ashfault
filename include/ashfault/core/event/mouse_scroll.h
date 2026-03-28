@@ -6,7 +6,7 @@
 
 namespace ashfault {
 class ASHFAULT_API MouseScrollEvent : public Event {
- public:
+public:
   MouseScrollEvent(float delta);
   ~MouseScrollEvent() = default;
 
@@ -16,7 +16,7 @@ class ASHFAULT_API MouseScrollEvent : public Event {
 
   float delta() const;
 
- private:
+private:
   float m_Delta;
 };
 }  // namespace ashfault

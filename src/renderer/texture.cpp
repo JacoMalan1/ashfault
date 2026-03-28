@@ -4,8 +4,12 @@
 
 namespace ashfault {
 VulkanTexture::VulkanTexture(std::pair<VkImage, VmaAllocation> image,
-                             VkImageView image_view, VkDevice device, VmaAllocator allocator)
-    : m_Image(image), m_ImageView(image_view), m_Device(device), m_Allocator(allocator) {}
+                             VkImageView image_view, VkDevice device,
+                             VmaAllocator allocator)
+    : m_Image(image),
+      m_ImageView(image_view),
+      m_Device(device),
+      m_Allocator(allocator) {}
 
 VkImage &VulkanTexture::image() { return m_Image.first; }
 

@@ -92,11 +92,7 @@ void PerspectiveCamera::set_orientation(glm::quat orientation) {
   m_Orientation = orientation;
 }
 
-glm::mat4 OrthoCamera::projection() {
-  return glm::identity<glm::mat4>();
-}
+glm::mat4 OrthoCamera::projection() { return glm::identity<glm::mat4>(); }
 
-glm::mat4 OrthoCamera::view() {
-  return glm::identity<glm::mat4>();
-}
+glm::mat4 OrthoCamera::view() { return glm::identity<glm::mat4>(); }
 }  // namespace ashfault

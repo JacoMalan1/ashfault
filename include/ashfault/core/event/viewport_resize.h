@@ -8,7 +8,7 @@
 
 namespace ashfault {
 class ASHFAULT_API ViewportResizeEvent : public Event {
- public:
+public:
   ViewportResizeEvent(std::uint32_t width, std::uint32_t height);
   ~ViewportResizeEvent() = default;
 
@@ -19,7 +19,7 @@ class ASHFAULT_API ViewportResizeEvent : public Event {
   std::uint32_t width() const;
   std::uint32_t height() const;
 
- private:
+private:
   std::uint32_t m_Width, m_Height;
 };
 }  // namespace ashfault

@@ -9,7 +9,7 @@ Application::Application(std::shared_ptr<Window> window)
       m_LayerStack(new LayerStack()),
       m_AssetManager(std::make_shared<AssetManager>()) {}
 
-void Application::run() { 
+void Application::run() {
   Renderer::init(m_Window);
 
   while (!m_Window->should_close()) {

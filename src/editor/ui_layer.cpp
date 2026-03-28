@@ -47,7 +47,8 @@ EditorUiLayer::~EditorUiLayer() {
   for (auto tex : m_ViewportTextures) {
     ImGui_ImplVulkan_RemoveTexture(tex);
   }
-  vkDestroySampler(Renderer::vulkan_backend().device(), m_ViewportSampler, nullptr);
+  vkDestroySampler(Renderer::vulkan_backend().device(), m_ViewportSampler,
+                   nullptr);
 }
 
 void EditorUiLayer::on_attach(LayerStack *stack) {

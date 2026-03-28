@@ -10,7 +10,7 @@
 
 namespace ashfault {
 class ASHFAULT_API ShaderManager {
- public:
+public:
   ShaderManager();
 
   void add_vertex_shader(VulkanRenderer *renderer, const std::string &path,
@@ -23,7 +23,7 @@ class ASHFAULT_API ShaderManager {
   std::optional<std::shared_ptr<VulkanShader>> get_fragment_shader(
       const std::string &name);
 
- private:
+private:
   std::unordered_map<std::string, std::shared_ptr<VulkanShader>>
       m_VertexShaders;
   std::unordered_map<std::string, std::shared_ptr<VulkanShader>>

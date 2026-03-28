@@ -8,6 +8,6 @@ struct Light {
   glm::vec4 direction;
   glm::vec4 color;
 };
-}
+}  // namespace ashfault
 
 #endif

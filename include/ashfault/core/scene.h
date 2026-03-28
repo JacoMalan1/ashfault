@@ -13,7 +13,7 @@
 
 namespace ashfault {
 class ASHFAULT_API Scene {
- public:
+public:
   Scene();
 
   Entity create_entity();
@@ -26,7 +26,7 @@ class ASHFAULT_API Scene {
 
   std::optional<Entity> get_entity(Entity::id_type id);
 
- private:
+private:
   Entity::id_type m_NextEntityId;
   ComponentRegistry m_ComponentRegistry;
   std::vector<Entity> m_Entities;

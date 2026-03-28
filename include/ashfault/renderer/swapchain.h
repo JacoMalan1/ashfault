@@ -11,7 +11,7 @@
 
 namespace ashfault {
 class ASHFAULT_API Swapchain {
- public:
+public:
   Swapchain(VkSurfaceFormatKHR format, VkPresentModeKHR present_mode,
             std::uint32_t image_count, VkExtent2D extent, VkSurfaceKHR surface,
             SwapchainSupportDetails support, VkDevice device);
@@ -32,7 +32,7 @@ class ASHFAULT_API Swapchain {
   std::optional<std::uint32_t> acquire_image(VkSemaphore semaphore);
   void build(VkExtent2D swap_extent);
 
- private:
+private:
   std::uint32_t m_ImageCount;
   VkSwapchainKHR m_Handle;
   std::vector<VkImage> m_Images;

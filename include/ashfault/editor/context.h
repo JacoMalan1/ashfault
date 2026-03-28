@@ -13,6 +13,6 @@ struct ASHFAULT_API EditorContext : public RuntimeContext {
   std::optional<Entity> selected_entity;
   PerspectiveCamera *perspective_camera;
 };
-}
+}  // namespace ashfault
 
 #endif

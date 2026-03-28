@@ -15,6 +15,6 @@ public:
 private:
   std::shared_ptr<Texture> read(const std::string &path) override;
 };
-}
+}  // namespace ashfault
 
 #endif

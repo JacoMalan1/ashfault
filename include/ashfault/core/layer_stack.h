@@ -9,7 +9,7 @@
 
 namespace ashfault {
 class ASHFAULT_API LayerStack {
- public:
+public:
   LayerStack();
   ~LayerStack();
 
@@ -24,7 +24,7 @@ class ASHFAULT_API LayerStack {
   void on_event(Event &event);
   void on_imgui_render();
 
- private:
+private:
   std::vector<Layer *> m_Layers;
   std::size_t m_InsertPosition;
 };

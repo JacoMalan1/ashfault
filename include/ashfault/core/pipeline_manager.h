@@ -10,7 +10,7 @@
 
 namespace ashfault {
 class ASHFAULT_API PipelineManager {
- public:
+public:
   PipelineManager() = default;
   void destroy();
 
@@ -18,7 +18,7 @@ class ASHFAULT_API PipelineManager {
                              std::shared_ptr<GraphicsPipeline> pipeline);
   GraphicsPipeline *get_graphics_pipeline(const std::string &name);
 
- private:
+private:
   std::unordered_map<std::string, std::shared_ptr<GraphicsPipeline>>
       m_Pipelines;
 };

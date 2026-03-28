@@ -20,6 +20,6 @@ public:
 private:
   State::RuntimeState m_State;
 };
-}
+}  // namespace ashfault
 
 #endif

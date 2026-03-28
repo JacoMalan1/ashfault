@@ -8,6 +8,6 @@ namespace ashfault {
 struct ASHFAULT_API TagComponent {
   std::string tag;
 };
-}
+}  // namespace ashfault
 
 #endif

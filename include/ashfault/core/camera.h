@@ -7,7 +7,7 @@
 
 namespace ashfault {
 class ASHFAULT_API Camera {
- public:
+public:
   Camera() = default;
   virtual ~Camera() = default;
 
@@ -16,7 +16,7 @@ class ASHFAULT_API Camera {
 };
 
 class ASHFAULT_API PerspectiveCamera : public Camera {
- public:
+public:
   PerspectiveCamera(float fov, float aspect_ratio);
   ~PerspectiveCamera();
 
@@ -42,18 +42,18 @@ class ASHFAULT_API PerspectiveCamera : public Camera {
   void set_radius(float radius);
   void set_orientation(glm::quat orientation);
 
- private:
+private:
   float m_FOV, m_AspectRatio, m_Radius;
   glm::vec3 m_Position, m_Rotation;
   glm::quat m_Orientation;
 };
 
 class ASHFAULT_API OrthoCamera : public Camera {
- public:
+public:
   glm::mat4 projection() override;
   glm::mat4 view() override;
 
- private:
+private:
   glm::vec3 m_Position, m_Rotation;
 };
 }  // namespace ashfault
