@@ -19,7 +19,7 @@ class ASHFAULT_API Application {
  protected:
   std::shared_ptr<Window> m_Window;
   std::shared_ptr<Input> m_Input;
-  std::unique_ptr<LayerStack> m_LayerStack;
+  LayerStack *m_LayerStack;
   std::shared_ptr<AssetManager> m_AssetManager;
 };
 }  // namespace ashfault

@@ -4,6 +4,8 @@
 #include <spdlog/spdlog.h>
 #include <tiny_obj_loader.h>
 
+#include <ashfault/core/timer.hpp>
+#include <chrono>
 #include <vector>
 
 namespace ashfault {
@@ -22,6 +24,10 @@ std::shared_ptr<VulkanBuffer> Mesh::index_buffer() {
 }
 
 std::shared_ptr<Mesh> Mesh::load_from_file(const std::string &path) {
+  SPDLOG_DEBUG("Loading mesh '{}'", path);
+  Timer<std::chrono::high_resolution_clock> timer{};
+  timer.start();
+
   tinyobj::attrib_t attribs;
   std::vector<tinyobj::shape_t> shapes;
   std::vector<tinyobj::material_t> materials;
@@ -30,11 +36,14 @@ std::shared_ptr<Mesh> Mesh::load_from_file(const std::string &path) {
     throw std::runtime_error(err);
   }
 
+  std::unordered_map<Mesh::Vertex, std::uint32_t> vertex_set;
   std::vector<Mesh::Vertex> vertices;
   std::vector<std::uint32_t> indices;
+  vertex_set.reserve(shapes[0].mesh.indices.size());
+  vertices.reserve(shapes[0].mesh.indices.size());
+  indices.reserve(shapes[0].mesh.indices.size());
 
   for (std::size_t f = 0; f < shapes[0].mesh.indices.size(); f++) {
-    indices.push_back(f);
     tinyobj::index_t idx = shapes[0].mesh.indices[f];
 
     tinyobj::real_t vx = attribs.vertices[3 * idx.vertex_index + 0];
@@ -45,13 +54,33 @@ std::shared_ptr<Mesh> Mesh::load_from_file(const std::string &path) {
     tinyobj::real_t vny = attribs.normals[3 * idx.normal_index + 1];
     tinyobj::real_t vnz = attribs.normals[3 * idx.normal_index + 2];
 
-    Mesh::Vertex vert = {.position = glm::vec3(vx, vy, vz),
-                         .normal = glm::vec3(vnx, vny, vnz)};
-    vertices.push_back(vert);
-  }
+    tinyobj::real_t uvx = attribs.texcoords[2 * idx.texcoord_index + 0];
+    tinyobj::real_t uvy = attribs.texcoords[2 * idx.texcoord_index + 1];
 
-  SPDLOG_INFO("Loaded {} vertices", vertices.size());
-  SPDLOG_INFO("Loaded {} indices", indices.size());
+    Mesh::Vertex vert = {
+        .position = glm::vec3(vx, vy, vz),
+        .normal = glm::vec3(vnx, vny, vnz),
+        .uv = glm::vec2(uvx, uvy),
+    };
+
+    if (vertex_set.contains(vert)) {
+      indices.push_back(vertex_set[vert]);
+    } else {
+      auto new_idx = vertices.size();
+      vertex_set.emplace(vert, new_idx);
+      indices.push_back(new_idx);
+      vertices.push_back(vert);
+    }
+  }
+  vertices.shrink_to_fit();
+
+  SPDLOG_INFO("Loaded {} vertices, {} indices in {:.2f}ms", vertices.size(),
+              indices.size(), timer.reset());
   return Renderer::create_mesh(Mesh::Static, vertices, indices);
+}
+
+void Mesh::destroy() {
+  m_IndexBuffer->destroy();
+  m_VertexBuffer->destroy();
 }
 }  // namespace ashfault

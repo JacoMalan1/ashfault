@@ -10,7 +10,7 @@ GraphicsPipeline::GraphicsPipeline(VkDevice device, VkPipelineLayout layout,
                                    VkPipeline pipeline)
     : m_Layout(layout), m_Pipeline(pipeline), m_Device(device) {}
 
-GraphicsPipeline::~GraphicsPipeline() {
+void GraphicsPipeline::destroy() {
   vkDeviceWaitIdle(this->m_Device);
   vkDestroyPipeline(this->m_Device, this->m_Pipeline, nullptr);
   vkDestroyPipelineLayout(this->m_Device, this->m_Layout, nullptr);
@@ -134,7 +134,7 @@ std::shared_ptr<GraphicsPipeline> GraphicsPipelineBuilder::build(
 
   VkPipelineRasterizationStateCreateInfo rasterizer{};
   rasterizer.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
-  rasterizer.cullMode = VK_CULL_MODE_BACK_BIT;
+  rasterizer.cullMode = VK_CULL_MODE_NONE;
   rasterizer.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
   rasterizer.polygonMode = VK_POLYGON_MODE_FILL;
   rasterizer.lineWidth = 1.0f;

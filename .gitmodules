@@ -25,3 +25,6 @@
 [submodule "vendor/lua"]
 	path = vendor/lua
 	url = https://github.com/lua/lua
+[submodule "vendor/stb"]
+	path = vendor/stb
+	url = https://github.com/nothings/stb

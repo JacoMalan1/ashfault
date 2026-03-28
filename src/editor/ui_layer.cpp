@@ -42,7 +42,13 @@ EditorUiLayer::EditorUiLayer(EditorContext *context,
       m_AssetManager(asset_manager),
       m_RuntimeState(State::Edit) {}
 
-EditorUiLayer::~EditorUiLayer() {}
+EditorUiLayer::~EditorUiLayer() {
+  m_ViewportTarget->destroy();
+  for (auto tex : m_ViewportTextures) {
+    ImGui_ImplVulkan_RemoveTexture(tex);
+  }
+  vkDestroySampler(Renderer::vulkan_backend().device(), m_ViewportSampler, nullptr);
+}
 
 void EditorUiLayer::on_attach(LayerStack *stack) {
   SPDLOG_INFO("Editor UI layer attach");
@@ -145,6 +151,7 @@ void EditorUiLayer::on_detach() { m_LayerStack = nullptr; }
 void EditorUiLayer::on_update(float dt) {
   if (m_UpdateViewport) {
     ImVec2 dims = m_PreviousViewportSize.value_or(ImVec2(1, 1));
+    m_ViewportTarget->destroy();
     m_ViewportTarget = Renderer::create_render_target(
         std::clamp<std::uint32_t>(dims.x, 1, 8192),
         std::clamp<std::uint32_t>(dims.y, 1, 8192), false, false);

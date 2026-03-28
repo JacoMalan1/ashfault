@@ -6,7 +6,7 @@
 #include <functional>
 
 namespace ashfault {
-template <class Clock = std::chrono::system_clock>
+template <class Clock = std::chrono::system_clock, class Unit = std::milli>
   requires std::chrono::is_clock<Clock>::value
 class ASHFAULT_API Timer {
 public:
@@ -17,7 +17,7 @@ public:
   float reset() {
     auto now = Clock::now();
     auto elapsed =
-        std::chrono::duration_cast<std::chrono::duration<float, std::milli>>(
+        std::chrono::duration_cast<std::chrono::duration<float, Unit>>(
             now - m_StartTime);
     m_StartTime = now;
     return elapsed.count();
@@ -33,6 +33,6 @@ public:
 private:
   std::chrono::time_point<Clock, typename Clock::duration> m_StartTime;
 };
-} // namespace ashfault
+}  // namespace ashfault
 
 #endif

@@ -6,6 +6,7 @@
 #include <ashfault/renderer/descriptor_set.h>
 #include <ashfault/renderer/pipeline.h>
 #include <ashfault/renderer/shader.h>
+#include <ashfault/renderer/texture.h>
 #include <vk_mem_alloc.h>
 
 #include <ashfault/renderer/buffer.hpp>
@@ -20,11 +21,21 @@
 #include <vulkan/vulkan.h>
 #include <vulkan/vulkan_core.h>
 
+#include <format>
+
 #define MAX_FRAMES_IN_FLIGHT 3
-#define VK_CHECK_RESULT(x)                                 \
-  if (x != VK_SUCCESS) {                                   \
-    throw std::runtime_error(std::string("Vulkan error")); \
+#define VK_CHECK_RESULT(x)                                                 \
+  {                                                                        \
+    VkResult __result = x;                                                 \
+    if (__result != VK_SUCCESS) {                                          \
+      throw std::runtime_error(std::format(                                \
+          "Vulkan error {} in {}:{}", (int)__result, __FILE__, __LINE__)); \
+    }                                                                      \
   }
+
+#ifdef ASHFAULT_VK_VALIDATION
+#include <spdlog/spdlog.h>
+#endif
 
 namespace ashfault {
 class ASHFAULT_API Swapchain;
@@ -110,7 +121,8 @@ public:
   /// create the image.
   VkImageView create_image_view(VkImage image, VkFormat format,
                                 VkImageAspectFlags imageAspect);
-
+  VulkanTexture create_texture(std::uint32_t width, std::uint32_t height,
+                               const char *data);
   VkSampler create_sampler();
 
   /// @brief Creates a vulkan memory buffer.
@@ -281,10 +293,11 @@ private:
   bool m_Resized;
 
   void create_instance();
+  void setup_debug_callback();
   void create_surface();
   void create_device();
   void create_allocator();
-  void setup_swapchain();
+  void setup_swapchain(bool vsync = false);
   void setup_synchronization();
   void setup_command_buffers();
   void cleanup_swapchain();
@@ -301,6 +314,11 @@ private:
   std::optional<std::pair<VkPhysicalDevice, QueueSuitability>>
   choose_physical_device();
   SwapchainSupportDetails query_swapchain_support(VkPhysicalDevice device);
+
+#ifdef ASHFAULT_VK_VALIDATION
+  std::shared_ptr<spdlog::logger> m_VkDebugLogger;
+  VkDebugUtilsMessengerEXT m_DebugMessenger;
+#endif
 };
 }  // namespace ashfault
 

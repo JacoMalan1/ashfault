@@ -22,7 +22,7 @@ RenderTarget::RenderTarget(
       m_DepthView(depth_view),
       m_RenderArea(render_area) {}
 
-RenderTarget::~RenderTarget() {
+void RenderTarget::destroy() {
   vkDeviceWaitIdle(m_Renderer->device());
   if (m_DepthImage.has_value()) {
     vkDestroyImageView(m_Renderer->device(), m_DepthView.value(), nullptr);
@@ -61,7 +61,7 @@ void RenderTarget::begin_rendering(std::uint32_t image_index,
 
   VkRenderingAttachmentInfo color_attachment{};
   color_attachment.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
-  color_attachment.clearValue.color = {{0.0f, 0.0f, 0.0f, 1.0f}};
+  color_attachment.clearValue.color = {{0.03f, 0.03f, 0.03f, 1.0f}};
   color_attachment.imageView = image_view(image_index);
   color_attachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
   color_attachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;

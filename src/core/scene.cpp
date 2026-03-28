@@ -1,6 +1,8 @@
+#include <ashfault/core/component/material.h>
 #include <ashfault/core/component/mesh.h>
 #include <ashfault/core/component/transform.h>
 #include <ashfault/core/component/light.h>
+#include <ashfault/core/material.h>
 #include <ashfault/core/scene.h>
 #include <ashfault/renderer/light.h>
 #include <vulkan/vulkan_core.h>
@@ -38,6 +40,8 @@ void Scene::draw_all() {
         m_ComponentRegistry.get_component<PointLightComponent>(entity);
     auto transform =
         m_ComponentRegistry.get_component<TransformComponent>(entity);
+    auto material_component =
+        m_ComponentRegistry.get_component<MaterialComponent>(entity);
 
     if (directional_light.has_value()) {
       Light light{};
@@ -53,7 +57,7 @@ void Scene::draw_all() {
       light.position = glm::vec4(0.0f, 0.0f, 0.0f, 2.0f);
       light.color = glm::vec4(point_light.value()->color, 0.0f);
       if (transform.has_value()) {
-	light.position += glm::vec4(transform.value()->position, 0.0f);
+        light.position += glm::vec4(transform.value()->position, 0.0f);
       }
       Renderer::add_light(light);
     }
@@ -76,8 +80,11 @@ void Scene::draw_all() {
 
         model_mat = T * R * S;
       }
+      Material material = material_component
+                              ? material_component.value()->material
+                              : Material{.albedo_texture_index = 0};
 
-      Renderer::submit_mesh(*mesh.value()->mesh.get(), model_mat);
+      Renderer::submit_mesh(*mesh.value()->mesh.get(), model_mat, material);
     }
   }
 }

@@ -12,8 +12,6 @@ namespace ashfault {
 Script::Script(const std::string &source)
     : m_Initialized(false), m_Source(source) {}
 
-Script::~Script() {}
-
 void Script::init(sol::state &lua) {
   m_Environment = sol::environment(lua, sol::create, lua.globals());
 
@@ -75,4 +73,6 @@ void Script::on_update(float dt, std::optional<Entity> entity) {
                  e.what());
   }
 }
+
+void Script::destroy() {}
 }  // namespace ashfault

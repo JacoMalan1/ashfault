@@ -1,11 +1,13 @@
 #include <ashfault/core/component/mesh.h>
 #include <ashfault/core/component/tag.h>
+#include <ashfault/core/component/material.h>
 #include <ashfault/core/component/transform.h>
 #include <ashfault/core/event/key_press.h>
 #include <ashfault/core/event/mouse_drag.h>
 #include <ashfault/core/event/mouse_scroll.h>
 #include <ashfault/core/event/viewport_resize.h>
 #include <ashfault/core/layer_stack.h>
+#include <ashfault/core/texture.h>
 #include <ashfault/editor/context.h>
 #include <ashfault/editor/editor_layer.h>
 #include <ashfault/editor/event/state_change.h>
@@ -28,23 +30,17 @@ EditorLayer::EditorLayer(EditorContext *context,
 EditorLayer::~EditorLayer() {}
 
 void EditorLayer::on_attach(LayerStack *) {
-  auto mesh = m_AssetManager->load<Mesh>("monkey", "monkey.obj");
+  std::uint32_t white = 0xffffffff;
+  Renderer::upload_texture(reinterpret_cast<const char *>(&white), 1, 1);
+  auto tex = m_AssetManager->load<Texture>("pavement", "pavement_albedo.png");
   m_PerspectiveCamera->set_position(glm::vec3(0.0f, 0.0f, 0.0f));
   m_Context->perspective_camera = m_PerspectiveCamera.get();
 
   m_ActiveScene = std::make_unique<Scene>();
   m_Context->active_scene = m_ActiveScene.get();
-  auto e = m_ActiveScene->create_entity();
-  m_Context->selected_entity = e;
-  MeshComponent mesh_component = {.mesh = mesh};
-  TagComponent tag = {.tag = "Monkey"};
 
-  m_ActiveScene->component_registry().add_component(e, mesh_component);
-  m_ActiveScene->component_registry().add_component(e, tag);
-
-  EventBus<StateChangeEvent>::get().subscribe([&](const StateChangeEvent &ev) {
-    m_RuntimeState = ev.state();
-  });
+  EventBus<StateChangeEvent>::get().subscribe(
+      [&](const StateChangeEvent &ev) { m_RuntimeState = ev.state(); });
 }
 
 void EditorLayer::on_detach() {}

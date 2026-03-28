@@ -11,4 +11,10 @@ GraphicsPipeline *PipelineManager::get_graphics_pipeline(
     const std::string &name) {
   return this->m_Pipelines[name].get();
 }
+
+void PipelineManager::destroy() {
+  for (auto [name, pipeline] : m_Pipelines) {
+    pipeline->destroy();
+  }
+}
 }  // namespace ashfault

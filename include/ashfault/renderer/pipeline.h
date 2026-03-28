@@ -54,7 +54,7 @@ public:
 
   GraphicsPipeline(const GraphicsPipeline &) = delete;
   GraphicsPipeline &operator=(const GraphicsPipeline &) = delete;
-  ~GraphicsPipeline();
+  void destroy();
 
   VkPipeline handle() const;
   const VkPipelineLayout &layout() const;

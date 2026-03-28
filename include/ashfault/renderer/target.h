@@ -23,7 +23,8 @@ class ASHFAULT_API RenderTarget {
       const std::optional<std::vector<VmaAllocation>> &allocations,
       const std::vector<VkCommandBuffer> &command_buffers,
       VkRect2D render_area);
-  ~RenderTarget();
+
+  void destroy();
 
   VkCommandBuffer &command_buffer(std::uint32_t index);
   VkImage image(std::uint32_t index);

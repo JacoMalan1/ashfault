@@ -3,13 +3,20 @@
 
 #include <ashfault/ashfault.h>
 #include <memory>
+#include <type_traits>
 #include <typeindex>
 #include <unordered_map>
 #include <string>
 #include <stdexcept>
 
 namespace ashfault {
+class ASHFAULT_API IAsset {
+public:
+  virtual void destroy() = 0;
+};
+
 template <class T>
+  requires std::is_base_of<IAsset, T>::value
 class ASHFAULT_API Asset {
 public:
   Asset() = default;
@@ -21,6 +28,7 @@ public:
   std::shared_ptr<T> get() { return m_Asset; }
   const std::string &id() const { return m_ID; }
   const std::string &path() const { return m_Path; }
+  void destroy() { m_Asset->destroy(); }
 
 private:
   std::string m_ID;
@@ -28,8 +36,14 @@ private:
   std::shared_ptr<T> m_Asset;
 };
 
+class ASHFAULT_API IAssetLoader {
+public:
+  IAssetLoader() = default;
+  virtual void destroy() = 0;
+};
+
 template <class T>
-class ASHFAULT_API AssetLoader {
+class ASHFAULT_API AssetLoader : public IAssetLoader {
 public:
   AssetLoader() = default;
   virtual ~AssetLoader() = default;
@@ -48,6 +62,12 @@ public:
     if (m_LoadedAssets.count(id) > 0) {
       auto new_asset = read(m_LoadedAssets[id].path());
       *m_LoadedAssets[id].get() = *new_asset;
+    }
+  }
+
+  void destroy() override {
+    for (auto [name, asset] : m_LoadedAssets) {
+      asset.destroy();
     }
   }
 
@@ -93,6 +113,12 @@ public:
     std::shared_ptr<AssetLoader<T>> loader =
         std::static_pointer_cast<AssetLoader<T>>(m_Loaders[type_idx]);
     return loader->reload(id);
+  }
+
+  void destroy() {
+    for (auto [idx, loader] : m_Loaders) {
+      std::static_pointer_cast<IAssetLoader>(loader)->destroy();
+    }
   }
 
 private:

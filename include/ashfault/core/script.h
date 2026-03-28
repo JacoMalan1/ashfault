@@ -3,15 +3,16 @@
 
 #include <ashfault/ashfault.h>
 #include <ashfault/core/entity.h>
+#include <ashfault/core/asset_manager.hpp>
 #include <optional>
 #include <string>
 #include <sol/sol.hpp>
 
 namespace ashfault {
-class ASHFAULT_API Script {
+class ASHFAULT_API Script : public IAsset {
 public:
   Script(const std::string &source);
-  ~Script();
+  void destroy() override;
 
   void init(sol::state &lua);
 

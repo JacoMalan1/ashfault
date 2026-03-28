@@ -1,7 +1,9 @@
 #include <ashfault/core/asset/mesh_loader.h>
 #include <ashfault/core/asset/script_loader.h>
+#include <ashfault/core/asset/texture_loader.h>
 #include <ashfault/core/event/key_press.h>
 #include <ashfault/core/layer/render_layer.h>
+#include <ashfault/core/texture.h>
 #include <ashfault/editor/editor.h>
 #include <ashfault/editor/editor_layer.h>
 #include <ashfault/editor/event/state_change.h>
@@ -25,12 +27,11 @@ using namespace std::chrono_literals;
 namespace ashfault::editor {
 Editor::Editor(std::shared_ptr<Window> window) : Application(window) {}
 
-Editor::~Editor() {}
-
 void Editor::run() {
   Renderer::init(m_Window);
   m_AssetManager->register_loader<Mesh>(std::make_shared<MeshLoader>());
   m_AssetManager->register_loader<Script>(std::make_shared<ScriptLoader>());
+  m_AssetManager->register_loader<Texture>(std::make_shared<TextureLoader>());
 
   EditorContext context{};
   context.active_scene = nullptr;
@@ -86,6 +87,8 @@ void Editor::run() {
     Renderer::submit_and_wait();
     m_Window->poll_events();
   }
+  delete m_LayerStack;
+  m_AssetManager->destroy();
   Renderer::shutdown();
 }
 }  // namespace ashfault::editor

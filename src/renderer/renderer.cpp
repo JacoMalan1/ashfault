@@ -1,5 +1,7 @@
 #include <ashfault/core/camera.h>
+#include <ashfault/core/material.h>
 #include <ashfault/core/pipeline_manager.h>
+#include <ashfault/renderer/descriptor_set.h>
 #include <ashfault/renderer/pipeline.h>
 #include <ashfault/renderer/renderer.h>
 #include <ashfault/renderer/swapchain.h>
@@ -9,6 +11,7 @@
 #include <spdlog/spdlog.h>
 #include <vulkan/vulkan_core.h>
 
+#include <algorithm>
 #include <ashfault/renderer/buffer.hpp>
 #include <cstddef>
 #include <glm/ext/matrix_float4x4.hpp>
@@ -18,10 +21,11 @@
 #include <memory>
 
 namespace ashfault {
-struct CameraData {
+struct PushConstants {
   glm::mat4 projection;
   glm::mat4 view;
   glm::mat4 model;
+  int albedo_texture_index;
 };
 
 struct RendererData {
@@ -29,7 +33,6 @@ struct RendererData {
   Swapchain *swapchain;
   std::unique_ptr<PipelineManager> pipeline_manager;
 
-  std::vector<VkCommandBuffer> imgui_command_buffers;
   std::vector<VkSemaphore> image_available_semaphores;
   std::vector<VkSemaphore> render_finished_semaphores;
   std::vector<VkFence> in_flight_fences;
@@ -43,17 +46,53 @@ struct RendererData {
   std::shared_ptr<RenderTarget> default_target;
   std::vector<std::shared_ptr<RenderTarget>> targets;
 
-  std::optional<CameraData> camera_data;
+  std::optional<PushConstants> camera_data;
   VkPipelineLayout pipeline_layout;
-  std::vector<VkDescriptorSetLayout> set_layouts;
+  std::vector<VkDescriptorSetLayout> push_descriptor_layouts;
   std::pair<VkBuffer, VmaAllocation> light_buffer;
   void *light_buffer_mapping;
   std::array<Light, ASHFAULT_MAX_LIGHTS> lights;
   std::int32_t light_count;
+
+  std::vector<VkDescriptorSetLayout> texture_layouts;
+  std::vector<VulkanTexture> textures;
+  VkDescriptorSet texture_descriptors;
+  VkDescriptorPool texture_pool;
+  VkSampler sampler;
 };
 
 static RendererData s_Data;
 static PFN_vkCmdPushDescriptorSetKHR vkCmdPushDescriptorSetKHR;
+
+void Renderer::create_descriptors() {
+  s_Data.sampler = s_Data.render_backend->create_sampler();
+
+  std::array<VkDescriptorPoolSize, 1> sizes{};
+  sizes[0].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+  sizes[0].descriptorCount = ASHFAULT_MAX_TEXTURES;
+
+  VkDescriptorPoolCreateInfo pool_info{};
+  pool_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+  pool_info.pPoolSizes = sizes.data();
+  pool_info.poolSizeCount = sizes.size();
+  pool_info.flags = VK_DESCRIPTOR_POOL_CREATE_UPDATE_AFTER_BIND_BIT |
+                    VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
+  pool_info.maxSets = 1;
+
+  VK_CHECK_RESULT(vkCreateDescriptorPool(s_Data.render_backend->device(),
+                                         &pool_info, nullptr,
+                                         &s_Data.texture_pool));
+
+  VkDescriptorSetAllocateInfo alloc_info{};
+  alloc_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+  alloc_info.descriptorPool = s_Data.texture_pool;
+  alloc_info.descriptorSetCount = 1;
+  alloc_info.pSetLayouts = &s_Data.texture_layouts.front();
+
+  VK_CHECK_RESULT(vkAllocateDescriptorSets(s_Data.render_backend->device(),
+                                           &alloc_info,
+                                           &s_Data.texture_descriptors));
+}
 
 void Renderer::create_pipelines() {
   std::array<VkDescriptorSetLayoutBinding, 1> bindings{};
@@ -68,10 +107,41 @@ void Renderer::create_pipelines() {
   layout_info.pBindings = bindings.data();
   layout_info.flags = VK_DESCRIPTOR_SET_LAYOUT_CREATE_PUSH_DESCRIPTOR_BIT;
 
-  s_Data.set_layouts.resize(1);
+  s_Data.push_descriptor_layouts.resize(bindings.size());
+  VK_CHECK_RESULT(vkCreateDescriptorSetLayout(
+      s_Data.render_backend->device(), &layout_info, nullptr,
+      s_Data.push_descriptor_layouts.data()));
+
+  VkDescriptorSetLayoutBinding binding{};
+  binding.descriptorCount = ASHFAULT_MAX_TEXTURES;
+  binding.binding = 0;
+  binding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+  binding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+
+  VkDescriptorBindingFlags binding_flags =
+      VK_DESCRIPTOR_BINDING_PARTIALLY_BOUND_BIT;
+
+  VkDescriptorSetLayoutBindingFlagsCreateInfo binding_flags_info{};
+  binding_flags_info.sType =
+      VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_BINDING_FLAGS_CREATE_INFO;
+  binding_flags_info.pBindingFlags = &binding_flags;
+  binding_flags_info.bindingCount = 1;
+
+  VkDescriptorSetLayoutCreateInfo texture_layout_info{};
+  texture_layout_info.sType =
+      VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+  texture_layout_info.bindingCount = 1;
+  texture_layout_info.pBindings = &binding;
+  texture_layout_info.pNext = &binding_flags_info;
+
+  s_Data.texture_layouts.resize(1);
   VK_CHECK_RESULT(vkCreateDescriptorSetLayout(s_Data.render_backend->device(),
-                                              &layout_info, nullptr,
-                                              s_Data.set_layouts.data()));
+                                              &texture_layout_info, nullptr,
+                                              s_Data.texture_layouts.data()));
+
+  std::vector<VkDescriptorSetLayout> all_layouts{};
+  all_layouts.push_back(s_Data.push_descriptor_layouts[0]);
+  all_layouts.push_back(s_Data.texture_layouts[0]);
 
   auto static_vshader =
       s_Data.render_backend->create_shader("blinn_phong.vert.spv");
@@ -91,14 +161,20 @@ void Renderer::create_pipelines() {
       .format = VK_FORMAT_R32G32B32_SFLOAT,
       .offset = offsetof(Mesh::Vertex, normal),
   });
+  vertex_attribs.push_back({
+      .location = 2,
+      .binding = 0,
+      .format = VK_FORMAT_R32G32_SFLOAT,
+      .offset = offsetof(Mesh::Vertex, uv),
+  });
 
   auto static_pipeline =
       s_Data.render_backend->create_graphics_pipeline()
           .input_attribute_descriptions(vertex_attribs, sizeof(Mesh::Vertex))
           .vertex_shader(static_vshader)
           .fragment_shader(static_fshader)
-          .push_constant(VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(CameraData))
-          .build(s_Data.set_layouts);
+          .push_constant(VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(PushConstants))
+          .build(all_layouts);
 
   s_Data.pipeline_manager->add_graphics_pipeline("blinn_phong",
                                                  static_pipeline);
@@ -107,6 +183,7 @@ void Renderer::create_pipelines() {
 
 bool Renderer::start_frame() {
   s_Data.swapchain = s_Data.render_backend->swapchain();
+  s_Data.default_target->destroy();
   s_Data.default_target =
       create_render_target(s_Data.swapchain->swap_extent().width,
                            s_Data.swapchain->swap_extent().height, false, true);
@@ -139,6 +216,11 @@ bool Renderer::start_frame() {
 
   s_Data.default_target->begin_rendering(s_Data.image_index,
                                          s_Data.current_frame);
+
+  vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS,
+                          s_Data.pipeline_layout, 1, 1,
+                          &s_Data.texture_descriptors, 0, nullptr);
+
   std::memcpy(s_Data.light_buffer_mapping, s_Data.lights.data(),
               sizeof(Light) * s_Data.lights.size());
   std::memcpy(reinterpret_cast<char *>(s_Data.light_buffer_mapping) +
@@ -155,7 +237,6 @@ bool Renderer::start_frame() {
   write.descriptorCount = 1;
   write.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
   write.dstBinding = 0;
-  write.dstSet = 0;
   write.pBufferInfo = &buffer_info;
   vkCmdPushDescriptorSetKHR(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS,
                             s_Data.pipeline_layout, 0, 1, &write);
@@ -180,7 +261,8 @@ void Renderer::init(std::shared_ptr<Window> window) {
   vkCmdPushDescriptorSetKHR =
       (PFN_vkCmdPushDescriptorSetKHR)vkGetDeviceProcAddr(
           s_Data.render_backend->device(), "vkCmdPushDescriptorSetKHR");
-  SPDLOG_DEBUG("Loaded `vkCmdPushDescriptorSetKHR` ({})", (void *)vkCmdPushDescriptorSetKHR);
+  SPDLOG_DEBUG("Loaded `vkCmdPushDescriptorSetKHR` ({})",
+               (void *)vkCmdPushDescriptorSetKHR);
 
   s_Data.swapchain = s_Data.render_backend->swapchain();
   s_Data.pipeline_manager = std::make_unique<PipelineManager>();
@@ -197,9 +279,6 @@ void Renderer::init(std::shared_ptr<Window> window) {
   s_Data.in_flight_fences =
       s_Data.render_backend->create_fences(s_Data.swapchain->image_count());
 
-  s_Data.imgui_command_buffers =
-      s_Data.render_backend->allocate_command_buffers(
-          s_Data.swapchain->image_count());
   VmaAllocationCreateInfo alloc_info{};
   alloc_info.flags = VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT |
                      VMA_ALLOCATION_CREATE_MAPPED_BIT;
@@ -211,6 +290,7 @@ void Renderer::init(std::shared_ptr<Window> window) {
       sizeof(Light) * ASHFAULT_MAX_LIGHTS + sizeof(int),
       VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, alloc_info);
   Renderer::create_pipelines();
+  Renderer::create_descriptors();
   vmaMapMemory(s_Data.render_backend->allocator(), s_Data.light_buffer.second,
                &s_Data.light_buffer_mapping);
 }
@@ -232,7 +312,9 @@ void Renderer::push_render_target(std::shared_ptr<RenderTarget> target) {
   vkBeginCommandBuffer(cmd, &begin_info);
 
   target->begin_rendering(s_Data.image_index, s_Data.current_frame);
-
+  vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS,
+                          s_Data.pipeline_layout, 1, 1,
+                          &s_Data.texture_descriptors, 0, nullptr);
   std::memcpy(s_Data.light_buffer_mapping, s_Data.lights.data(),
               sizeof(Light) * s_Data.lights.size());
   std::memcpy(reinterpret_cast<char *>(s_Data.light_buffer_mapping) +
@@ -348,10 +430,12 @@ void Renderer::submit_and_wait() {
 }
 
 void Renderer::submit_mesh(Mesh &mesh) {
-  submit_mesh(mesh, glm::identity<glm::mat4>());
+  Material default_material{.albedo_texture_index = 0};
+  submit_mesh(mesh, glm::identity<glm::mat4>(), default_material);
 }
 
-void Renderer::submit_mesh(Mesh &mesh, const glm::mat4 &transform) {
+void Renderer::submit_mesh(Mesh &mesh, const glm::mat4 &transform,
+                           const Material &material) {
   auto cmd = render_target().command_buffer(s_Data.current_frame);
   GraphicsPipeline *pipeline = nullptr;
   switch (mesh.type()) {
@@ -361,23 +445,51 @@ void Renderer::submit_mesh(Mesh &mesh, const glm::mat4 &transform) {
       break;
   }
 
-  auto data = s_Data.camera_data.value_or<CameraData>(
+  s_Data.camera_data->albedo_texture_index = material.albedo_texture_index;
+  auto data = s_Data.camera_data.value_or<PushConstants>(
       {.projection = glm::identity<glm::mat4>(),
        .view = glm::identity<glm::mat4>(),
-       .model = glm::identity<glm::mat4>()});
+       .model = glm::identity<glm::mat4>(),
+       .albedo_texture_index = material.albedo_texture_index});
   data.model = transform;
   vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline->handle());
   vkCmdPushConstants(cmd, pipeline->layout(), VK_SHADER_STAGE_VERTEX_BIT, 0,
-                     sizeof(CameraData), &data);
+                     sizeof(PushConstants), &data);
   VkDeviceSize offset = 0;
+  vkCmdBindIndexBuffer(cmd, mesh.index_buffer()->handle(), 0,
+                       index_type<std::uint32_t>::value);
   vkCmdBindVertexBuffers(cmd, 0, 1, &mesh.vertex_buffer()->handle(), &offset);
-  vkCmdDraw(cmd, mesh.vertex_buffer()->count(), 1, 0, 0);
+  vkCmdDrawIndexed(cmd, mesh.index_buffer()->count(), 1, 0, 0, 0);
 }
 
 void Renderer::shutdown() {
-  vkDeviceWaitIdle(s_Data.render_backend->device());
+  auto device = s_Data.render_backend->device();
+  vkDeviceWaitIdle(device);
+  vmaUnmapMemory(s_Data.render_backend->allocator(),
+                 s_Data.light_buffer.second);
+  vmaDestroyBuffer(s_Data.render_backend->allocator(),
+                   s_Data.light_buffer.first, s_Data.light_buffer.second);
+  std::for_each(s_Data.targets.begin(), s_Data.targets.end(),
+                [](auto target) { target->destroy(); });
+  s_Data.default_target->destroy();
   s_Data.default_target.reset();
   s_Data.targets.clear();
+  s_Data.pipeline_manager->destroy();
+  vkFreeDescriptorSets(device, s_Data.texture_pool, 1,
+                       &s_Data.texture_descriptors);
+  vkDestroyDescriptorPool(device, s_Data.texture_pool, nullptr);
+  for (auto layout : s_Data.texture_layouts)
+    vkDestroyDescriptorSetLayout(device, layout, nullptr);
+  for (auto layout : s_Data.push_descriptor_layouts)
+    vkDestroyDescriptorSetLayout(device, layout, nullptr);
+  for (auto semaphore : s_Data.render_finished_semaphores)
+    vkDestroySemaphore(device, semaphore, nullptr);
+  for (auto semaphore : s_Data.image_available_semaphores)
+    vkDestroySemaphore(device, semaphore, nullptr);
+  for (auto fence : s_Data.in_flight_fences)
+    vkDestroyFence(device, fence, nullptr);
+  for (auto &tex : s_Data.textures) tex.destroy();
+  vkDestroySampler(device, s_Data.sampler, nullptr);
   s_Data.render_backend->shutdown();
 }
 
@@ -394,12 +506,15 @@ std::shared_ptr<Mesh> Renderer::create_mesh(
 }
 
 void Renderer::begin_scene(Camera &camera) {
-  CameraData data = {.projection = camera.projection(), .view = camera.view()};
+  PushConstants data = {.projection = camera.projection(),
+                        .view = camera.view()};
 
   s_Data.camera_data = data;
 }
 
-void Renderer::end_scene() { s_Data.camera_data = std::optional<CameraData>(); }
+void Renderer::end_scene() {
+  s_Data.camera_data = std::optional<PushConstants>();
+}
 
 std::uint32_t Renderer::frame_index() { return s_Data.current_frame; }
 
@@ -407,5 +522,30 @@ void Renderer::add_light(const Light &light) {
   if (s_Data.light_count < ASHFAULT_MAX_LIGHTS) {
     s_Data.lights[s_Data.light_count++] = light;
   }
+}
+
+int Renderer::upload_texture(const char *pixels, std::uint32_t width,
+                             std::uint32_t height) {
+  auto texture = s_Data.render_backend->create_texture(width, height, pixels);
+  std::size_t tex_index = s_Data.textures.size();
+  s_Data.textures.push_back(texture);
+
+  VkDescriptorImageInfo image_info{};
+  image_info.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+  image_info.imageView = texture.image_view();
+  image_info.sampler = s_Data.sampler;
+
+  VkWriteDescriptorSet write{};
+  write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+  write.descriptorCount = 1;
+  write.dstSet = s_Data.texture_descriptors;
+  write.dstBinding = 0;
+  write.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+  write.pImageInfo = &image_info;
+  write.dstArrayElement = tex_index;
+
+  vkUpdateDescriptorSets(s_Data.render_backend->device(), 1, &write, 0,
+                         nullptr);
+  return tex_index;
 }
 }  // namespace ashfault

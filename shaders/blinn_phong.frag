@@ -1,10 +1,14 @@
 #version 450
+#extension GL_EXT_nonuniform_qualifier : enable
 
 #define MAX_LIGHTS 128
+#define MAX_TEXTURES 1000
 
 layout(location = 0) in vec3 i_Normal;
 layout(location = 1) in vec3 i_FragPos;
 layout(location = 2) in mat4 i_ViewMat;
+layout(location = 6) in vec2 i_UV;
+layout(location = 7) flat in int i_TexIndex;
 
 struct Light {
   vec4 position;
@@ -16,6 +20,8 @@ layout(std140, set = 0, binding = 0) uniform Lights {
   Light lights[MAX_LIGHTS];
   int lightCount;
 } lights;
+
+layout(set = 1, binding = 0) uniform sampler2D albedos[MAX_TEXTURES];
 
 layout(location = 0) out vec4 o_FragColor;
 
@@ -57,7 +63,7 @@ vec3 point_light(Light light, vec3 normal, vec3 viewDir, vec3 fragPos) {
 }
 
 void main() {
-  vec3 col = vec3(1);
+  vec3 col = texture(albedos[i_TexIndex], i_UV).xyz;
   float ambientStrength = 0.2;
   vec3 ambient = vec3(1) * ambientStrength;
   vec3 lightAccumulation = vec3(0);

@@ -41,7 +41,7 @@ public:
   VulkanBuffer(const VulkanBuffer &) = delete;
   VulkanBuffer &operator=(const VulkanBuffer &) = delete;
 
-  ~VulkanBuffer() {
+  void destroy() {
     vkDeviceWaitIdle(this->m_Device);
     vmaDestroyBuffer(this->m_Allocator, this->m_Buffer, this->m_Allocation);
   }

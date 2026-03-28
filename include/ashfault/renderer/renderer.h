@@ -3,6 +3,7 @@
 
 #include <ashfault/ashfault.h>
 #include <ashfault/core/camera.h>
+#include <ashfault/core/material.h>
 #include <ashfault/core/mesh.h>
 #include <ashfault/core/window.h>
 #include <ashfault/renderer/light.h>
@@ -12,10 +13,11 @@
 #include <memory>
 
 #define ASHFAULT_MAX_LIGHTS 128
+#define ASHFAULT_MAX_TEXTURES 1000
 
 namespace ashfault {
 class ASHFAULT_API Renderer {
- public:
+public:
   static void init(std::shared_ptr<Window> window);
   static void shutdown();
   static bool start_frame();
@@ -33,7 +35,8 @@ class ASHFAULT_API Renderer {
       std::uint32_t width, std::uint32_t height, bool msaa = true,
       bool swapchain = false);
 
-  static void submit_mesh(Mesh &mesh, const glm::mat4 &transform);
+  static void submit_mesh(Mesh &mesh, const glm::mat4 &transform,
+                          const Material &material);
   static void submit_mesh(Mesh &mesh);
   static void add_light(const Light &light);
 
@@ -49,8 +52,12 @@ class ASHFAULT_API Renderer {
   static std::uint32_t swapchain_image_index();
   static std::uint32_t frame_index();
 
- private:
+  static int upload_texture(const char *pixels, std::uint32_t width,
+                                      std::uint32_t height);
+
+private:
   static void create_pipelines();
+  static void create_descriptors();
 };
 }  // namespace ashfault
 

@@ -5,8 +5,6 @@ function OnSceneStart()
     local transform = Scene.GetComponent(e, Transform)
     if transform ~= nil then
       transform.position.x = 0
-      transform.position.y = 0
-      transform.position.z = 0
     else
       print(string.format("Entity %d does not have a transform, creating one...", e))
       local t = Transform.new()

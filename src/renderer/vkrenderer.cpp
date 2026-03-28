@@ -3,6 +3,7 @@
 #include <ashfault/renderer/shader.h>
 #include <ashfault/renderer/swapchain.h>
 #include <ashfault/renderer/vkrenderer.h>
+#include <endian.h>
 #include <imgui.h>
 #include <imgui_impl_glfw.h>
 #include <imgui_impl_vulkan.h>
@@ -14,6 +15,7 @@
 #include <cstdint>
 #include <cstring>
 #include <limits>
+#include <ranges>
 #include <set>
 #include <stdexcept>
 
@@ -21,6 +23,9 @@
 #include <GLFW/glfw3.h>
 
 namespace ashfault {
+
+static PFN_vkCreateDebugUtilsMessengerEXT vkCreateDebugUtilsMessengerEXT;
+static PFN_vkDestroyDebugUtilsMessengerEXT vkDestroyDebugUtilsMessengerEXT;
 
 int device_type_ranking(VkPhysicalDeviceType type) {
   switch (type) {
@@ -181,8 +186,10 @@ void ashfault::VulkanRenderer::create_instance() {
   for (std::size_t i = 0; i < layer_props.size(); i++) {
     if (std::strcmp(layer_props[i].layerName, "VK_LAYER_KHRONOS_validation") ==
         0) {
+#ifdef ASHFAULT_VK_VALIDATION
       enabled_layers.push_back("VK_LAYER_KHRONOS_validation");
       SPDLOG_INFO("Enabling validation layers");
+#endif
     }
   }
 
@@ -241,6 +248,8 @@ void ashfault::VulkanRenderer::create_device() {
   VkPhysicalDeviceVulkan12Features features_12{};
   features_12.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES;
   features_12.runtimeDescriptorArray = VK_TRUE;
+  features_12.descriptorIndexing = VK_TRUE;
+  features_12.descriptorBindingPartiallyBound = VK_TRUE;
 
   VkPhysicalDeviceVulkan13Features features_13{};
   features_13.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_3_FEATURES;
@@ -334,14 +343,35 @@ VkExtent2D VulkanRenderer::choose_swap_extent(
   return extent;
 }
 
-void ashfault::VulkanRenderer::setup_swapchain() {
+void ashfault::VulkanRenderer::setup_swapchain(bool vsync) {
   SwapchainSupportDetails swapchain_support =
       this->query_swapchain_support(this->m_PhysicalDevice);
   VkSurfaceFormatKHR swapchain_surface_format =
       select_surface_format(swapchain_support.formats);
   VkPresentModeKHR swapchain_present_mode =
       select_present_mode(swapchain_support.present_modes);
-  SPDLOG_INFO("Selected present mode {}", (int)swapchain_present_mode);
+  if (vsync) {
+    swapchain_present_mode = VK_PRESENT_MODE_FIFO_KHR;
+  }
+  std::string present_mode_str;
+  switch (swapchain_present_mode) {
+    case VK_PRESENT_MODE_MAILBOX_KHR:
+      present_mode_str = "Mailbox";
+      break;
+    case VK_PRESENT_MODE_FIFO_KHR:
+      present_mode_str = "FIFO";
+      break;
+    case VK_PRESENT_MODE_IMMEDIATE_KHR:
+      present_mode_str = "Immediate";
+      break;
+    case VK_PRESENT_MODE_FIFO_RELAXED_KHR:
+      present_mode_str = "Relaxed FIFO";
+      break;
+    default:
+      present_mode_str = std::format("{}", (int)swapchain_present_mode);
+      break;
+  }
+  SPDLOG_INFO("Selected present mode `{}`", present_mode_str);
 
   VkExtent2D swap_extent = choose_swap_extent(swapchain_support.capabilities);
 
@@ -474,6 +504,9 @@ void ashfault::VulkanRenderer::init(std::shared_ptr<Window> window) {
   this->m_Resized = false;
   this->m_CurrentFrame = 0;
   this->create_instance();
+#ifdef ASHFAULT_VK_VALIDATION
+  this->setup_debug_callback();
+#endif
   this->create_surface();
   this->create_device();
   this->create_allocator();
@@ -518,8 +551,11 @@ std::pair<VkImage, VmaAllocation> VulkanRenderer::create_image(
 
   VkImage image;
   VmaAllocation allocation;
-  if (vmaCreateImage(this->m_Allocator, &image_info, &allocation_info, &image,
-                     &allocation, nullptr) != VK_SUCCESS) {
+  VkResult result =
+      vmaCreateImage(this->m_Allocator, &image_info, &allocation_info, &image,
+                     &allocation, nullptr);
+  if (result != VK_SUCCESS) {
+    SPDLOG_ERROR("Failed to create image: {}", (int)result);
     throw std::runtime_error("Failed to create image");
   }
 
@@ -622,6 +658,9 @@ void VulkanRenderer::shutdown() {
   vmaDestroyAllocator(this->m_Allocator);
   vkDestroyDevice(this->m_Device, nullptr);
   vkDestroySurfaceKHR(this->m_Instance, this->m_Surface, nullptr);
+#ifdef ASHFAULT_VK_VALIDATION
+  vkDestroyDebugUtilsMessengerEXT(m_Instance, m_DebugMessenger, nullptr);
+#endif
   vkDestroyInstance(this->m_Instance, nullptr);
 }
 
@@ -662,6 +701,9 @@ VkSampler VulkanRenderer::create_sampler() {
   create_info.addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT;
   create_info.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT;
   create_info.anisotropyEnable = VK_FALSE;
+  create_info.magFilter = VK_FILTER_LINEAR;
+  create_info.minFilter = VK_FILTER_LINEAR;
+  create_info.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
 
   VkSampler ret;
   VK_CHECK_RESULT(vkCreateSampler(this->m_Device, &create_info, nullptr, &ret));
@@ -705,4 +747,129 @@ VkQueue &VulkanRenderer::graphics_queue() { return m_GraphicsQueue; }
 VkQueue &VulkanRenderer::present_queue() { return m_PresentQueue; }
 
 VkCommandPool &VulkanRenderer::command_pool() { return m_CommandPool; }
+
+VulkanTexture VulkanRenderer::create_texture(std::uint32_t width,
+                                             std::uint32_t height,
+                                             const char *data) {
+  VmaAllocationCreateInfo staging_alloc_info{};
+  staging_alloc_info.usage = VMA_MEMORY_USAGE_AUTO;
+  staging_alloc_info.flags =
+      VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT;
+  staging_alloc_info.requiredFlags = VK_MEMORY_PROPERTY_HOST_COHERENT_BIT |
+                                     VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT;
+
+  SPDLOG_TRACE("Allocating texture of size {}x{}x{}", width, height, 4);
+  auto [staging_buffer, staging_alloc] =
+      this->create_buffer(width * height * sizeof(std::uint32_t),
+                          VK_BUFFER_USAGE_TRANSFER_SRC_BIT, staging_alloc_info);
+
+  char *mapping;
+  vmaMapMemory(m_Allocator, staging_alloc, reinterpret_cast<void **>(&mapping));
+  std::memcpy(mapping, data, width * height * sizeof(std::uint32_t));
+  vmaUnmapMemory(m_Allocator, staging_alloc);
+
+  VmaAllocationCreateInfo alloc_info{};
+  alloc_info.usage = VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE;
+  alloc_info.requiredFlags = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
+
+  auto [image, allocation] = this->create_image(
+      width, height, VK_SAMPLE_COUNT_1_BIT, VK_FORMAT_R8G8B8A8_SRGB,
+      VK_IMAGE_TILING_OPTIMAL,
+      VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT, alloc_info);
+  command_buffer([&](VkCommandBuffer cmd) {
+    VkImageMemoryBarrier transfer_barrier{};
+    transfer_barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+    transfer_barrier.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+    transfer_barrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+    transfer_barrier.srcAccessMask = 0;
+    transfer_barrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+    transfer_barrier.image = image;
+    transfer_barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+    transfer_barrier.subresourceRange.baseArrayLayer = 0;
+    transfer_barrier.subresourceRange.baseMipLevel = 0;
+    transfer_barrier.subresourceRange.layerCount = 1;
+    transfer_barrier.subresourceRange.levelCount = 1;
+
+    vkCmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
+                         VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0, nullptr, 0,
+                         nullptr, 1, &transfer_barrier);
+
+    VkBufferImageCopy region{};
+    region.bufferOffset = 0;
+    region.imageOffset.x = 0;
+    region.imageOffset.y = 0;
+    region.imageOffset.z = 0;
+    region.imageExtent.width = width;
+    region.imageExtent.height = height;
+    region.imageExtent.depth = 1;
+    region.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+    region.imageSubresource.baseArrayLayer = 0;
+    region.imageSubresource.mipLevel = 0;
+    region.imageSubresource.layerCount = 1;
+
+    vkCmdCopyBufferToImage(cmd, staging_buffer, image,
+                           VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region);
+
+    VkImageMemoryBarrier color_barrier{};
+    color_barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+    color_barrier.image = image;
+    color_barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+    color_barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+    color_barrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+    color_barrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+    color_barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+    color_barrier.subresourceRange.baseArrayLayer = 0;
+    color_barrier.subresourceRange.baseMipLevel = 0;
+    color_barrier.subresourceRange.layerCount = 1;
+    color_barrier.subresourceRange.levelCount = 1;
+
+    vkCmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_TRANSFER_BIT,
+                         VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0, 0, nullptr,
+                         0, nullptr, 1, &color_barrier);
+  });
+
+  vmaDestroyBuffer(m_Allocator, staging_buffer, staging_alloc);
+  auto image_view = this->create_image_view(image, VK_FORMAT_R8G8B8A8_SRGB,
+                                            VK_IMAGE_ASPECT_COLOR_BIT);
+  return VulkanTexture(std::make_pair(image, allocation), image_view, m_Device,
+                       m_Allocator);
+}
+
+VKAPI_ATTR VkBool32 VKAPI_CALL
+debug_callback(VkDebugUtilsMessageSeverityFlagBitsEXT severity,
+               VkDebugUtilsMessageTypeFlagsEXT type,
+               const VkDebugUtilsMessengerCallbackDataEXT *callback_data,
+               void *user_data) {
+  auto *logger = reinterpret_cast<spdlog::logger *>(user_data);
+  if (severity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT) {
+    logger->error("{}", callback_data->pMessage);
+  } else {
+    logger->warn("{}", callback_data->pMessage);
+  }
+  return VK_FALSE;
+}
+
+void VulkanRenderer::setup_debug_callback() {
+  m_VkDebugLogger = spdlog::default_logger()->clone("vulkan_debug");
+  vkCreateDebugUtilsMessengerEXT =
+      (PFN_vkCreateDebugUtilsMessengerEXT)vkGetInstanceProcAddr(
+          m_Instance, "vkCreateDebugUtilsMessengerEXT");
+  vkDestroyDebugUtilsMessengerEXT =
+      (PFN_vkDestroyDebugUtilsMessengerEXT)vkGetInstanceProcAddr(
+          m_Instance, "vkDestroyDebugUtilsMessengerEXT");
+
+  VkDebugUtilsMessengerCreateInfoEXT create_info{};
+  create_info.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT;
+  create_info.messageSeverity =
+      VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT |
+      VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT;
+  create_info.messageType = VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT |
+                            VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT |
+                            VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT;
+  create_info.pfnUserCallback = debug_callback;
+  create_info.pUserData = m_VkDebugLogger.get();
+
+  VK_CHECK_RESULT(vkCreateDebugUtilsMessengerEXT(m_Instance, &create_info,
+                                                 nullptr, &m_DebugMessenger));
+}
 }  // namespace ashfault
