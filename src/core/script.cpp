@@ -28,7 +28,8 @@ void Script::init(sol::state &lua) {
   }
 
   if (m_Environment["OnSceneStart"].valid()) {
-    m_OnSceneStart = m_Environment["OnSceneStart"];
+    m_OnSceneStart =
+        std::make_optional<sol::function>(m_Environment["OnSceneStart"]);
   }
   m_OnUpdate = m_Environment["OnUpdate"];
   m_Environment.set_on(m_OnUpdate);
