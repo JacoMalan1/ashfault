@@ -1,5 +1,6 @@
 #include <ashfault/core/component/material.h>
 #include <ashfault/core/component/mesh.h>
+#include <ashfault/core/component/tag.h>
 #include <ashfault/core/component/transform.h>
 #include <ashfault/core/component/light.h>
 #include <ashfault/core/material.h>
@@ -20,6 +21,8 @@ Scene::Scene() : m_NextEntityId(0), m_ComponentRegistry(), m_Entities() {}
 Entity Scene::create_entity() {
   Entity e(m_NextEntityId++);
   this->m_Entities.push_back(e);
+  TagComponent tag{.tag = std::format("Entity {}", e.handle())};
+  m_ComponentRegistry.add_component(e, tag);
   return e;
 }
 
@@ -80,9 +83,10 @@ void Scene::draw_all() {
 
         model_mat = T * R * S;
       }
-      Material material = material_component
-                              ? material_component.value()->material
-                              : Material{.albedo_texture_index = 0};
+      Material material =
+          material_component
+              ? material_component.value()->material
+              : Material{.albedo_texture_index = 0, .normal_texture_index = 0};
 
       Renderer::submit_mesh(*mesh.value()->mesh.get(), model_mat, material);
     }

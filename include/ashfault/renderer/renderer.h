@@ -13,7 +13,7 @@
 #include <memory>
 
 #define ASHFAULT_MAX_LIGHTS 128
-#define ASHFAULT_MAX_TEXTURES 1000
+#define ASHFAULT_MAX_TEXTURES 10000
 
 namespace ashfault {
 class ASHFAULT_API Renderer {

@@ -10,9 +10,6 @@
 [submodule "vendor/glm"]
 	path = vendor/glm
 	url = https://github.com/g-truc/glm
-[submodule "vendor/tinyobjloader"]
-	path = vendor/tinyobjloader
-	url = https://github.com/tinyobjloader/tinyobjloader
 [submodule "vendor/imgui"]
 	path = vendor/imgui
 	url = https://github.com/ocornut/imgui
@@ -28,3 +25,6 @@
 [submodule "vendor/sol2"]
 	path = vendor/sol2
 	url = https://github.com/JacoMalan1/sol2
+[submodule "vendor/assimp"]
+	path = vendor/assimp
+	url = https://github.com/assimp/assimp

@@ -30,6 +30,7 @@
 #include <glm/gtc/quaternion.hpp>
 #include <glm/trigonometric.hpp>
 #include <imgui_internal.h>
+#include <misc/cpp/imgui_stdlib.h>
 
 namespace ashfault {
 EditorUiLayer::EditorUiLayer(EditorContext *context,
@@ -392,10 +393,7 @@ void EditorUiLayer::render_component_window() {
 
     if (tag.has_value()) {
       ImGui::SeparatorText("Tag");
-      char buf[1024];
-      std::strcpy(buf, tag.value()->tag.c_str());
-      ImGui::InputText("Name", buf, 1024);
-      tag.value()->tag = buf;
+      ImGui::InputText("Name", &tag.value()->tag);
 
       if (ImGui::Button("Delete Component##Tag")) {
         scene->component_registry().remove_component<TagComponent>(entity);

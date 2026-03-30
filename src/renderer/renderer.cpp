@@ -25,7 +25,7 @@ struct PushConstants {
   glm::mat4 projection;
   glm::mat4 view;
   glm::mat4 model;
-  int albedo_texture_index;
+  int albedo_texture_index, normal_texture_index;
 };
 
 struct RendererData {
@@ -152,17 +152,23 @@ void Renderer::create_pipelines() {
   vertex_attribs.push_back({
       .location = 0,
       .binding = 0,
-      .format = VK_FORMAT_R32G32B32_SFLOAT,
+      .format = VK_FORMAT_R32G32B32A32_SFLOAT,
       .offset = 0,
   });
   vertex_attribs.push_back({
       .location = 1,
       .binding = 0,
       .format = VK_FORMAT_R32G32B32_SFLOAT,
-      .offset = offsetof(Mesh::Vertex, normal),
+      .offset = offsetof(Mesh::Vertex, position),
   });
   vertex_attribs.push_back({
       .location = 2,
+      .binding = 0,
+      .format = VK_FORMAT_R32G32B32_SFLOAT,
+      .offset = offsetof(Mesh::Vertex, normal),
+  });
+  vertex_attribs.push_back({
+      .location = 3,
       .binding = 0,
       .format = VK_FORMAT_R32G32_SFLOAT,
       .offset = offsetof(Mesh::Vertex, uv),
@@ -446,11 +452,13 @@ void Renderer::submit_mesh(Mesh &mesh, const glm::mat4 &transform,
   }
 
   s_Data.camera_data->albedo_texture_index = material.albedo_texture_index;
+  s_Data.camera_data->normal_texture_index = material.normal_texture_index;
   auto data = s_Data.camera_data.value_or<PushConstants>(
       {.projection = glm::identity<glm::mat4>(),
        .view = glm::identity<glm::mat4>(),
        .model = glm::identity<glm::mat4>(),
-       .albedo_texture_index = material.albedo_texture_index});
+       .albedo_texture_index = material.albedo_texture_index,
+       .normal_texture_index = material.normal_texture_index});
   data.model = transform;
   vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline->handle());
   vkCmdPushConstants(cmd, pipeline->layout(), VK_SHADER_STAGE_VERTEX_BIT, 0,

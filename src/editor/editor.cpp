@@ -56,11 +56,6 @@ void Editor::run() {
     }
   });
 
-  m_Window->set_key_callback([&](Window &, int key, int, int action, int) {
-    KeyPressEvent ev(key, action);
-    m_LayerStack->on_event(ev);
-  });
-
   SPDLOG_INFO("Editor startup finished");
   Timer<std::chrono::high_resolution_clock> timer{};
   timer.start();
