@@ -1,4 +1,3 @@
-#include <ashfault/core/component/material.h>
 #include <ashfault/core/component/mesh.h>
 #include <ashfault/core/component/tag.h>
 #include <ashfault/core/component/transform.h>
@@ -43,8 +42,6 @@ void Scene::draw_all() {
         m_ComponentRegistry.get_component<PointLightComponent>(entity);
     auto transform =
         m_ComponentRegistry.get_component<TransformComponent>(entity);
-    auto material_component =
-        m_ComponentRegistry.get_component<MaterialComponent>(entity);
 
     if (directional_light.has_value()) {
       Light light{};
@@ -83,10 +80,9 @@ void Scene::draw_all() {
 
         model_mat = T * R * S;
       }
-      Material material =
-          material_component
-              ? material_component.value()->material
-              : Material{.albedo_texture_index = 0, .normal_texture_index = 0};
+
+      Material material = mesh.value()->material.value_or(
+          Material{.albedo_texture_index = 0, .normal_texture_index = 0});
 
       Renderer::submit_mesh(*mesh.value()->mesh.get(), model_mat, material);
     }

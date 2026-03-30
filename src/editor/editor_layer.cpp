@@ -1,6 +1,5 @@
 #include <ashfault/core/component/mesh.h>
 #include <ashfault/core/component/tag.h>
-#include <ashfault/core/component/material.h>
 #include <ashfault/core/component/transform.h>
 #include <ashfault/core/event/key_press.h>
 #include <ashfault/core/event/mouse_drag.h>
@@ -42,12 +41,13 @@ void EditorLayer::on_attach(LayerStack *) {
   m_ActiveScene = std::make_unique<Scene>();
   m_Context->active_scene = m_ActiveScene.get();
 
+  MeshComponent mesh{};
   auto entity = m_ActiveScene->create_entity();
-  MaterialComponent mat{
-      .material = {
-          .albedo_texture_index = static_cast<int>(tex.get()->index()),
-          .normal_texture_index = static_cast<int>(norm.get()->index())}};
-  m_ActiveScene->component_registry().add_component(entity, mat);
+  mesh.mesh = m_AssetManager->load<Mesh>("./monkey.obj", "./monkey.obj");
+  mesh.material = {
+      .albedo_texture_index = static_cast<int>(tex.get()->index()),
+      .normal_texture_index = static_cast<int>(norm.get()->index())};
+  m_ActiveScene->component_registry().add_component(entity, mesh);
 
   EventBus<StateChangeEvent>::get().subscribe(
       [&](const StateChangeEvent &ev) { m_RuntimeState = ev.state(); });
