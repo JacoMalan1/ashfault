@@ -19,12 +19,12 @@
 [submodule "vendor/ImGuizmo"]
 	path = vendor/ImGuizmo
 	url = https://github.com/CedricGuillemet/ImGuizmo
-[submodule "vendor/sol2"]
-	path = vendor/sol2
-	url = https://github.com/ThePhD/sol2.git
 [submodule "vendor/lua"]
 	path = vendor/lua
 	url = https://github.com/lua/lua
 [submodule "vendor/stb"]
 	path = vendor/stb
 	url = https://github.com/nothings/stb
+[submodule "vendor/sol2"]
+	path = vendor/sol2
+	url = https://github.com/JacoMalan1/sol2
