@@ -377,8 +377,12 @@ void EditorUiLayer::render_component_window() {
         if (!mesh.has_value() && ImGui::MenuItem("Mesh")) {
           MeshComponent mesh{
               .mesh = m_AssetManager->load<Mesh>("monkey", "monkey.obj"),
-              .material = Material{.albedo_texture_index = 0,
-                                   .normal_texture_index = 0}};
+              .material = Material{
+                  .diffuse = 1.0f,
+                  .specular = 1.0f,
+                  .albedo_texture_index = 0,
+                  .normal_texture_index = 0,
+              }};
           scene->component_registry().add_component(entity, mesh);
         }
         if (!script.has_value() && ImGui::MenuItem("Script")) {
@@ -455,6 +459,8 @@ void EditorUiLayer::render_component_window() {
         ImGui::EndDragDropTarget();
       }
       ImGui::EndDisabled();
+      ImGui::DragFloat("Diffuse", &mesh.value()->material->diffuse, 0.01f, 0.0f, 1.0f);
+      ImGui::DragFloat("Specular", &mesh.value()->material->specular, 0.01f, 0.0f, 1.0f);
       Renderer::push_render_target(m_TexturePreviewTargets[0].first);
       Renderer::draw_image(mesh.value()->material->albedo_texture_index);
       Renderer::pop_render_target();

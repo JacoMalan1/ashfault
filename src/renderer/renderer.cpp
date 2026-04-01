@@ -26,6 +26,7 @@ struct PushConstants {
   glm::mat4 view;
   glm::mat4 model;
   int albedo_texture_index, normal_texture_index;
+  float diffuse, specular;
 };
 
 struct RendererData {
@@ -500,7 +501,12 @@ void Renderer::submit_and_wait() {
 }
 
 void Renderer::submit_mesh(Mesh &mesh) {
-  Material default_material{.albedo_texture_index = 0};
+  Material default_material{
+      .diffuse = 1.0f,
+      .specular = 1.0f,
+      .albedo_texture_index = 0,
+      .normal_texture_index = 0,
+  };
   submit_mesh(mesh, glm::identity<glm::mat4>(), default_material);
 }
 
@@ -517,12 +523,17 @@ void Renderer::submit_mesh(Mesh &mesh, const glm::mat4 &transform,
 
   s_Data.camera_data->albedo_texture_index = material.albedo_texture_index;
   s_Data.camera_data->normal_texture_index = material.normal_texture_index;
-  auto data = s_Data.camera_data.value_or<PushConstants>(
-      {.projection = glm::identity<glm::mat4>(),
-       .view = glm::identity<glm::mat4>(),
-       .model = glm::identity<glm::mat4>(),
-       .albedo_texture_index = material.albedo_texture_index,
-       .normal_texture_index = material.normal_texture_index});
+  s_Data.camera_data->diffuse = material.diffuse;
+  s_Data.camera_data->specular = material.specular;
+  auto data = s_Data.camera_data.value_or<PushConstants>({
+      .projection = glm::identity<glm::mat4>(),
+      .view = glm::identity<glm::mat4>(),
+      .model = glm::identity<glm::mat4>(),
+      .albedo_texture_index = material.albedo_texture_index,
+      .normal_texture_index = material.normal_texture_index,
+      .diffuse = material.diffuse,
+      .specular = material.specular,
+  });
   data.model = transform;
   vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline->handle());
   vkCmdPushConstants(cmd, pipeline->layout(), VK_SHADER_STAGE_VERTEX_BIT, 0,
