@@ -5,7 +5,8 @@
 namespace ashfault {
 std::shared_ptr<Texture> TextureLoader::read(const std::string &path) {
   int width, height, channels;
-  auto *image = stbi_load(path.c_str(), &width, &height, &channels, STBI_rgb_alpha);
+  auto *image =
+      stbi_load(path.c_str(), &width, &height, &channels, STBI_rgb_alpha);
   if (!image) {
     throw std::runtime_error("Failed to read texture");
   }

@@ -37,6 +37,8 @@
 		spirv-tools
 		clang-tools
 		xwayland
+		mangohud
+		renderdoc
               ];
 
 	      env = {

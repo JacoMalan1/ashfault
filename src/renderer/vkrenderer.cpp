@@ -249,6 +249,8 @@ void ashfault::VulkanRenderer::create_device() {
   features_12.runtimeDescriptorArray = VK_TRUE;
   features_12.descriptorIndexing = VK_TRUE;
   features_12.descriptorBindingPartiallyBound = VK_TRUE;
+  features_12.descriptorBindingSampledImageUpdateAfterBind = VK_TRUE;
+  features_12.descriptorBindingUniformBufferUpdateAfterBind = VK_TRUE;
 
   VkPhysicalDeviceVulkan13Features features_13{};
   features_13.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_3_FEATURES;
@@ -482,8 +484,7 @@ void VulkanRenderer::setup_imgui() {
   init_info.Device = this->m_Device;
   init_info.QueueFamily = this->m_QueueFamilies.graphics_queue.value();
   init_info.Queue = this->m_GraphicsQueue;
-  init_info.DescriptorPoolSize =
-      IMGUI_IMPL_VULKAN_MINIMUM_IMAGE_SAMPLER_POOL_SIZE;
+  init_info.DescriptorPoolSize = 32;
   init_info.MinImageCount = this->m_Swapchain->image_count();
   init_info.ImageCount = this->m_Swapchain->image_count();
   init_info.PipelineInfoMain.PipelineRenderingCreateInfo = rendering_info;

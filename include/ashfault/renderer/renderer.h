@@ -9,6 +9,7 @@
 #include <ashfault/renderer/light.h>
 #include <ashfault/renderer/target.h>
 #include <imgui.h>
+#include <vulkan/vulkan_core.h>
 
 #include <memory>
 
@@ -54,6 +55,7 @@ public:
 
   static int upload_texture(const char *pixels, std::uint32_t width,
                             std::uint32_t height);
+  static void draw_image(int texture_id);
 
 private:
   static void create_pipelines();

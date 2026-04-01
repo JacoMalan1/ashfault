@@ -31,23 +31,12 @@ EditorLayer::~EditorLayer() {}
 void EditorLayer::on_attach(LayerStack *) {
   std::uint32_t white = 0xffffffff;
   Renderer::upload_texture(reinterpret_cast<const char *>(&white), 1, 1);
-  auto tex =
-      m_AssetManager->load<Texture>("rock_wall", "rock_wall_16_diff_8k.jpg");
-  auto norm = m_AssetManager->load<Texture>("rock_wall_norm",
-                                            "rock_wall_16_nor_gl_8k.png");
+  auto tex = m_AssetManager->load<Texture>("rock_wall", "pavement_albedo.png");
   m_PerspectiveCamera->set_position(glm::vec3(0.0f, 0.0f, 0.0f));
   m_Context->perspective_camera = m_PerspectiveCamera.get();
 
   m_ActiveScene = std::make_unique<Scene>();
   m_Context->active_scene = m_ActiveScene.get();
-
-  MeshComponent mesh{};
-  auto entity = m_ActiveScene->create_entity();
-  mesh.mesh = m_AssetManager->load<Mesh>("./monkey.obj", "./monkey.obj");
-  mesh.material = {
-      .albedo_texture_index = static_cast<int>(tex.get()->index()),
-      .normal_texture_index = static_cast<int>(norm.get()->index())};
-  m_ActiveScene->component_registry().add_component(entity, mesh);
 
   EventBus<StateChangeEvent>::get().subscribe(
       [&](const StateChangeEvent &ev) { m_RuntimeState = ev.state(); });
