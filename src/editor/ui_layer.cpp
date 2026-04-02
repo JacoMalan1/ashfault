@@ -149,7 +149,7 @@ void EditorUiLayer::on_attach(LayerStack *stack) {
 
   m_ViewportTextures.resize(renderer.swapchain()->image_count());
   for (std::size_t i = 0; i < 2; i++) {
-    auto target = Renderer::create_render_target(1920, 1920, false);
+    auto target = Renderer::create_render_target(400, 400, false);
     std::vector<VkDescriptorSet> textures{};
     textures.resize(renderer.swapchain()->image_count());
     for (std::size_t j = 0; j < renderer.swapchain()->image_count(); j++) {
@@ -240,6 +240,20 @@ void render_directory(const std::filesystem::path &path,
       std::filesystem::begin(std::filesystem::directory_iterator(path));
   auto end = std::filesystem::end(std::filesystem::directory_iterator(path));
 
+  std::vector<std::filesystem::directory_entry> entries{};
+  for (auto it = begin; it != end; it++) {
+    entries.push_back(*it);
+  }
+
+  std::sort(entries.begin(), entries.end(),
+            [](const std::filesystem::directory_entry &a,
+               const std::filesystem::directory_entry &b) {
+              if (a.is_directory() && !b.is_directory()) return true;
+              if (!a.is_directory() && b.is_directory()) return false;
+
+              return a.path() < b.path();
+            });
+
   ImGuiTreeNodeFlags flags = 0;
   if (default_open) {
     flags |= ImGuiTreeNodeFlags_DefaultOpen;
@@ -259,7 +273,7 @@ void render_directory(const std::filesystem::path &path,
 
   if (ImGui::TreeNodeEx(reinterpret_cast<const char *>(path.filename().c_str()),
                         flags)) {
-    for (auto it = begin; it != end; it++) {
+    for (auto it = entries.begin(); it != entries.end(); it++) {
       auto path = it->path();
       if (path.has_filename() && path.filename().string().starts_with(".")) {
         continue;
@@ -459,8 +473,10 @@ void EditorUiLayer::render_component_window() {
         ImGui::EndDragDropTarget();
       }
       ImGui::EndDisabled();
-      ImGui::DragFloat("Diffuse", &mesh.value()->material->diffuse, 0.01f, 0.0f, 1.0f);
-      ImGui::DragFloat("Specular", &mesh.value()->material->specular, 0.01f, 0.0f, 1.0f);
+      ImGui::DragFloat("Diffuse", &mesh.value()->material->diffuse, 0.01f, 0.0f,
+                       1.0f);
+      ImGui::DragFloat("Specular", &mesh.value()->material->specular, 0.01f,
+                       0.0f, 1.0f);
       Renderer::push_render_target(m_TexturePreviewTargets[0].first);
       Renderer::draw_image(mesh.value()->material->albedo_texture_index);
       Renderer::pop_render_target();

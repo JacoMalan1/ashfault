@@ -7,12 +7,17 @@
 layout(location = 0) in vec3 i_Normal;
 layout(location = 1) in vec3 i_FragPos;
 layout(location = 2) in vec2 i_UV;
-layout(location = 3) flat in int i_TexIndex;
-layout(location = 4) flat in int i_NormalIdx;
-layout(location = 5) flat in float i_Diffuse;
-layout(location = 6) flat in float i_Specular;
-layout(location = 9) in mat4 i_ViewMat;
-layout(location = 13) in mat3 i_TBN;
+layout(location = 3) in mat3 i_TBN;
+
+layout(push_constant) uniform PushConstants {
+  mat4 proj_mat;
+  mat4 view_mat;
+  mat4 model;
+  int albedo_tex_index;
+  int normal_tex_index;
+  float diffuse;
+  float specular;
+} pc;
 
 struct Light {
   vec4 position;
@@ -31,7 +36,7 @@ layout(location = 0) out vec4 o_FragColor;
 
 vec3 directional_light(Light light, vec3 normal, vec3 viewDir, vec3 fragPos, float diffuseStrength, float specularStrength) {
   vec3 result = vec3(0);
-  vec3 lightDir = normalize(-(i_ViewMat * vec4(light.direction.xyz, 0.0)).xyz);
+  vec3 lightDir = normalize(-(pc.view_mat * vec4(light.direction.xyz, 0.0)).xyz);
 
   float diff = max(dot(normal, lightDir), 0.0);
   vec3 diffuse = diffuseStrength * diff * light.color.rgb;
@@ -45,7 +50,7 @@ vec3 directional_light(Light light, vec3 normal, vec3 viewDir, vec3 fragPos, flo
 }
 
 vec3 point_light(Light light, vec3 normal, vec3 viewDir, vec3 fragPos, float diffuseStrength, float specularStrength) {
-  vec3 lightPos = (i_ViewMat * vec4(light.position.xyz, 1.0f)).xyz;
+  vec3 lightPos = (pc.view_mat * vec4(light.position.xyz, 1.0f)).xyz;
   vec3 lightDir = normalize(lightPos - fragPos);
 
   float diff = max(dot(normal, lightDir), 0.0);
@@ -66,16 +71,16 @@ vec3 point_light(Light light, vec3 normal, vec3 viewDir, vec3 fragPos, float dif
 }
 
 void main() {
-  vec3 col = texture(textures[i_TexIndex], i_UV).xyz;
+  vec3 col = texture(textures[pc.albedo_tex_index], i_UV).xyz;
   float ambientStrength = 0.2;
   vec3 ambient = vec3(1) * ambientStrength;
   vec3 lightAccumulation = vec3(0);
-  float diffuse = clamp(i_Diffuse, 0.0, 1.0);
-  float specular = clamp(i_Specular, 0.0, 1.0);
+  float diffuse = clamp(pc.diffuse, 0.0, 1.0);
+  float specular = clamp(pc.specular, 0.0, 1.0);
 
   vec3 normal = i_Normal;
-  if (i_NormalIdx != 0) {
-    normal = texture(textures[i_NormalIdx], i_UV).xyz * 2.0f - 1.0f;
+  if (pc.normal_tex_index != 0) {
+    normal = texture(textures[pc.normal_tex_index], i_UV).xyz * 2.0f - 1.0f;
     normal = normalize(i_TBN * normal);
   }
 

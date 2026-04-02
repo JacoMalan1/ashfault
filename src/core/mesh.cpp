@@ -32,7 +32,8 @@ std::shared_ptr<Mesh> Mesh::load_from_file(const std::string &path) {
   Assimp::Importer importer;
   const auto *scene = importer.ReadFile(
       path, aiProcess_CalcTangentSpace | aiProcess_GenNormals |
-                aiProcess_Triangulate | aiProcess_JoinIdenticalVertices);
+                aiProcess_Triangulate | aiProcess_JoinIdenticalVertices |
+                aiProcess_FlipUVs);
 
   if (!scene) {
     throw std::runtime_error("Failed to load model file");

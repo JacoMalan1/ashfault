@@ -186,7 +186,9 @@ void create_blinn_phong_pipeline() {
           .input_attribute_descriptions(vertex_attribs, sizeof(Mesh::Vertex))
           .vertex_shader(static_vshader)
           .fragment_shader(static_fshader)
-          .push_constant(VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(PushConstants))
+          .push_constant(
+              VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0,
+              sizeof(PushConstants))
           .build(all_layouts);
 
   s_Data.pipeline_manager->add_graphics_pipeline("blinn_phong",
@@ -240,7 +242,7 @@ void create_texture_preview_pipeline() {
           .vertex_shader(vshader)
           .fragment_shader(fshader)
           .input_attribute_descriptions(vertex_inputs, 4 * sizeof(float))
-          .push_constant(VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(int))
+          .push_constant(VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(int))
           .build(layouts);
   s_Data.pipeline_manager->add_graphics_pipeline("texture_preview", pipeline);
 
@@ -536,8 +538,9 @@ void Renderer::submit_mesh(Mesh &mesh, const glm::mat4 &transform,
   });
   data.model = transform;
   vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline->handle());
-  vkCmdPushConstants(cmd, pipeline->layout(), VK_SHADER_STAGE_VERTEX_BIT, 0,
-                     sizeof(PushConstants), &data);
+  vkCmdPushConstants(cmd, pipeline->layout(),
+                     VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
+                     0, sizeof(PushConstants), &data);
   VkDeviceSize offset = 0;
   vkCmdBindIndexBuffer(cmd, mesh.index_buffer()->handle(), 0,
                        index_type<std::uint32_t>::value);
@@ -662,7 +665,7 @@ void Renderer::draw_image(int texture_id) {
       s_Data.pipeline_manager->get_graphics_pipeline("texture_preview");
   vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline->handle());
 
-  vkCmdPushConstants(cmd, pipeline->layout(), VK_SHADER_STAGE_VERTEX_BIT, 0,
+  vkCmdPushConstants(cmd, pipeline->layout(), VK_SHADER_STAGE_FRAGMENT_BIT, 0,
                      sizeof(int), &texture_id);
   vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS,
                           pipeline->layout(), 1, 1, &s_Data.texture_descriptors,

@@ -8,12 +8,7 @@ layout(location = 3) in vec2 a_UV;
 layout(location = 0) out vec3 o_Normal;
 layout(location = 1) out vec3 o_FragPos;
 layout(location = 2) out vec2 o_UV;
-layout(location = 3) out int o_TexIndex;
-layout(location = 4) out int o_NormalIdx;
-layout(location = 5) out float o_Diffuse;
-layout(location = 6) out float o_Specular;
-layout(location = 9) out mat4 o_ViewMat;
-layout(location = 13) out mat3 o_TBN;
+layout(location = 3) out mat3 o_TBN;
 
 layout(push_constant) uniform PushConstants {
   mat4 proj_mat;
@@ -40,9 +35,4 @@ void main() {
   }
 
   o_UV = a_UV;
-  o_TexIndex = pc.albedo_tex_index;
-  o_NormalIdx = pc.normal_tex_index;
-  o_ViewMat = pc.view_mat;
-  o_Diffuse = pc.diffuse;
-  o_Specular = pc.specular;
 }
