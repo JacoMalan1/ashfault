@@ -17,6 +17,7 @@ class ASHFAULT_API Mesh : IAsset {
 public:
   enum MeshType { Static };
   struct Vertex {
+    glm::vec4 tangent;
     glm::vec3 position;
     glm::vec3 normal;
     glm::vec2 uv;
@@ -49,7 +50,8 @@ struct std::hash<ashfault::Mesh::Vertex> {
   std::size_t operator()(const ashfault::Mesh::Vertex &vert) const noexcept {
     std::hash<glm::vec3> hasher{};
     std::hash<glm::vec2> vec2_hasher{};
-    return hasher(vert.position) ^ hasher(vert.normal) ^ vec2_hasher(vert.uv);
+    return ((hasher(vert.position) ^ (hasher(vert.normal) << 1)) >> 1) ^
+           (vec2_hasher(vert.uv) << 1);
   }
 };
 

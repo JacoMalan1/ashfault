@@ -1,4 +1,5 @@
 build/
+assets/textures/*
 .cache
 .direnv
 compile_commands.json

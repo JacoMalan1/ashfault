@@ -25,7 +25,8 @@ struct PushConstants {
   glm::mat4 projection;
   glm::mat4 view;
   glm::mat4 model;
-  int albedo_texture_index;
+  int albedo_texture_index, normal_texture_index;
+  float diffuse, specular;
 };
 
 struct RendererData {
@@ -59,6 +60,9 @@ struct RendererData {
   VkDescriptorSet texture_descriptors;
   VkDescriptorPool texture_pool;
   VkSampler sampler;
+
+  std::shared_ptr<VulkanBuffer> texture_preview_vbuf;
+  std::shared_ptr<VulkanBuffer> texture_preview_ibuf;
 };
 
 static RendererData s_Data;
@@ -94,7 +98,7 @@ void Renderer::create_descriptors() {
                                            &s_Data.texture_descriptors));
 }
 
-void Renderer::create_pipelines() {
+void create_blinn_phong_pipeline() {
   std::array<VkDescriptorSetLayoutBinding, 1> bindings{};
   bindings[0] = {.binding = 0,
                  .descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
@@ -119,7 +123,8 @@ void Renderer::create_pipelines() {
   binding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
 
   VkDescriptorBindingFlags binding_flags =
-      VK_DESCRIPTOR_BINDING_PARTIALLY_BOUND_BIT;
+      VK_DESCRIPTOR_BINDING_PARTIALLY_BOUND_BIT |
+      VK_DESCRIPTOR_BINDING_UPDATE_AFTER_BIND_BIT;
 
   VkDescriptorSetLayoutBindingFlagsCreateInfo binding_flags_info{};
   binding_flags_info.sType =
@@ -132,6 +137,8 @@ void Renderer::create_pipelines() {
       VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
   texture_layout_info.bindingCount = 1;
   texture_layout_info.pBindings = &binding;
+  texture_layout_info.flags =
+      VK_DESCRIPTOR_SET_LAYOUT_CREATE_UPDATE_AFTER_BIND_POOL_BIT;
   texture_layout_info.pNext = &binding_flags_info;
 
   s_Data.texture_layouts.resize(1);
@@ -152,17 +159,23 @@ void Renderer::create_pipelines() {
   vertex_attribs.push_back({
       .location = 0,
       .binding = 0,
-      .format = VK_FORMAT_R32G32B32_SFLOAT,
+      .format = VK_FORMAT_R32G32B32A32_SFLOAT,
       .offset = 0,
   });
   vertex_attribs.push_back({
       .location = 1,
       .binding = 0,
       .format = VK_FORMAT_R32G32B32_SFLOAT,
-      .offset = offsetof(Mesh::Vertex, normal),
+      .offset = offsetof(Mesh::Vertex, position),
   });
   vertex_attribs.push_back({
       .location = 2,
+      .binding = 0,
+      .format = VK_FORMAT_R32G32B32_SFLOAT,
+      .offset = offsetof(Mesh::Vertex, normal),
+  });
+  vertex_attribs.push_back({
+      .location = 3,
       .binding = 0,
       .format = VK_FORMAT_R32G32_SFLOAT,
       .offset = offsetof(Mesh::Vertex, uv),
@@ -173,12 +186,93 @@ void Renderer::create_pipelines() {
           .input_attribute_descriptions(vertex_attribs, sizeof(Mesh::Vertex))
           .vertex_shader(static_vshader)
           .fragment_shader(static_fshader)
-          .push_constant(VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(PushConstants))
+          .push_constant(
+              VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0,
+              sizeof(PushConstants))
           .build(all_layouts);
 
   s_Data.pipeline_manager->add_graphics_pipeline("blinn_phong",
                                                  static_pipeline);
   s_Data.pipeline_layout = static_pipeline->layout();
+}
+
+struct TexturePreviewVertex {
+  glm::vec2 position;
+  glm::vec2 uv;
+};
+
+void create_texture_preview_pipeline() {
+  VkDescriptorSetLayoutBinding binding{};
+  binding.binding = 0;
+  binding.descriptorCount = 1;
+  binding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+  binding.stageFlags = VK_PIPELINE_STAGE_VERTEX_SHADER_BIT;
+
+  VkDescriptorSetLayoutCreateInfo layout_info{};
+  layout_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+  layout_info.bindingCount = 1;
+  layout_info.pBindings = &binding;
+  layout_info.flags = VK_DESCRIPTOR_SET_LAYOUT_CREATE_PUSH_DESCRIPTOR_BIT_KHR;
+
+  s_Data.push_descriptor_layouts.resize(s_Data.push_descriptor_layouts.size() +
+                                        1);
+  VK_CHECK_RESULT(vkCreateDescriptorSetLayout(
+      s_Data.render_backend->device(), &layout_info, nullptr,
+      s_Data.push_descriptor_layouts.data() +
+          s_Data.push_descriptor_layouts.size() - 1));
+
+  auto vshader = s_Data.render_backend->create_shader("image_preview.vert.spv");
+  auto fshader = s_Data.render_backend->create_shader("image_preview.frag.spv");
+
+  std::vector<VkVertexInputAttributeDescription> vertex_inputs{};
+  vertex_inputs.push_back({.location = 0,
+                           .binding = 0,
+                           .format = VK_FORMAT_R32G32_SFLOAT,
+                           .offset = 0});
+  vertex_inputs.push_back({.location = 1,
+                           .binding = 0,
+                           .format = VK_FORMAT_R32G32_SFLOAT,
+                           .offset = 2 * sizeof(float)});
+
+  std::vector<VkDescriptorSetLayout> layouts{
+      s_Data.push_descriptor_layouts[s_Data.push_descriptor_layouts.size() - 1],
+      s_Data.texture_layouts[0]};
+  auto pipeline =
+      s_Data.render_backend->create_graphics_pipeline()
+          .vertex_shader(vshader)
+          .fragment_shader(fshader)
+          .input_attribute_descriptions(vertex_inputs, 4 * sizeof(float))
+          .push_constant(VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(int))
+          .build(layouts);
+  s_Data.pipeline_manager->add_graphics_pipeline("texture_preview", pipeline);
+
+  std::vector<TexturePreviewVertex> vertices{};
+  vertices.push_back({
+      .position = glm::vec2(-1.0f, -1.0f),
+      .uv = glm::vec2(0.0f, 0.0f),
+  });
+  vertices.push_back({
+      .position = glm::vec2(-1.0f, 1.0f),
+      .uv = glm::vec2(0.0f, 1.0f),
+  });
+  vertices.push_back({
+      .position = glm::vec2(1.0f, 1.0f),
+      .uv = glm::vec2(1.0f, 1.0f),
+  });
+  vertices.push_back({
+      .position = glm::vec2(1.0f, -1.0f),
+      .uv = glm::vec2(1.0f, 0.0f),
+  });
+  std::vector<std::uint32_t> indices = {0, 1, 2, 0, 2, 3};
+  s_Data.texture_preview_vbuf =
+      s_Data.render_backend->create_vertex_buffer(vertices);
+  s_Data.texture_preview_ibuf =
+      s_Data.render_backend->create_index_buffer(indices);
+}
+
+void Renderer::create_pipelines() {
+  create_blinn_phong_pipeline();
+  create_texture_preview_pipeline();
 }
 
 bool Renderer::start_frame() {
@@ -315,27 +409,6 @@ void Renderer::push_render_target(std::shared_ptr<RenderTarget> target) {
   vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS,
                           s_Data.pipeline_layout, 1, 1,
                           &s_Data.texture_descriptors, 0, nullptr);
-  std::memcpy(s_Data.light_buffer_mapping, s_Data.lights.data(),
-              sizeof(Light) * s_Data.lights.size());
-  std::memcpy(reinterpret_cast<char *>(s_Data.light_buffer_mapping) +
-                  sizeof(Light) * ASHFAULT_MAX_LIGHTS,
-              &s_Data.light_count, sizeof(std::int32_t));
-
-  VkDescriptorBufferInfo buffer_info{};
-  buffer_info.buffer = s_Data.light_buffer.first;
-  buffer_info.offset = 0;
-  buffer_info.range = sizeof(Light) * ASHFAULT_MAX_LIGHTS + sizeof(int);
-
-  VkWriteDescriptorSet write{};
-  write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-  write.descriptorCount = 1;
-  write.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-  write.dstBinding = 0;
-  write.dstSet = 0;
-  write.pBufferInfo = &buffer_info;
-  vkCmdPushDescriptorSetKHR(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS,
-                            s_Data.pipeline_layout, 0, 1, &write);
-  s_Data.light_count = 0;
 }
 
 void Renderer::pop_render_target() {
@@ -430,7 +503,12 @@ void Renderer::submit_and_wait() {
 }
 
 void Renderer::submit_mesh(Mesh &mesh) {
-  Material default_material{.albedo_texture_index = 0};
+  Material default_material{
+      .diffuse = 1.0f,
+      .specular = 1.0f,
+      .albedo_texture_index = 0,
+      .normal_texture_index = 0,
+  };
   submit_mesh(mesh, glm::identity<glm::mat4>(), default_material);
 }
 
@@ -446,15 +524,23 @@ void Renderer::submit_mesh(Mesh &mesh, const glm::mat4 &transform,
   }
 
   s_Data.camera_data->albedo_texture_index = material.albedo_texture_index;
-  auto data = s_Data.camera_data.value_or<PushConstants>(
-      {.projection = glm::identity<glm::mat4>(),
-       .view = glm::identity<glm::mat4>(),
-       .model = glm::identity<glm::mat4>(),
-       .albedo_texture_index = material.albedo_texture_index});
+  s_Data.camera_data->normal_texture_index = material.normal_texture_index;
+  s_Data.camera_data->diffuse = material.diffuse;
+  s_Data.camera_data->specular = material.specular;
+  auto data = s_Data.camera_data.value_or<PushConstants>({
+      .projection = glm::identity<glm::mat4>(),
+      .view = glm::identity<glm::mat4>(),
+      .model = glm::identity<glm::mat4>(),
+      .albedo_texture_index = material.albedo_texture_index,
+      .normal_texture_index = material.normal_texture_index,
+      .diffuse = material.diffuse,
+      .specular = material.specular,
+  });
   data.model = transform;
   vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline->handle());
-  vkCmdPushConstants(cmd, pipeline->layout(), VK_SHADER_STAGE_VERTEX_BIT, 0,
-                     sizeof(PushConstants), &data);
+  vkCmdPushConstants(cmd, pipeline->layout(),
+                     VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
+                     0, sizeof(PushConstants), &data);
   VkDeviceSize offset = 0;
   vkCmdBindIndexBuffer(cmd, mesh.index_buffer()->handle(), 0,
                        index_type<std::uint32_t>::value);
@@ -465,6 +551,8 @@ void Renderer::submit_mesh(Mesh &mesh, const glm::mat4 &transform,
 void Renderer::shutdown() {
   auto device = s_Data.render_backend->device();
   vkDeviceWaitIdle(device);
+  s_Data.texture_preview_ibuf->destroy();
+  s_Data.texture_preview_vbuf->destroy();
   vmaUnmapMemory(s_Data.render_backend->allocator(),
                  s_Data.light_buffer.second);
   vmaDestroyBuffer(s_Data.render_backend->allocator(),
@@ -510,6 +598,28 @@ void Renderer::begin_scene(Camera &camera) {
                         .view = camera.view()};
 
   s_Data.camera_data = data;
+  VkCommandBuffer cmd = render_target().command_buffer(s_Data.current_frame);
+  std::memcpy(s_Data.light_buffer_mapping, s_Data.lights.data(),
+              sizeof(Light) * s_Data.lights.size());
+  std::memcpy(reinterpret_cast<char *>(s_Data.light_buffer_mapping) +
+                  sizeof(Light) * ASHFAULT_MAX_LIGHTS,
+              &s_Data.light_count, sizeof(std::int32_t));
+
+  VkDescriptorBufferInfo buffer_info{};
+  buffer_info.buffer = s_Data.light_buffer.first;
+  buffer_info.offset = 0;
+  buffer_info.range = sizeof(Light) * ASHFAULT_MAX_LIGHTS + sizeof(int);
+
+  VkWriteDescriptorSet write{};
+  write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+  write.descriptorCount = 1;
+  write.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+  write.dstBinding = 0;
+  write.dstSet = 0;
+  write.pBufferInfo = &buffer_info;
+  vkCmdPushDescriptorSetKHR(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS,
+                            s_Data.pipeline_layout, 0, 1, &write);
+  s_Data.light_count = 0;
 }
 
 void Renderer::end_scene() {
@@ -547,5 +657,24 @@ int Renderer::upload_texture(const char *pixels, std::uint32_t width,
   vkUpdateDescriptorSets(s_Data.render_backend->device(), 1, &write, 0,
                          nullptr);
   return tex_index;
+}
+
+void Renderer::draw_image(int texture_id) {
+  VkCommandBuffer cmd = render_target().command_buffer(s_Data.current_frame);
+  auto pipeline =
+      s_Data.pipeline_manager->get_graphics_pipeline("texture_preview");
+  vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline->handle());
+
+  vkCmdPushConstants(cmd, pipeline->layout(), VK_SHADER_STAGE_FRAGMENT_BIT, 0,
+                     sizeof(int), &texture_id);
+  vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS,
+                          pipeline->layout(), 1, 1, &s_Data.texture_descriptors,
+                          0, nullptr);
+  VkDeviceSize offset = 0;
+  vkCmdBindVertexBuffers(cmd, 0, 1, &s_Data.texture_preview_vbuf->handle(),
+                         &offset);
+  vkCmdBindIndexBuffer(cmd, s_Data.texture_preview_ibuf->handle(), 0,
+                       index_type<std::uint32_t>::value);
+  vkCmdDrawIndexed(cmd, s_Data.texture_preview_ibuf->count(), 1, 0, 0, 0);
 }
 }  // namespace ashfault

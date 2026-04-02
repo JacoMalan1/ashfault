@@ -1,6 +1,5 @@
 #include <ashfault/core/component/mesh.h>
 #include <ashfault/core/component/tag.h>
-#include <ashfault/core/component/material.h>
 #include <ashfault/core/component/transform.h>
 #include <ashfault/core/event/key_press.h>
 #include <ashfault/core/event/mouse_drag.h>
@@ -32,7 +31,7 @@ EditorLayer::~EditorLayer() {}
 void EditorLayer::on_attach(LayerStack *) {
   std::uint32_t white = 0xffffffff;
   Renderer::upload_texture(reinterpret_cast<const char *>(&white), 1, 1);
-  auto tex = m_AssetManager->load<Texture>("pavement", "pavement_albedo.png");
+  auto tex = m_AssetManager->load<Texture>("rock_wall", "pavement_albedo.png");
   m_PerspectiveCamera->set_position(glm::vec3(0.0f, 0.0f, 0.0f));
   m_Context->perspective_camera = m_PerspectiveCamera.get();
 

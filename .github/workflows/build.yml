@@ -74,6 +74,8 @@ jobs:
           submodules: 'recursive'
 
       - uses: ilammy/msvc-dev-cmd@v1.13.0
+        with:
+          toolset: 14.44
 
       - name: Setup Vulkan SDK
         uses: humbletim/install-vulkan-sdk@v1.2
@@ -85,9 +87,8 @@ jobs:
         run: |
           mkdir build
           cd build
-          cmake -G "NMake Makefiles" -DCMAKE_BUILD_TYPE=Relase ..
+          cmake -G "NMake Makefiles" -DCMAKE_BUILD_TYPE=Release ..
 
       - name: Build
         run: |
-          cd build
-          nmake
+          cmake --build build

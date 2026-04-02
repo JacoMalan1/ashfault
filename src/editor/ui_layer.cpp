@@ -4,6 +4,7 @@
 #include <ashfault/core/event/mouse_scroll.h>
 #include <ashfault/core/event/scene_start.h>
 #include <ashfault/core/event/viewport_resize.h>
+#include <ashfault/core/texture.h>
 #include <ashfault/editor/context.h>
 #include <ashfault/editor/event/state_change.h>
 #include <ashfault/editor/ui_layer.h>
@@ -30,6 +31,7 @@
 #include <glm/gtc/quaternion.hpp>
 #include <glm/trigonometric.hpp>
 #include <imgui_internal.h>
+#include <misc/cpp/imgui_stdlib.h>
 
 namespace ashfault {
 EditorUiLayer::EditorUiLayer(EditorContext *context,
@@ -44,6 +46,12 @@ EditorUiLayer::EditorUiLayer(EditorContext *context,
 
 EditorUiLayer::~EditorUiLayer() {
   m_ViewportTarget->destroy();
+  for (auto &[target, textures] : m_TexturePreviewTargets) {
+    target->destroy();
+    for (auto tex : textures) {
+      ImGui_ImplVulkan_RemoveTexture(tex);
+    }
+  }
   for (auto tex : m_ViewportTextures) {
     ImGui_ImplVulkan_RemoveTexture(tex);
   }
@@ -140,6 +148,18 @@ void EditorUiLayer::on_attach(LayerStack *stack) {
   m_ViewportSampler = renderer.create_sampler();
 
   m_ViewportTextures.resize(renderer.swapchain()->image_count());
+  for (std::size_t i = 0; i < 2; i++) {
+    auto target = Renderer::create_render_target(400, 400, false);
+    std::vector<VkDescriptorSet> textures{};
+    textures.resize(renderer.swapchain()->image_count());
+    for (std::size_t j = 0; j < renderer.swapchain()->image_count(); j++) {
+      textures[j] =
+          ImGui_ImplVulkan_AddTexture(m_ViewportSampler, target->image_view(j),
+                                      VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+    }
+    m_TexturePreviewTargets.push_back(std::make_pair(target, textures));
+  }
+
   for (std::size_t i = 0; i < renderer.swapchain()->image_count(); i++) {
     m_ViewportTextures[i] = ImGui_ImplVulkan_AddTexture(
         m_ViewportSampler, m_ViewportTarget->image_view(i),
@@ -220,42 +240,54 @@ void render_directory(const std::filesystem::path &path,
       std::filesystem::begin(std::filesystem::directory_iterator(path));
   auto end = std::filesystem::end(std::filesystem::directory_iterator(path));
 
+  std::vector<std::filesystem::directory_entry> entries{};
+  for (auto it = begin; it != end; it++) {
+    entries.push_back(*it);
+  }
+
+  std::sort(entries.begin(), entries.end(),
+            [](const std::filesystem::directory_entry &a,
+               const std::filesystem::directory_entry &b) {
+              if (a.is_directory() && !b.is_directory()) return true;
+              if (!a.is_directory() && b.is_directory()) return false;
+
+              return a.path() < b.path();
+            });
+
   ImGuiTreeNodeFlags flags = 0;
   if (default_open) {
     flags |= ImGuiTreeNodeFlags_DefaultOpen;
   }
+
+  auto drop_source = [](const std::string &ext, const std::string &type,
+                        const std::filesystem::path &path) {
+    if (path.extension().string() == ext) {
+      if (ImGui::BeginDragDropSource()) {
+        auto str = path.string();
+        ImGui::SetDragDropPayload(type.c_str(), str.c_str(),
+                                  std::strlen(str.c_str()) + 1);
+        ImGui::EndDragDropSource();
+      }
+    }
+  };
+
   if (ImGui::TreeNodeEx(reinterpret_cast<const char *>(path.filename().c_str()),
                         flags)) {
-    for (auto it = begin; it != end; it++) {
+    for (auto it = entries.begin(); it != entries.end(); it++) {
       auto path = it->path();
       if (path.has_filename() && path.filename().string().starts_with(".")) {
         continue;
       }
       if (it->is_directory()) {
         render_directory(path);
-      } else if (path.has_extension() && path.extension().string() == ".obj") {
+      } else if (path.has_extension()) {
         if (ImGui::TreeNodeEx(
                 reinterpret_cast<const char *>(path.filename().c_str()),
                 ImGuiTreeNodeFlags_Leaf)) {
-          if (ImGui::BeginDragDropSource()) {
-            auto str = it->path().string();
-            ImGui::SetDragDropPayload("obj", str.c_str(),
-                                      std::strlen(str.c_str()) + 1);
-            ImGui::EndDragDropSource();
-          }
-          ImGui::TreePop();
-        }
-      } else if (it->path().has_extension() &&
-                 it->path().extension().string() == ".lua") {
-        if (ImGui::TreeNodeEx(
-                reinterpret_cast<const char *>(path.filename().c_str()),
-                ImGuiTreeNodeFlags_Leaf)) {
-          if (ImGui::BeginDragDropSource()) {
-            auto str = path.string();
-            ImGui::SetDragDropPayload("lua", str.c_str(),
-                                      std::strlen(str.c_str()) + 1);
-            ImGui::EndDragDropSource();
-          }
+          drop_source(".obj", "obj", path);
+          drop_source(".lua", "lua", path);
+          drop_source(".png", "texture", path);
+          drop_source(".jpg", "texture", path);
           ImGui::TreePop();
         }
       }
@@ -358,7 +390,13 @@ void EditorUiLayer::render_component_window() {
 
         if (!mesh.has_value() && ImGui::MenuItem("Mesh")) {
           MeshComponent mesh{
-              .mesh = m_AssetManager->load<Mesh>("monkey", "monkey.obj")};
+              .mesh = m_AssetManager->load<Mesh>("monkey", "monkey.obj"),
+              .material = Material{
+                  .diffuse = 1.0f,
+                  .specular = 1.0f,
+                  .albedo_texture_index = 0,
+                  .normal_texture_index = 0,
+              }};
           scene->component_registry().add_component(entity, mesh);
         }
         if (!script.has_value() && ImGui::MenuItem("Script")) {
@@ -392,10 +430,7 @@ void EditorUiLayer::render_component_window() {
 
     if (tag.has_value()) {
       ImGui::SeparatorText("Tag");
-      char buf[1024];
-      std::strcpy(buf, tag.value()->tag.c_str());
-      ImGui::InputText("Name", buf, 1024);
-      tag.value()->tag = buf;
+      ImGui::InputText("Name", &tag.value()->tag);
 
       if (ImGui::Button("Delete Component##Tag")) {
         scene->component_registry().remove_component<TagComponent>(entity);
@@ -438,6 +473,46 @@ void EditorUiLayer::render_component_window() {
         ImGui::EndDragDropTarget();
       }
       ImGui::EndDisabled();
+      ImGui::DragFloat("Diffuse", &mesh.value()->material->diffuse, 0.01f, 0.0f,
+                       1.0f);
+      ImGui::DragFloat("Specular", &mesh.value()->material->specular, 0.01f,
+                       0.0f, 1.0f);
+      Renderer::push_render_target(m_TexturePreviewTargets[0].first);
+      Renderer::draw_image(mesh.value()->material->albedo_texture_index);
+      Renderer::pop_render_target();
+      ImGui::Text("Albedo Texture");
+      ImGui::Image(
+          m_TexturePreviewTargets[0].second[Renderer::swapchain_image_index()],
+          ImVec2(200, 200));
+      if (ImGui::BeginDragDropTarget()) {
+        if (auto payload = ImGui::AcceptDragDropPayload("texture")) {
+          std::string str;
+          str.resize(payload->DataSize);
+          std::strcpy(str.data(), static_cast<char *>(payload->Data));
+          auto tex = m_AssetManager->load<Texture>(str, str);
+          mesh.value()->material->albedo_texture_index = tex.get()->index();
+        }
+        ImGui::EndDragDropTarget();
+      }
+
+      Renderer::push_render_target(m_TexturePreviewTargets[1].first);
+      Renderer::draw_image(mesh.value()->material->normal_texture_index);
+      Renderer::pop_render_target();
+      ImGui::Text("Normal Map");
+      ImGui::Image(
+          m_TexturePreviewTargets[1].second[Renderer::swapchain_image_index()],
+          ImVec2(200, 200));
+      if (ImGui::BeginDragDropTarget()) {
+        if (auto payload = ImGui::AcceptDragDropPayload("texture")) {
+          std::string str;
+          str.resize(payload->DataSize);
+          std::strcpy(str.data(), static_cast<char *>(payload->Data));
+          auto tex = m_AssetManager->load<Texture>(str, str);
+          mesh.value()->material->normal_texture_index = tex.get()->index();
+        }
+        ImGui::EndDragDropTarget();
+      }
+
       if (ImGui::Button("Delete Component##Mesh")) {
         scene->component_registry().remove_component<MeshComponent>(entity);
       }

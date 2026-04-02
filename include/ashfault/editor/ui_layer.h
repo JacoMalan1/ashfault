@@ -39,6 +39,9 @@ private:
   void render_toolbar();
 
   std::shared_ptr<RenderTarget> m_ViewportTarget;
+  std::vector<
+      std::pair<std::shared_ptr<RenderTarget>, std::vector<VkDescriptorSet>>>
+      m_TexturePreviewTargets;
   VkSampler m_ViewportSampler;
   std::vector<VkDescriptorSet> m_ViewportTextures;
   std::optional<ImVec2> m_PreviousViewportSize;
