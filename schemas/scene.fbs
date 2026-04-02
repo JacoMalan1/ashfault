@@ -1,0 +1,5 @@
+namespace ashfault.serialization;
+
+table Scene {
+  name:string;
+}

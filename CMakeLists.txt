@@ -8,6 +8,33 @@ if(CMAKE_EXPORT_COMPILE_COMMANDS)
       ${CMAKE_CXX_IMPLICIT_INCLUDE_DIRECTORIES})
 endif()
 
+add_subdirectory(${PROJECT_SOURCE_DIR}/vendor/flatbuffers)
+file(GLOB SCHEMAS ${PROJECT_SOURCE_DIR}/schemas/*.fbs)
+
+set(FB_GENERATED_DIR ${CMAKE_BINARY_DIR}/generated)
+file(MAKE_DIRECTORY ${FB_GENERATED_DIR})
+
+set(GENERATED_HEADERS)
+
+foreach(SCHEMA ${SCHEMAS})
+  get_filename_component(SCHEMA_NAME ${SCHEMA} NAME_WE)
+  set(OUT_HEADER ${FB_GENERATED_DIR}/${SCHEMA_NAME}_generated.h)
+
+  add_custom_command(
+    OUTPUT ${OUT_HEADER}
+    COMMAND flatc --cpp -o ${FB_GENERATED_DIR} ${SCHEMA}
+    DEPENDS flatc ${SCHEMA}
+    COMMENT "Compiling FlatBuffers schema: ${SCHEMA_NAME}"
+    VERBATIM
+  )
+
+  list(APPEND GENERATED_HEADERS ${OUT_HEADER})
+endforeach()
+
+add_custom_target(generate_schemas
+  DEPENDS ${GENERATED_HEADERS}
+)
+
 option(ASHFAULT_SANITIZE "Enable sanitizers" OFF)
 
 if (ASHFAULT_SANITIZE)
@@ -35,6 +62,7 @@ list(APPEND IMGUI_SRC_FILES ${PROJECT_SOURCE_DIR}/vendor/imgui/backends/imgui_im
 list(REMOVE_ITEM LIB_SRC_FILES ${PROJECT_SOURCE_DIR}/src/main.cpp)
 list(REMOVE_ITEM LIB_SRC_FILES ${PROJECT_SOURCE_DIR}/src/editor/main.cpp)
 file(GLOB SHADERS ${SHADER_SOURCE_DIR}/*.vert ${SHADER_SOURCE_DIR}/*.frag)
+list(APPEND LIB_SRC_FILES ${GENERATED_HEADERS})
 
 find_package(Doxygen)
 find_package(Vulkan REQUIRED)
@@ -74,6 +102,7 @@ add_custom_target(shaders ALL DEPENDS ${SPV_SHADERS})
 
 add_library(lua STATIC ${LUA_SRC_FILES})
 add_library(ashfault SHARED ${LIB_SRC_FILES} ${IMGUI_SRC_FILES} ${LIB_HEADERS} ${IMGUIZMO_SRC_FILES})
+add_dependencies(ashfault generate_schemas)
 target_compile_definitions(ashfault PUBLIC -DSPDLOG_ACTIVE_LEVEL=0)
 target_compile_definitions(ashfault PUBLIC -DASHFAULT_BUILD_DLL)
 
@@ -92,6 +121,7 @@ include_directories(SYSTEM vendor/ImGuizmo)
 include_directories(SYSTEM vendor/sol2/include)
 include_directories(SYSTEM vendor/lua)
 include_directories(SYSTEM vendor/stb)
+include_directories(SYSTEM vendor/flatbuffers/include)
 
 if(NOT(MSVC))
   target_compile_options(ashfault PUBLIC -Wall -Wpedantic -Wno-nullability-extension -Wno-nullability-completeness)
@@ -120,6 +150,8 @@ target_link_libraries(ashfault PUBLIC glm::glm)
 target_link_libraries(ashfault PUBLIC assimp)
 target_link_libraries(ashfault PUBLIC lua)
 target_link_libraries(ashfault PUBLIC sol2)
+
+target_include_directories(ashfault PUBLIC ${FB_GENERATED_DIR})
 
 target_link_libraries(editor ashfault)
 target_link_libraries(editor GPUOpen::VulkanMemoryAllocator)
