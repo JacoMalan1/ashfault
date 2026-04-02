@@ -89,5 +89,4 @@ jobs:
 
       - name: Build
         run: |
-          cd build
-          nmake
+          cmake --build build
