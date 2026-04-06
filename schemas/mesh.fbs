@@ -1,0 +1,15 @@
+include "asset.fbs";
+
+namespace ashfault.serialization;
+
+table Material {
+  diffuse:float32;
+  specular:float32;
+  albedo_map:Asset;
+  normal_map:Asset;
+}
+
+table MeshComponent {
+  mesh:Asset (required);
+  material:Material;
+}

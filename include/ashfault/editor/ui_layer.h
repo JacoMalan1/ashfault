@@ -8,6 +8,7 @@
 #include <ashfault/renderer/target.h>
 #include <imgui.h>
 
+#include <filesystem>
 #include <memory>
 
 #include <ashfault/core/asset_manager.hpp>
@@ -37,6 +38,8 @@ private:
   void render_component_window();
   void render_file_browser();
   void render_toolbar();
+  void render_directory(const std::filesystem::path &path,
+                        bool default_open = false);
 
   std::shared_ptr<RenderTarget> m_ViewportTarget;
   std::vector<
