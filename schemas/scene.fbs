@@ -1,13 +1,18 @@
 include "transform.fbs";
 include "tag.fbs";
 include "mesh.fbs";
+include "light.fbs";
+include "script.fbs";
 
 namespace ashfault.serialization;
 
 union ComponentData {
   TransformComponent,
   TagComponent,
-  MeshComponent
+  MeshComponent,
+  PointLightComponent,
+  DirectionalLightComponent,
+  ScriptComponent
 }
 
 table Component {

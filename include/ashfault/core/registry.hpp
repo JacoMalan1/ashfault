@@ -79,7 +79,8 @@ public:
       throw std::runtime_error("No component pool with specified type");
     }
 
-    return *std::static_pointer_cast<ComponentPool<C>>(m_ComponentPools.at(index));
+    return *std::static_pointer_cast<ComponentPool<C>>(
+        m_ComponentPools.at(index));
   }
 
   template <typename C>

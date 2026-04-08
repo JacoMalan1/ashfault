@@ -277,8 +277,9 @@ void EditorUiLayer::render_directory(const std::filesystem::path &path,
     }
   };
 
-  if (ImGui::TreeNodeEx(reinterpret_cast<const char *>(path.filename().string().c_str()),
-                        flags)) {
+  if (ImGui::TreeNodeEx(
+          reinterpret_cast<const char *>(path.filename().string().c_str()),
+          flags)) {
     for (auto it = entries.begin(); it != entries.end(); it++) {
       auto path = it->path();
       if (path.has_filename() && path.filename().string().starts_with(".")) {
@@ -287,9 +288,9 @@ void EditorUiLayer::render_directory(const std::filesystem::path &path,
       if (it->is_directory()) {
         render_directory(path);
       } else if (path.has_extension()) {
-        if (ImGui::TreeNodeEx(
-                reinterpret_cast<const char *>(path.filename().string().c_str()),
-                ImGuiTreeNodeFlags_Leaf)) {
+        if (ImGui::TreeNodeEx(reinterpret_cast<const char *>(
+                                  path.filename().string().c_str()),
+                              ImGuiTreeNodeFlags_Leaf)) {
           if (path.extension().string() == ".afscene") {
             if (ImGui::BeginPopupContextItem("open_scene")) {
               if (ImGui::Button("Open Scene")) {
@@ -421,13 +422,7 @@ void EditorUiLayer::render_component_window() {
 
         if (!mesh.has_value() && ImGui::MenuItem("Mesh")) {
           MeshComponent mesh{
-              .mesh = m_AssetManager->load<Mesh>("monkey", "monkey.obj"),
-              .material = Material{
-                  .diffuse = 1.0f,
-                  .specular = 1.0f,
-                  .albedo_texture_index = 0,
-                  .normal_texture_index = 0,
-              }};
+              .mesh = m_AssetManager->load<Mesh>("monkey", "monkey.obj")};
           scene->component_registry().add_component(entity, mesh);
         }
         if (!script.has_value() && ImGui::MenuItem("Script")) {
@@ -509,7 +504,11 @@ void EditorUiLayer::render_component_window() {
       ImGui::DragFloat("Specular", &mesh.value()->material->specular, 0.01f,
                        0.0f, 1.0f);
       Renderer::push_render_target(m_TexturePreviewTargets[0].first);
-      Renderer::draw_image(mesh.value()->material->albedo_texture_index);
+      Renderer::draw_image(
+          mesh.value()->material.has_value() &&
+                  mesh.value()->material->albedo_texture.has_value()
+              ? mesh.value()->material->albedo_texture->get()->index()
+              : 0);
       Renderer::pop_render_target();
       ImGui::Text("Albedo Texture");
       ImGui::Image(
@@ -521,13 +520,24 @@ void EditorUiLayer::render_component_window() {
           str.resize(payload->DataSize);
           std::strcpy(str.data(), static_cast<char *>(payload->Data));
           auto tex = m_AssetManager->load<Texture>(str, str);
-          mesh.value()->material->albedo_texture_index = tex.get()->index();
+
+          if (!mesh.value()->material.has_value()) {
+            mesh.value()->material = Material{.diffuse = 1.0f,
+                                              .specular = 1.0f,
+                                              .albedo_texture = {},
+                                              .normal_texture = {}};
+          }
+          mesh.value()->material->albedo_texture = tex;
         }
         ImGui::EndDragDropTarget();
       }
 
       Renderer::push_render_target(m_TexturePreviewTargets[1].first);
-      Renderer::draw_image(mesh.value()->material->normal_texture_index);
+      Renderer::draw_image(
+          mesh.value()->material.has_value() &&
+                  mesh.value()->material->normal_texture.has_value()
+              ? mesh.value()->material->normal_texture->get()->index()
+              : 0);
       Renderer::pop_render_target();
       ImGui::Text("Normal Map");
       ImGui::Image(
@@ -539,7 +549,14 @@ void EditorUiLayer::render_component_window() {
           str.resize(payload->DataSize);
           std::strcpy(str.data(), static_cast<char *>(payload->Data));
           auto tex = m_AssetManager->load<Texture>(str, str);
-          mesh.value()->material->normal_texture_index = tex.get()->index();
+
+          if (!mesh.value()->material.has_value()) {
+            mesh.value()->material = Material{.diffuse = 1.0f,
+                                              .specular = 1.0f,
+                                              .albedo_texture = {},
+                                              .normal_texture = {}};
+          }
+          mesh.value()->material->normal_texture = tex;
         }
         ImGui::EndDragDropTarget();
       }

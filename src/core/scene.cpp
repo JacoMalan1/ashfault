@@ -81,10 +81,8 @@ void Scene::draw_all() {
         model_mat = T * R * S;
       }
 
-      Material material = mesh.value()->material.value_or(
-          Material{.albedo_texture_index = 0, .normal_texture_index = 0});
-
-      Renderer::submit_mesh(*mesh.value()->mesh.get(), model_mat, material);
+      Renderer::submit_mesh(*mesh.value()->mesh.get(), model_mat,
+                            mesh.value()->material);
     }
   }
 }

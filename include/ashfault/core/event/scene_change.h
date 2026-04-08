@@ -16,9 +16,10 @@ public:
   Event::EventType event_type() const override;
 
   const std::shared_ptr<Scene> &scene() const;
+
 private:
   std::shared_ptr<Scene> m_Scene;
 };
-}
+}  // namespace ashfault
 
 #endif

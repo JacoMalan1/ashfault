@@ -12,7 +12,8 @@ public:
   static flatbuffers::Offset<ashfault::serialization::Scene> serialize(
       flatbuffers::FlatBufferBuilder &builder, const ashfault::Scene &scene);
 
-  static ashfault::Scene deserialize(const void* scene, std::size_t len, AssetManager *asset_manager);
+  static ashfault::Scene deserialize(const void *scene, std::size_t len,
+                                     AssetManager *asset_manager);
 };
 }  // namespace ashfault::serialization
 

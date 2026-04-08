@@ -7,7 +7,7 @@
 
 namespace ashfault {
 namespace serialization {
-  class SceneSerializer;
+class SceneSerializer;
 }
 
 class ASHFAULT_API Entity {

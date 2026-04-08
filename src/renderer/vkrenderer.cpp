@@ -215,6 +215,10 @@ void ashfault::VulkanRenderer::create_instance() {
 }
 
 void ashfault::VulkanRenderer::create_device() {
+  for (auto ext : s_DeviceExtensions) {
+    SPDLOG_INFO("Required device extension: {}", ext);
+  }
+
   auto [physical_device, queue_info] = choose_physical_device().value();
   this->m_QueueFamilies = queue_info;
   this->m_PhysicalDevice = physical_device;
@@ -226,14 +230,16 @@ void ashfault::VulkanRenderer::create_device() {
                               props.limits.framebufferDepthSampleCounts;
 
   VkSampleCountFlagBits msaa_samples = VK_SAMPLE_COUNT_1_BIT;
-  if (counts & VK_SAMPLE_COUNT_8_BIT)
+  if (counts & VK_SAMPLE_COUNT_16_BIT)
+    msaa_samples = VK_SAMPLE_COUNT_16_BIT;
+  else if (counts & VK_SAMPLE_COUNT_8_BIT)
     msaa_samples = VK_SAMPLE_COUNT_8_BIT;
   else if (counts & VK_SAMPLE_COUNT_4_BIT)
     msaa_samples = VK_SAMPLE_COUNT_4_BIT;
   else if (counts & VK_SAMPLE_COUNT_2_BIT)
     msaa_samples = VK_SAMPLE_COUNT_2_BIT;
   this->m_MsaaSamples = msaa_samples;
-  SPDLOG_INFO("MSAA Samples: {}", (int)msaa_samples);
+  SPDLOG_INFO("Maximum MSAA Samples: {}", (int)msaa_samples);
 
   float queue_prios = 1.0f;
 
@@ -250,7 +256,6 @@ void ashfault::VulkanRenderer::create_device() {
   features_12.descriptorIndexing = VK_TRUE;
   features_12.descriptorBindingPartiallyBound = VK_TRUE;
   features_12.descriptorBindingSampledImageUpdateAfterBind = VK_TRUE;
-  features_12.descriptorBindingUniformBufferUpdateAfterBind = VK_TRUE;
 
   VkPhysicalDeviceVulkan13Features features_13{};
   features_13.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_3_FEATURES;
@@ -310,8 +315,10 @@ int present_mode_ranking(VkPresentModeKHR mode) {
       return 2;
     case VK_PRESENT_MODE_FIFO_KHR:
       return 3;
-    default:
+    case VK_PRESENT_MODE_FIFO_RELAXED_KHR:
       return 4;
+    default:
+      return 5;
   }
 }
 
