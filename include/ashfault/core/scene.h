@@ -12,8 +12,13 @@
 #include <ashfault/renderer/descriptor_set.h>
 
 namespace ashfault {
+namespace serialization {
+class SceneSerializer;
+}
+
 class ASHFAULT_API Scene {
 public:
+  friend class serialization::SceneSerializer;
   Scene();
 
   Entity create_entity();

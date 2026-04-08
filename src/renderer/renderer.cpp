@@ -12,6 +12,7 @@
 #include <vulkan/vulkan_core.h>
 
 #include <algorithm>
+#include <ashfault/core/asset_manager.hpp>
 #include <ashfault/renderer/buffer.hpp>
 #include <cstddef>
 #include <glm/ext/matrix_float4x4.hpp>
@@ -57,7 +58,8 @@ struct RendererData {
 
   std::vector<VkDescriptorSetLayout> texture_layouts;
   std::vector<VulkanTexture> textures;
-  VkDescriptorSet texture_descriptors;
+  std::array<int, ASHFAULT_MAX_TEXTURES> dirty_textures;
+  std::vector<VkDescriptorSet> texture_descriptors;
   VkDescriptorPool texture_pool;
   VkSampler sampler;
 
@@ -69,19 +71,19 @@ static RendererData s_Data;
 static PFN_vkCmdPushDescriptorSetKHR vkCmdPushDescriptorSetKHR;
 
 void Renderer::create_descriptors() {
+  auto num_frames = s_Data.swapchain->image_count();
   s_Data.sampler = s_Data.render_backend->create_sampler();
 
   std::array<VkDescriptorPoolSize, 1> sizes{};
   sizes[0].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-  sizes[0].descriptorCount = ASHFAULT_MAX_TEXTURES;
+  sizes[0].descriptorCount = ASHFAULT_MAX_TEXTURES * num_frames;
 
   VkDescriptorPoolCreateInfo pool_info{};
   pool_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
   pool_info.pPoolSizes = sizes.data();
   pool_info.poolSizeCount = sizes.size();
-  pool_info.flags = VK_DESCRIPTOR_POOL_CREATE_UPDATE_AFTER_BIND_BIT |
-                    VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
-  pool_info.maxSets = 1;
+  pool_info.flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
+  pool_info.maxSets = static_cast<std::uint32_t>(num_frames);
 
   VK_CHECK_RESULT(vkCreateDescriptorPool(s_Data.render_backend->device(),
                                          &pool_info, nullptr,
@@ -90,12 +92,13 @@ void Renderer::create_descriptors() {
   VkDescriptorSetAllocateInfo alloc_info{};
   alloc_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
   alloc_info.descriptorPool = s_Data.texture_pool;
-  alloc_info.descriptorSetCount = 1;
+  alloc_info.descriptorSetCount = static_cast<std::uint32_t>(num_frames);
   alloc_info.pSetLayouts = &s_Data.texture_layouts.front();
 
+  s_Data.texture_descriptors.resize(num_frames);
   VK_CHECK_RESULT(vkAllocateDescriptorSets(s_Data.render_backend->device(),
                                            &alloc_info,
-                                           &s_Data.texture_descriptors));
+                                           s_Data.texture_descriptors.data()));
 }
 
 void create_blinn_phong_pipeline() {
@@ -123,8 +126,7 @@ void create_blinn_phong_pipeline() {
   binding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
 
   VkDescriptorBindingFlags binding_flags =
-      VK_DESCRIPTOR_BINDING_PARTIALLY_BOUND_BIT |
-      VK_DESCRIPTOR_BINDING_UPDATE_AFTER_BIND_BIT;
+      VK_DESCRIPTOR_BINDING_PARTIALLY_BOUND_BIT;
 
   VkDescriptorSetLayoutBindingFlagsCreateInfo binding_flags_info{};
   binding_flags_info.sType =
@@ -137,14 +139,14 @@ void create_blinn_phong_pipeline() {
       VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
   texture_layout_info.bindingCount = 1;
   texture_layout_info.pBindings = &binding;
-  texture_layout_info.flags =
-      VK_DESCRIPTOR_SET_LAYOUT_CREATE_UPDATE_AFTER_BIND_POOL_BIT;
   texture_layout_info.pNext = &binding_flags_info;
 
-  s_Data.texture_layouts.resize(1);
-  VK_CHECK_RESULT(vkCreateDescriptorSetLayout(s_Data.render_backend->device(),
-                                              &texture_layout_info, nullptr,
-                                              s_Data.texture_layouts.data()));
+  s_Data.texture_layouts.resize(s_Data.swapchain->image_count());
+  for (std::size_t i = 0; i < s_Data.swapchain->image_count(); i++) {
+    VK_CHECK_RESULT(vkCreateDescriptorSetLayout(s_Data.render_backend->device(),
+                                                &texture_layout_info, nullptr,
+                                                &s_Data.texture_layouts[i]));
+  }
 
   std::vector<VkDescriptorSetLayout> all_layouts{};
   all_layouts.push_back(s_Data.push_descriptor_layouts[0]);
@@ -304,6 +306,29 @@ bool Renderer::start_frame() {
       s_Data.default_target->command_buffer(s_Data.current_frame);
   vkResetCommandBuffer(cmd, 0);
 
+  for (std::size_t i = 0; i < ASHFAULT_MAX_TEXTURES; i++) {
+    if (s_Data.dirty_textures[i] > 0) {
+      VkDescriptorImageInfo image_info{};
+      image_info.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+      image_info.imageView = s_Data.textures[i].image_view();
+      image_info.sampler = s_Data.sampler;
+
+      VkWriteDescriptorSet write{};
+      write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+      write.descriptorCount = 1;
+      write.dstSet = s_Data.texture_descriptors[s_Data.current_frame];
+      write.dstBinding = 0;
+      write.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+      write.pImageInfo = &image_info;
+      write.dstArrayElement = i;
+
+      vkUpdateDescriptorSets(s_Data.render_backend->device(), 1, &write, 0,
+                             nullptr);
+      s_Data.dirty_textures[i]--;
+      break;
+    }
+  }
+
   VkCommandBufferBeginInfo begin_info{};
   begin_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
   vkBeginCommandBuffer(cmd, &begin_info);
@@ -311,9 +336,9 @@ bool Renderer::start_frame() {
   s_Data.default_target->begin_rendering(s_Data.image_index,
                                          s_Data.current_frame);
 
-  vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS,
-                          s_Data.pipeline_layout, 1, 1,
-                          &s_Data.texture_descriptors, 0, nullptr);
+  vkCmdBindDescriptorSets(
+      cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, s_Data.pipeline_layout, 1, 1,
+      &s_Data.texture_descriptors[s_Data.current_frame], 0, nullptr);
 
   std::memcpy(s_Data.light_buffer_mapping, s_Data.lights.data(),
               sizeof(Light) * s_Data.lights.size());
@@ -351,6 +376,7 @@ void Renderer::end_frame() {
 void Renderer::init(std::shared_ptr<Window> window) {
   s_Data.render_backend = std::make_shared<VulkanRenderer>();
   s_Data.render_backend->init(window);
+  s_Data.dirty_textures = {};
 
   vkCmdPushDescriptorSetKHR =
       (PFN_vkCmdPushDescriptorSetKHR)vkGetDeviceProcAddr(
@@ -406,9 +432,9 @@ void Renderer::push_render_target(std::shared_ptr<RenderTarget> target) {
   vkBeginCommandBuffer(cmd, &begin_info);
 
   target->begin_rendering(s_Data.image_index, s_Data.current_frame);
-  vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS,
-                          s_Data.pipeline_layout, 1, 1,
-                          &s_Data.texture_descriptors, 0, nullptr);
+  vkCmdBindDescriptorSets(
+      cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, s_Data.pipeline_layout, 1, 1,
+      &s_Data.texture_descriptors[s_Data.current_frame], 0, nullptr);
 }
 
 void Renderer::pop_render_target() {
@@ -502,18 +528,8 @@ void Renderer::submit_and_wait() {
   s_Data.current_frame = s_Data.current_frame % s_Data.swapchain->image_count();
 }
 
-void Renderer::submit_mesh(Mesh &mesh) {
-  Material default_material{
-      .diffuse = 1.0f,
-      .specular = 1.0f,
-      .albedo_texture_index = 0,
-      .normal_texture_index = 0,
-  };
-  submit_mesh(mesh, glm::identity<glm::mat4>(), default_material);
-}
-
 void Renderer::submit_mesh(Mesh &mesh, const glm::mat4 &transform,
-                           const Material &material) {
+                           std::optional<Material> material) {
   auto cmd = render_target().command_buffer(s_Data.current_frame);
   GraphicsPipeline *pipeline = nullptr;
   switch (mesh.type()) {
@@ -523,18 +539,31 @@ void Renderer::submit_mesh(Mesh &mesh, const glm::mat4 &transform,
       break;
   }
 
-  s_Data.camera_data->albedo_texture_index = material.albedo_texture_index;
-  s_Data.camera_data->normal_texture_index = material.normal_texture_index;
-  s_Data.camera_data->diffuse = material.diffuse;
-  s_Data.camera_data->specular = material.specular;
+  s_Data.camera_data->albedo_texture_index =
+      material.has_value() && material->albedo_texture.has_value()
+          ? material->albedo_texture->get()->index()
+          : 0;
+  s_Data.camera_data->normal_texture_index =
+      material.has_value() && material->normal_texture.has_value()
+          ? material->normal_texture->get()->index()
+          : 0;
+  s_Data.camera_data->diffuse = material.has_value() ? material->diffuse : 1.0f;
+  s_Data.camera_data->specular =
+      material.has_value() ? material->specular : 1.0f;
   auto data = s_Data.camera_data.value_or<PushConstants>({
       .projection = glm::identity<glm::mat4>(),
       .view = glm::identity<glm::mat4>(),
       .model = glm::identity<glm::mat4>(),
-      .albedo_texture_index = material.albedo_texture_index,
-      .normal_texture_index = material.normal_texture_index,
-      .diffuse = material.diffuse,
-      .specular = material.specular,
+      .albedo_texture_index = static_cast<int>(
+          material.has_value() && material->albedo_texture.has_value()
+              ? material->albedo_texture->get()->index()
+              : 0),
+      .normal_texture_index = static_cast<int>(
+          material.has_value() && material->normal_texture.has_value()
+              ? material->normal_texture->get()->index()
+              : 0),
+      .diffuse = material.has_value() ? material->diffuse : 1.0f,
+      .specular = material.has_value() ? material->specular : 1.0f,
   });
   data.model = transform;
   vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline->handle());
@@ -563,8 +592,9 @@ void Renderer::shutdown() {
   s_Data.default_target.reset();
   s_Data.targets.clear();
   s_Data.pipeline_manager->destroy();
-  vkFreeDescriptorSets(device, s_Data.texture_pool, 1,
-                       &s_Data.texture_descriptors);
+  vkFreeDescriptorSets(device, s_Data.texture_pool,
+                       s_Data.texture_descriptors.size(),
+                       s_Data.texture_descriptors.data());
   vkDestroyDescriptorPool(device, s_Data.texture_pool, nullptr);
   for (auto layout : s_Data.texture_layouts)
     vkDestroyDescriptorSetLayout(device, layout, nullptr);
@@ -639,23 +669,7 @@ int Renderer::upload_texture(const char *pixels, std::uint32_t width,
   auto texture = s_Data.render_backend->create_texture(width, height, pixels);
   std::size_t tex_index = s_Data.textures.size();
   s_Data.textures.push_back(texture);
-
-  VkDescriptorImageInfo image_info{};
-  image_info.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-  image_info.imageView = texture.image_view();
-  image_info.sampler = s_Data.sampler;
-
-  VkWriteDescriptorSet write{};
-  write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-  write.descriptorCount = 1;
-  write.dstSet = s_Data.texture_descriptors;
-  write.dstBinding = 0;
-  write.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-  write.pImageInfo = &image_info;
-  write.dstArrayElement = tex_index;
-
-  vkUpdateDescriptorSets(s_Data.render_backend->device(), 1, &write, 0,
-                         nullptr);
+  s_Data.dirty_textures[tex_index] = s_Data.swapchain->image_count();
   return tex_index;
 }
 
@@ -667,14 +681,18 @@ void Renderer::draw_image(int texture_id) {
 
   vkCmdPushConstants(cmd, pipeline->layout(), VK_SHADER_STAGE_FRAGMENT_BIT, 0,
                      sizeof(int), &texture_id);
-  vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS,
-                          pipeline->layout(), 1, 1, &s_Data.texture_descriptors,
-                          0, nullptr);
+  vkCmdBindDescriptorSets(
+      cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline->layout(), 1, 1,
+      &s_Data.texture_descriptors[s_Data.current_frame], 0, nullptr);
   VkDeviceSize offset = 0;
   vkCmdBindVertexBuffers(cmd, 0, 1, &s_Data.texture_preview_vbuf->handle(),
                          &offset);
   vkCmdBindIndexBuffer(cmd, s_Data.texture_preview_ibuf->handle(), 0,
                        index_type<std::uint32_t>::value);
   vkCmdDrawIndexed(cmd, s_Data.texture_preview_ibuf->count(), 1, 0, 0, 0);
+}
+
+VulkanTexture &Renderer::get_texture(std::size_t idx) {
+  return s_Data.textures.at(idx);
 }
 }  // namespace ashfault

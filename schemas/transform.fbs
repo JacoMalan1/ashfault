@@ -1,0 +1,15 @@
+namespace ashfault.serialization;
+
+struct Vec3 {
+  x: float32;
+  y: float32;
+  z: float32;
+}
+
+table TransformComponent {
+  position: Vec3;
+  rotation: Vec3;
+  scale: Vec3;
+}
+
+root_type TransformComponent;

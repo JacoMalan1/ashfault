@@ -1,0 +1,13 @@
+include "transform.fbs";
+
+namespace ashfault.serialization;
+
+table DirectionalLightComponent {
+  direction:Vec3;
+  color:Vec3;
+}
+
+table PointLightComponent {
+  position:Vec3;
+  color:Vec3;
+}

@@ -26,6 +26,7 @@ public:
   ~Asset() = default;
 
   std::shared_ptr<T> get() { return m_Asset; }
+  std::shared_ptr<T> get() const { return m_Asset; }
   const std::string &id() const { return m_ID; }
   const std::string &path() const { return m_Path; }
   void destroy() { m_Asset->destroy(); }

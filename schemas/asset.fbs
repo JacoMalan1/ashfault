@@ -1,0 +1,6 @@
+namespace ashfault.serialization;
+
+table Asset {
+  id:string;
+  path:string;
+}

@@ -1,0 +1,7 @@
+include "asset.fbs";
+
+namespace ashfault.serialization;
+
+table ScriptComponent {
+  script:Asset;
+}

@@ -4,6 +4,7 @@
 #include <ashfault/core/event/key_press.h>
 #include <ashfault/core/event/mouse_drag.h>
 #include <ashfault/core/event/mouse_scroll.h>
+#include <ashfault/core/event/scene_change.h>
 #include <ashfault/core/event/viewport_resize.h>
 #include <ashfault/core/layer_stack.h>
 #include <ashfault/core/texture.h>
@@ -71,6 +72,12 @@ void EditorLayer::on_event(Event &event) {
     ev.set_handled();
 
     m_PerspectiveCamera->zoom(-ev.delta() * 0.15);
+  });
+
+  dispatcher.dispatch<SceneChangeEvent>(event, [&](SceneChangeEvent &ev) {
+    ev.set_handled();
+    m_ActiveScene = std::make_unique<Scene>(*ev.scene());
+    m_Context->active_scene = m_ActiveScene.get();
   });
 }
 

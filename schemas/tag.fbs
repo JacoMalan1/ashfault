@@ -1,0 +1,5 @@
+namespace ashfault.serialization;
+
+table TagComponent {
+  tag:string;
+}

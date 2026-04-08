@@ -40,7 +40,7 @@ public:
       return {};
     }
 
-    return m_Components[e.handle()];
+    return &m_Components.at(e.handle());
   }
 
   void remove(Entity e) override {
@@ -73,6 +73,17 @@ public:
   }
 
   template <typename C>
+  const ComponentPool<C> &get_pool() const {
+    std::type_index index(typeid(C));
+    if (!m_ComponentPools.count(index)) {
+      throw std::runtime_error("No component pool with specified type");
+    }
+
+    return *std::static_pointer_cast<ComponentPool<C>>(
+        m_ComponentPools.at(index));
+  }
+
+  template <typename C>
   void add_component(Entity e, const C &component) {
     ComponentPool<C> &pool = this->get_pool<C>();
     pool.add(e, component);
@@ -86,7 +97,7 @@ public:
 
   template <typename C>
   std::optional<const C *> get_component(Entity e) const {
-    ComponentPool<C> &pool = this->get_pool<C>();
+    const ComponentPool<C> &pool = this->get_pool<C>();
     return pool.get(e);
   }
 

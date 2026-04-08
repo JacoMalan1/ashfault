@@ -37,8 +37,7 @@ public:
       bool swapchain = false);
 
   static void submit_mesh(Mesh &mesh, const glm::mat4 &transform,
-                          const Material &material);
-  static void submit_mesh(Mesh &mesh);
+                          std::optional<Material> material);
   static void add_light(const Light &light);
 
   static std::shared_ptr<Mesh> create_mesh(
@@ -56,6 +55,8 @@ public:
   static int upload_texture(const char *pixels, std::uint32_t width,
                             std::uint32_t height);
   static void draw_image(int texture_id);
+
+  static VulkanTexture &get_texture(std::size_t idx);
 
 private:
   static void create_pipelines();

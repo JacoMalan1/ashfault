@@ -1,0 +1,31 @@
+include "transform.fbs";
+include "tag.fbs";
+include "mesh.fbs";
+include "light.fbs";
+include "script.fbs";
+
+namespace ashfault.serialization;
+
+union ComponentData {
+  TransformComponent,
+  TagComponent,
+  MeshComponent,
+  PointLightComponent,
+  DirectionalLightComponent,
+  ScriptComponent
+}
+
+table Component {
+  data: ComponentData (required);
+}
+
+table Entity {
+  id:uint64;
+  components:[Component];
+}
+
+table Scene {
+  entities:[Entity];
+}
+
+root_type Scene;

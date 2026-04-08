@@ -1,7 +1,9 @@
 #include <ashfault/core/component/script.h>
 #include <ashfault/core/component/light.h>
+#include <ashfault/core/entity.h>
 #include <ashfault/core/event/mouse_drag.h>
 #include <ashfault/core/event/mouse_scroll.h>
+#include <ashfault/core/event/scene_change.h>
 #include <ashfault/core/event/scene_start.h>
 #include <ashfault/core/event/viewport_resize.h>
 #include <ashfault/core/texture.h>
@@ -10,6 +12,8 @@
 #include <ashfault/editor/ui_layer.h>
 #include <ashfault/renderer/renderer.h>
 #include <ashfault/renderer/swapchain.h>
+#include <ashfault/core/serialization/scene_serializer.h>
+#include <flatbuffers/flatbuffer_builder.h>
 #include <imgui.h>
 #include <imgui_impl_vulkan.h>
 #include <spdlog/common.h>
@@ -21,6 +25,7 @@
 #include <algorithm>
 #include <ashfault/core/event_bus.hpp>
 #include <filesystem>
+#include <fstream>
 #include <memory>
 #include <ImGuizmo.h>
 #include <ashfault/core/component/mesh.h>
@@ -30,6 +35,7 @@
 #include <glm/fwd.hpp>
 #include <glm/gtc/quaternion.hpp>
 #include <glm/trigonometric.hpp>
+#include <stdexcept>
 #include <imgui_internal.h>
 #include <misc/cpp/imgui_stdlib.h>
 
@@ -234,8 +240,8 @@ void EditorUiLayer::build_ui_skeleton() {
                                ImGuiDockNodeFlags_PassthruCentralNode);
 }
 
-void render_directory(const std::filesystem::path &path,
-                      bool default_open = false) {
+void EditorUiLayer::render_directory(const std::filesystem::path &path,
+                                     bool default_open) {
   auto begin =
       std::filesystem::begin(std::filesystem::directory_iterator(path));
   auto end = std::filesystem::end(std::filesystem::directory_iterator(path));
@@ -271,8 +277,9 @@ void render_directory(const std::filesystem::path &path,
     }
   };
 
-  if (ImGui::TreeNodeEx(reinterpret_cast<const char *>(path.filename().c_str()),
-                        flags)) {
+  if (ImGui::TreeNodeEx(
+          reinterpret_cast<const char *>(path.filename().string().c_str()),
+          flags)) {
     for (auto it = entries.begin(); it != entries.end(); it++) {
       auto path = it->path();
       if (path.has_filename() && path.filename().string().starts_with(".")) {
@@ -281,9 +288,34 @@ void render_directory(const std::filesystem::path &path,
       if (it->is_directory()) {
         render_directory(path);
       } else if (path.has_extension()) {
-        if (ImGui::TreeNodeEx(
-                reinterpret_cast<const char *>(path.filename().c_str()),
-                ImGuiTreeNodeFlags_Leaf)) {
+        if (ImGui::TreeNodeEx(reinterpret_cast<const char *>(
+                                  path.filename().string().c_str()),
+                              ImGuiTreeNodeFlags_Leaf)) {
+          if (path.extension().string() == ".afscene") {
+            if (ImGui::BeginPopupContextItem("open_scene")) {
+              if (ImGui::Button("Open Scene")) {
+                std::ifstream fs(path.string(),
+                                 std::ios::binary | std::ios::in);
+                if (!fs.is_open()) {
+                  SPDLOG_ERROR("Failed to open scene file!");
+                } else {
+                  fs.seekg(0, std::ios::end);
+                  auto size = fs.tellg();
+                  fs.seekg(0, std::ios::beg);
+                  std::vector<std::uint8_t> buff{};
+                  buff.resize(size);
+                  fs.read(reinterpret_cast<char *>(buff.data()), size);
+                  auto scene = std::make_shared<Scene>(
+                      serialization::SceneSerializer::deserialize(
+                          buff.data(), buff.size(), m_AssetManager.get()));
+                  SceneChangeEvent ev(scene);
+                  m_LayerStack->on_event(ev);
+                }
+                ImGui::CloseCurrentPopup();
+              }
+              ImGui::EndPopup();
+            }
+          }
           drop_source(".obj", "obj", path);
           drop_source(".lua", "lua", path);
           drop_source(".png", "texture", path);
@@ -390,13 +422,7 @@ void EditorUiLayer::render_component_window() {
 
         if (!mesh.has_value() && ImGui::MenuItem("Mesh")) {
           MeshComponent mesh{
-              .mesh = m_AssetManager->load<Mesh>("monkey", "monkey.obj"),
-              .material = Material{
-                  .diffuse = 1.0f,
-                  .specular = 1.0f,
-                  .albedo_texture_index = 0,
-                  .normal_texture_index = 0,
-              }};
+              .mesh = m_AssetManager->load<Mesh>("monkey", "monkey.obj")};
           scene->component_registry().add_component(entity, mesh);
         }
         if (!script.has_value() && ImGui::MenuItem("Script")) {
@@ -478,7 +504,11 @@ void EditorUiLayer::render_component_window() {
       ImGui::DragFloat("Specular", &mesh.value()->material->specular, 0.01f,
                        0.0f, 1.0f);
       Renderer::push_render_target(m_TexturePreviewTargets[0].first);
-      Renderer::draw_image(mesh.value()->material->albedo_texture_index);
+      Renderer::draw_image(
+          mesh.value()->material.has_value() &&
+                  mesh.value()->material->albedo_texture.has_value()
+              ? mesh.value()->material->albedo_texture->get()->index()
+              : 0);
       Renderer::pop_render_target();
       ImGui::Text("Albedo Texture");
       ImGui::Image(
@@ -490,13 +520,24 @@ void EditorUiLayer::render_component_window() {
           str.resize(payload->DataSize);
           std::strcpy(str.data(), static_cast<char *>(payload->Data));
           auto tex = m_AssetManager->load<Texture>(str, str);
-          mesh.value()->material->albedo_texture_index = tex.get()->index();
+
+          if (!mesh.value()->material.has_value()) {
+            mesh.value()->material = Material{.diffuse = 1.0f,
+                                              .specular = 1.0f,
+                                              .albedo_texture = {},
+                                              .normal_texture = {}};
+          }
+          mesh.value()->material->albedo_texture = tex;
         }
         ImGui::EndDragDropTarget();
       }
 
       Renderer::push_render_target(m_TexturePreviewTargets[1].first);
-      Renderer::draw_image(mesh.value()->material->normal_texture_index);
+      Renderer::draw_image(
+          mesh.value()->material.has_value() &&
+                  mesh.value()->material->normal_texture.has_value()
+              ? mesh.value()->material->normal_texture->get()->index()
+              : 0);
       Renderer::pop_render_target();
       ImGui::Text("Normal Map");
       ImGui::Image(
@@ -508,7 +549,14 @@ void EditorUiLayer::render_component_window() {
           str.resize(payload->DataSize);
           std::strcpy(str.data(), static_cast<char *>(payload->Data));
           auto tex = m_AssetManager->load<Texture>(str, str);
-          mesh.value()->material->normal_texture_index = tex.get()->index();
+
+          if (!mesh.value()->material.has_value()) {
+            mesh.value()->material = Material{.diffuse = 1.0f,
+                                              .specular = 1.0f,
+                                              .albedo_texture = {},
+                                              .normal_texture = {}};
+          }
+          mesh.value()->material->normal_texture = tex;
         }
         ImGui::EndDragDropTarget();
       }
@@ -612,14 +660,45 @@ void EditorUiLayer::on_imgui_render() {
   render_file_browser();
   render_toolbar();
 
+  bool open_save_popup = false;
   if (ImGui::BeginMainMenuBar()) {
     if (ImGui::BeginMenu("File")) {
+      if (ImGui::MenuItem("Save Scene")) {
+        open_save_popup = true;
+      }
       if (ImGui::MenuItem("Exit")) {
         std::exit(0);
       }
       ImGui::EndMenu();
     }
     ImGui::EndMainMenuBar();
+  }
+
+  static std::string save_scene_file_name;
+  if (open_save_popup) {
+    save_scene_file_name.clear();
+    ImGui::OpenPopup("save_scene");
+    open_save_popup = false;
+  }
+  if (ImGui::BeginPopupModal("save_scene", nullptr,
+                             ImGuiWindowFlags_AlwaysAutoResize)) {
+    ImGui::InputText("File Name", &save_scene_file_name);
+    if (ImGui::Button("Close")) {
+      ImGui::CloseCurrentPopup();
+    }
+    if (ImGui::Button("Save")) {
+      flatbuffers::FlatBufferBuilder builder{};
+      auto offset = serialization::SceneSerializer::serialize(
+          builder, *m_EditorContext->active_scene);
+      builder.Finish(offset);
+      std::ofstream fs(save_scene_file_name,
+                       std::ios::binary | std::ios::out | std::ios::trunc);
+      fs.write(reinterpret_cast<char *>(builder.GetBufferPointer()),
+               builder.GetSize());
+      fs.close();
+      ImGui::CloseCurrentPopup();
+    }
+    ImGui::EndPopup();
   }
 
   ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
