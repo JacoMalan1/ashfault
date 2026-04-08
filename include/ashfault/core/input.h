@@ -163,6 +163,7 @@ public:
                           const std::vector<KeyCombination> &key_combinations);
 
   static bool get_action(ActionId action_id);
+  static bool get_action(const std::string &action);
   static ActionId get_action_id(const std::string &action_name);
 
   void frame_start();
