@@ -35,6 +35,8 @@ public:
   void set_resize_callback(std::function<void(Window &, WindowDims)> callback);
   void set_key_callback(
       std::function<void(Window &, int, int, int, int)> callback);
+  void set_mouse_callback(
+      std::function<void(Window &, int, int, int)> callback);
 
 private:
   void attach_pointer();
@@ -43,6 +45,7 @@ private:
   std::optional<std::function<void(Window &, WindowDims)>> m_ResizeCallback;
   std::optional<std::function<void(Window &, int, int, int, int)>>
       m_KeyCallback;
+  std::optional<std::function<void(Window &, int, int, int)>> m_MouseCallback;
 };
 }  // namespace ashfault
 

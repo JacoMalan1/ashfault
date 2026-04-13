@@ -2,8 +2,8 @@
 #define ASHFAULT_APPLICATION_H
 
 #include <ashfault/ashfault.h>
-#include <ashfault/core/input.h>
 #include <ashfault/core/layer_stack.h>
+#include <ashfault/core/window.h>
 
 #include <memory>
 #include <ashfault/core/asset_manager.hpp>
@@ -18,7 +18,6 @@ public:
 
 protected:
   std::shared_ptr<Window> m_Window;
-  std::shared_ptr<Input> m_Input;
   LayerStack *m_LayerStack;
   std::shared_ptr<AssetManager> m_AssetManager;
 };

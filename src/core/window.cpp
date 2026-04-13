@@ -89,18 +89,41 @@ void Window::set_resize_callback(
 
 void Window::set_key_callback(
     std::function<void(Window &, int, int, int, int)> callback) {
+  this->m_KeyCallback = callback;
+
   if (glfwGetWindowUserPointer(this->m_Handle) == nullptr) {
     this->attach_pointer();
   }
 
   glfwSetKeyCallback(this->m_Handle, [](GLFWwindow *window, int key,
                                         int scancode, int action, int mods) {
+    ImGui_ImplGlfw_KeyCallback(window, key, scancode, action, mods);
     Window *window_ptr =
         reinterpret_cast<Window *>(glfwGetWindowUserPointer(window));
     if (!window_ptr) return;
     if (window_ptr->m_KeyCallback.has_value()) {
       window_ptr->m_KeyCallback.value()(*window_ptr, key, scancode, action,
                                         mods);
+    }
+  });
+}
+
+void Window::set_mouse_callback(
+    std::function<void(Window &, int, int, int)> callback) {
+  this->m_MouseCallback = callback;
+
+  if (glfwGetWindowUserPointer(this->m_Handle) == nullptr) {
+    this->attach_pointer();
+  }
+
+  glfwSetMouseButtonCallback(this->m_Handle, [](GLFWwindow *window, int button,
+                                                int action, int mods) {
+    ImGui_ImplGlfw_MouseButtonCallback(window, button, action, mods);
+    Window *window_ptr =
+        reinterpret_cast<Window *>(glfwGetWindowUserPointer(window));
+    if (!window_ptr) return;
+    if (window_ptr->m_MouseCallback.has_value()) {
+      window_ptr->m_MouseCallback.value()(*window_ptr, button, action, mods);
     }
   });
 }

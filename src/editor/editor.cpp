@@ -17,6 +17,7 @@
 #include <spdlog/spdlog.h>
 
 #include <ashfault/core/timer.hpp>
+#include <ashfault/core/input.h>
 #include <memory>
 
 #include <ashfault/core/layer/script_layer.hpp>
@@ -29,6 +30,7 @@ Editor::Editor(std::shared_ptr<Window> window) : Application(window) {}
 
 void Editor::run() {
   Renderer::init(m_Window);
+  Input::init(m_Window);
   m_AssetManager->register_loader<Mesh>(std::make_shared<MeshLoader>());
   m_AssetManager->register_loader<Script>(std::make_shared<ScriptLoader>());
   m_AssetManager->register_loader<Texture>(std::make_shared<TextureLoader>());

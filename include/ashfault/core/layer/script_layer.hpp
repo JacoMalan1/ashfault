@@ -62,6 +62,8 @@ private:
   std::shared_ptr<AssetManager> m_AssetManager;
   RuntimeContext *m_Context;
   sol::table m_SceneTable;
+  sol::table m_InputTable;
+  sol::table m_KeyTable;
   std::shared_ptr<spdlog::logger> m_ScriptLogger;
   std::unordered_map<const void *,
                      std::function<sol::object(Scene *scene, sol::state_view,
