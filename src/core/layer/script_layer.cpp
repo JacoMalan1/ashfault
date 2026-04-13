@@ -167,16 +167,20 @@ void ScriptLayer::bind_engine_functions() {
         }
       });
   m_InputTable.set_function("BindAction", [&](sol::object action,
-                                              std::vector<int> keys) {
+                                              std::vector<std::vector<int>>
+                                                  keys) {
     KeyCombination combination;
-    combination.keys.reserve(keys.size());
-    for (int k : keys) {
-      combination.keys.push_back(static_cast<Key>(k));
+    std::vector<KeyCombination> combinations;
+    for (auto combo : keys) {
+      for (int k : combo) {
+        combination.keys.push_back(static_cast<Key>(k));
+      }
+      combinations.push_back(combination);
     }
     if (action.get_type() == sol::type::string) {
-      Input::bind_action(action.as<std::string>(), {combination});
+      Input::bind_action(action.as<std::string>(), combinations);
     } else if (action.get_type() == sol::type::number) {
-      Input::bind_action(action.as<ActionId>(), {combination});
+      Input::bind_action(action.as<ActionId>(), combinations);
     } else {
       m_ScriptLogger->error(
           "Incorrect input type for function BindAction: should be a string "
