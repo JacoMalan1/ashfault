@@ -161,6 +161,11 @@ public:
                           const std::vector<KeyCombination> &key_combinations);
   static void bind_action(std::string action,
                           const std::vector<KeyCombination> &key_combinations);
+  static void unbind_action(ActionId action);
+  static void unbind_action(std::string action);
+  static void add_modifier_key(Key key);
+  static void remove_modifier_key(Key key);
+  static void clear_all_modifiers();
 
   static bool get_action(ActionId action_id);
   static bool get_action(const std::string &action);

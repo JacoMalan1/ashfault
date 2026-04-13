@@ -3,6 +3,7 @@
 #include <spdlog/spdlog.h>
 
 #include <cstring>
+#include <set>
 
 namespace ashfault {
 struct InputData {
@@ -11,7 +12,7 @@ struct InputData {
   ActionId next_id;
   std::shared_ptr<Window> window;
   std::array<bool, 507> keys;
-  std::vector<Key> modifiers;
+  std::set<Key> modifiers;
 };
 
 static InputData s_Data;
@@ -21,7 +22,7 @@ void Input::init(std::shared_ptr<Window> window) {
   s_Data.action_names = std::unordered_map<std::string, ActionId>();
   s_Data.actions = std::unordered_map<ActionId, std::vector<KeyCombination>>();
   s_Data.modifiers =
-      std::vector<Key>({Key::LeftShift, Key::LeftAlt, Key::LeftControl});
+      std::set<Key>({Key::LeftShift, Key::LeftAlt, Key::LeftControl});
 
   std::memset(s_Data.keys.data(), 0, s_Data.keys.size() * sizeof(bool));
   window->set_key_callback([&](Window &, int key, int, int action, int) {
@@ -61,18 +62,28 @@ void Input::bind_action(std::string action,
   ActionId data = get_action_id(action);
   s_Data.actions.insert_or_assign(data, key_combinations);
 }
+
+void Input::unbind_action(std::string action) {
+  ActionId data = get_action_id(action);
+  s_Data.actions.at(data).clear();
+}
+
+void Input::unbind_action(ActionId action) {
+  s_Data.actions.at(action).clear();
+}
+
 bool Input::get_action(ActionId action_id) {
   std::vector<KeyCombination> action_keys = s_Data.actions.at(action_id);
 
   for (const KeyCombination &key_combination : action_keys) {
-    std::vector<Key> modifiers_no_press = s_Data.modifiers;
+    std::set<Key> modifiers_no_press = s_Data.modifiers;
     bool action_condition_fulfilled = true;
     for (const Key &key : key_combination.keys) {
       if (s_Data.keys[static_cast<int>(key)] == false) {
         action_condition_fulfilled = false;
         break;
       } else {
-        std::erase(modifiers_no_press, key);
+        modifiers_no_press.erase(key);
       }
     }
     if (action_condition_fulfilled) {
@@ -92,14 +103,14 @@ bool Input::get_action(const std::string &action) {
       s_Data.actions.at(get_action_id(action));
 
   for (const KeyCombination &key_combination : action_keys) {
-    std::vector<Key> modifiers_no_press = s_Data.modifiers;
+    std::set<Key> modifiers_no_press = s_Data.modifiers;
     bool action_condition_fulfilled = true;
     for (const Key &key : key_combination.keys) {
       if (s_Data.keys[static_cast<int>(key)] == false) {
         action_condition_fulfilled = false;
         break;
       } else {
-        std::erase(modifiers_no_press, key);
+        modifiers_no_press.erase(key);
       }
     }
     if (action_condition_fulfilled) {
@@ -117,6 +128,12 @@ bool Input::get_action(const std::string &action) {
 ActionId Input::get_action_id(const std::string &action_name) {
   return s_Data.action_names.at(action_name);
 }
+
+void Input::add_modifier_key(Key key) { s_Data.modifiers.insert(key); }
+
+void Input::remove_modifier_key(Key key) { s_Data.modifiers.erase(key); }
+
+void Input::clear_all_modifiers() { s_Data.modifiers.clear(); }
 
 void Input::frame_start() {
   std::memset(s_Data.keys.data(), 0, s_Data.keys.size() * sizeof(bool));

@@ -183,6 +183,26 @@ void ScriptLayer::bind_engine_functions() {
           "or integer");
     }
   });
+  m_InputTable.set_function("UnbindAction", [&](sol::object action) {
+    if (action.get_type() == sol::type::string) {
+      Input::unbind_action(action.as<std::string>());
+    } else if (action.get_type() == sol::type::number) {
+      Input::unbind_action(action.as<ActionId>());
+    } else {
+      m_ScriptLogger->error(
+          "Incorrect input type for function UnbindAction: should be a "
+          "string "
+          "or integer");
+    }
+  });
+  m_InputTable.set_function("AddModifierKey", [&](int key) {
+    Input::add_modifier_key(static_cast<Key>(key));
+  });
+  m_InputTable.set_function("RemoveModifierKey", [&](int key) {
+    Input::remove_modifier_key(static_cast<Key>(key));
+  });
+  m_InputTable.set_function("ClearAllModifiers",
+                            [&]() { Input::clear_all_modifiers(); });
 
   m_KeyTable["Unknown"] = static_cast<int>(Key::Unknown);
   m_KeyTable["Space"] = static_cast<int>(Key::Space);
