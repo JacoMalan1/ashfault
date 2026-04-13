@@ -11,6 +11,7 @@ struct InputData {
   ActionId next_id;
   std::shared_ptr<Window> window;
   std::array<bool, 507> keys;
+  std::vector<Key> modifiers;
 };
 
 static InputData s_Data;
@@ -19,6 +20,8 @@ void Input::init(std::shared_ptr<Window> window) {
   s_Data.next_id = 0;
   s_Data.action_names = std::unordered_map<std::string, ActionId>();
   s_Data.actions = std::unordered_map<ActionId, std::vector<KeyCombination>>();
+  s_Data.modifiers =
+      std::vector<Key>({Key::LeftShift, Key::LeftAlt, Key::LeftControl});
 
   std::memset(s_Data.keys.data(), 0, s_Data.keys.size() * sizeof(bool));
   window->set_key_callback([&](Window &, int key, int, int action, int) {
@@ -60,15 +63,24 @@ void Input::bind_action(std::string action,
 }
 bool Input::get_action(ActionId action_id) {
   std::vector<KeyCombination> action_keys = s_Data.actions.at(action_id);
+
   for (const KeyCombination &key_combination : action_keys) {
+    std::vector<Key> modifiers_no_press = s_Data.modifiers;
     bool action_condition_fulfilled = true;
     for (const Key &key : key_combination.keys) {
       if (s_Data.keys[static_cast<int>(key)] == false) {
         action_condition_fulfilled = false;
         break;
+      } else {
+        std::erase(modifiers_no_press, key);
       }
     }
     if (action_condition_fulfilled) {
+      for (const Key &key : modifiers_no_press) {
+        if (s_Data.keys[static_cast<int>(key)] == true) {
+          return false;
+        }
+      }
       return true;
     }
   }
@@ -78,15 +90,24 @@ bool Input::get_action(ActionId action_id) {
 bool Input::get_action(const std::string &action) {
   std::vector<KeyCombination> action_keys =
       s_Data.actions.at(get_action_id(action));
+
   for (const KeyCombination &key_combination : action_keys) {
+    std::vector<Key> modifiers_no_press = s_Data.modifiers;
     bool action_condition_fulfilled = true;
     for (const Key &key : key_combination.keys) {
       if (s_Data.keys[static_cast<int>(key)] == false) {
         action_condition_fulfilled = false;
         break;
+      } else {
+        std::erase(modifiers_no_press, key);
       }
     }
     if (action_condition_fulfilled) {
+      for (const Key &key : modifiers_no_press) {
+        if (s_Data.keys[static_cast<int>(key)] == true) {
+          return false;
+        }
+      }
       return true;
     }
   }

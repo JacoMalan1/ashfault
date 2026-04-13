@@ -147,20 +147,42 @@ void ScriptLayer::bind_engine_functions() {
       });
   m_InputTable.set_function("RegisterAction",
                             [&](const std::string &action_name) {
-                              Input::register_action(action_name);
+                              return Input::register_action(action_name);
                             });
-  m_InputTable.set_function("GetAction", [&](const std::string &action) {
-    return Input::get_action(action);
+  m_InputTable.set_function("GetActionId", [&](const std::string &action_name) {
+    return Input::get_action_id(action_name);
   });
   m_InputTable.set_function(
-      "BindAction", [&](const std::string &action, std::vector<int> keys) {
-        KeyCombination combination;
-        combination.keys.reserve(keys.size());
-        for (int k : keys) {
-          combination.keys.push_back(static_cast<Key>(k));
+      "GetAction", [&](sol::this_state ts, sol::object action) -> sol::object {
+        if (action.get_type() == sol::type::string) {
+          return sol::make_object(ts,
+                                  Input::get_action(action.as<std::string>()));
+        } else if (action.get_type() == sol::type::number) {
+          return sol::make_object(ts, Input::get_action(action.as<ActionId>()));
+        } else {
+          m_ScriptLogger->error(
+              "Incorrect input type for function GetAction: should be a string "
+              "or integer");
+          return sol::make_object(ts, sol::nil);
         }
-        Input::bind_action(action, {combination});
       });
+  m_InputTable.set_function("BindAction", [&](sol::object action,
+                                              std::vector<int> keys) {
+    KeyCombination combination;
+    combination.keys.reserve(keys.size());
+    for (int k : keys) {
+      combination.keys.push_back(static_cast<Key>(k));
+    }
+    if (action.get_type() == sol::type::string) {
+      Input::bind_action(action.as<std::string>(), {combination});
+    } else if (action.get_type() == sol::type::number) {
+      Input::bind_action(action.as<ActionId>(), {combination});
+    } else {
+      m_ScriptLogger->error(
+          "Incorrect input type for function BindAction: should be a string "
+          "or integer");
+    }
+  });
 
   m_KeyTable["Unknown"] = static_cast<int>(Key::Unknown);
   m_KeyTable["Space"] = static_cast<int>(Key::Space);

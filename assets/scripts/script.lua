@@ -1,8 +1,8 @@
 function OnSceneStart()
 	local e = GetEntity()
 	print(string.format("Initializing entity %d", e))
-	Input.RegisterAction("right")
-	Input.BindAction("right", { Key.D })
+	right = Input.RegisterAction("right")
+	Input.BindAction(right, { Key.D })
 	Input.RegisterAction("left")
 	Input.BindAction("left", { Key.A })
 	Input.RegisterAction("back")
@@ -12,7 +12,7 @@ function OnSceneStart()
 	Input.RegisterAction("up")
 	Input.BindAction("up", { Key.Space })
 	Input.RegisterAction("down")
-	Input.BindAction("down", { Key.LeftShift })
+	Input.BindAction("down", { Key.LeftShift, Key.Space })
 
 	if e ~= nil then
 		local transform = Scene.GetComponent(e, Transform)
@@ -36,7 +36,8 @@ function OnUpdate(dt)
 		if transform ~= nil then
 			-- print("hello")
 			-- print(string.format("GetAction value: %s", Input.GetAction("forward")))
-			if Input.GetAction("right") then
+			right = Input.GetActionId("right")
+			if Input.GetAction(right) then
 				transform.position.x = transform.position.x + 1.0 * dt
 			end
 			if Input.GetAction("left") then

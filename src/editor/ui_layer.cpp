@@ -499,10 +499,12 @@ void EditorUiLayer::render_component_window() {
         ImGui::EndDragDropTarget();
       }
       ImGui::EndDisabled();
-      ImGui::DragFloat("Diffuse", &mesh.value()->material->diffuse, 0.01f, 0.0f,
-                       1.0f);
-      ImGui::DragFloat("Specular", &mesh.value()->material->specular, 0.01f,
-                       0.0f, 1.0f);
+      if (mesh.value()->material.has_value()) {
+        ImGui::DragFloat("Diffuse", &mesh.value()->material->diffuse, 0.01f,
+                         0.0f, 1.0f);
+        ImGui::DragFloat("Specular", &mesh.value()->material->specular, 0.01f,
+                         0.0f, 1.0f);
+      }
       Renderer::push_render_target(m_TexturePreviewTargets[0].first);
       Renderer::draw_image(
           mesh.value()->material.has_value() &&
