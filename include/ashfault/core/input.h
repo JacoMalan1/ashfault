@@ -3,7 +3,7 @@
 
 #include <ashfault/ashfault.h>
 #include <ashfault/core/window.h>
-
+#include <string>
 #include <memory>
 
 namespace ashfault {
