@@ -4,6 +4,7 @@
 
 #include <cstring>
 #include <set>
+#include <array>
 
 namespace ashfault {
 struct InputData {
