@@ -1,6 +1,7 @@
 #include <ashfault/core/camera.h>
 #include <ashfault/core/material.h>
 #include <ashfault/core/pipeline_manager.h>
+#include <ashfault/core/particle.h>
 #include <ashfault/renderer/descriptor_set.h>
 #include <ashfault/renderer/pipeline.h>
 #include <ashfault/renderer/renderer.h>
@@ -12,6 +13,7 @@
 #include <vulkan/vulkan_core.h>
 
 #include <algorithm>
+#include <array>
 #include <ashfault/core/asset_manager.hpp>
 #include <ashfault/renderer/buffer.hpp>
 #include <cstddef>
@@ -28,6 +30,11 @@ struct PushConstants {
   glm::mat4 model;
   int albedo_texture_index, normal_texture_index;
   float diffuse, specular;
+};
+
+struct ParticlePushConstants {
+  float dt;
+  std::uint32_t particle_count;
 };
 
 struct RendererData {
@@ -65,10 +72,103 @@ struct RendererData {
 
   std::shared_ptr<VulkanBuffer> texture_preview_vbuf;
   std::shared_ptr<VulkanBuffer> texture_preview_ibuf;
+
+  std::vector<std::unique_ptr<VulkanBuffer>> particle_buffers;
+  std::vector<void *> particle_buffer_mappings;
+  std::uint32_t particle_count;
+  VkDescriptorSetLayout particle_storage_descriptor_layout;
 };
 
 static RendererData s_Data;
 static PFN_vkCmdPushDescriptorSetKHR vkCmdPushDescriptorSetKHR;
+
+void Renderer::create_particle_pipelines() {
+  std::array<VkDescriptorSetLayoutBinding, 2> bindings{};
+  bindings[0].binding = 0;
+  bindings[0].descriptorCount = 1;
+  bindings[0].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+  bindings[0].stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+
+  bindings[1].binding = 1;
+  bindings[1].descriptorCount = 1;
+  bindings[1].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+  bindings[1].stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+
+  VkDescriptorSetLayoutCreateInfo dset_layout_info{};
+  dset_layout_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+  dset_layout_info.bindingCount = bindings.size();
+  dset_layout_info.pBindings = bindings.data();
+  dset_layout_info.flags = VK_DESCRIPTOR_SET_LAYOUT_CREATE_PUSH_DESCRIPTOR_BIT;
+
+  VK_CHECK_RESULT(vkCreateDescriptorSetLayout(
+      s_Data.render_backend->device(), &dset_layout_info, nullptr,
+      &s_Data.particle_storage_descriptor_layout));
+
+  VkPushConstantRange range{};
+  range.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+  range.size = sizeof(ParticlePushConstants);
+  range.offset = 0;
+
+  VkPipelineLayoutCreateInfo layout_info{};
+  layout_info.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+  layout_info.setLayoutCount = 1;
+  layout_info.pSetLayouts = &s_Data.particle_storage_descriptor_layout;
+  layout_info.pushConstantRangeCount = 1;
+  layout_info.pPushConstantRanges = &range;
+  VkPipelineLayout compute_layout;
+
+  VK_CHECK_RESULT(vkCreatePipelineLayout(
+      s_Data.render_backend->device(), &layout_info, nullptr, &compute_layout));
+
+  auto shader = s_Data.render_backend->create_shader("particle.comp.spv");
+
+  VkPipelineShaderStageCreateInfo stage_info{};
+  stage_info.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+  stage_info.stage = VK_SHADER_STAGE_COMPUTE_BIT;
+  stage_info.module = shader->handle();
+  stage_info.pName = "main";
+
+  VkComputePipelineCreateInfo pipeline_info{};
+  pipeline_info.sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO;
+  pipeline_info.layout = compute_layout;
+  pipeline_info.stage = stage_info;
+
+  VkPipeline compute_pipeline;
+  VK_CHECK_RESULT(vkCreateComputePipelines(s_Data.render_backend->device(),
+                                           VK_NULL_HANDLE, 1, &pipeline_info,
+                                           nullptr, &compute_pipeline));
+  s_Data.pipeline_manager->add_compute_pipeline(
+      "particle",
+      std::make_shared<ComputePipeline>(s_Data.render_backend->device(),
+                                        compute_layout, compute_pipeline));
+
+  VkVertexInputAttributeDescription vbinding{};
+  vbinding.binding = 0;
+  vbinding.offset = 0;
+  vbinding.format = VK_FORMAT_R32G32B32A32_SFLOAT;
+  vbinding.location = 0;
+
+  std::vector<VkVertexInputAttributeDescription> vertex_descriptions{};
+  vertex_descriptions.push_back(vbinding);
+
+  auto vshader = s_Data.render_backend->create_shader("particle.vert.spv");
+  auto fshader = s_Data.render_backend->create_shader("particle.frag.spv");
+
+  VkPipelineInputAssemblyStateCreateInfo assembly_state{};
+  assembly_state.sType =
+      VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
+  assembly_state.primitiveRestartEnable = VK_FALSE;
+  assembly_state.topology = VK_PRIMITIVE_TOPOLOGY_POINT_LIST;
+
+  auto graphics_pipeline =
+      s_Data.render_backend->create_graphics_pipeline()
+          .input_attribute_descriptions(vertex_descriptions, sizeof(Particle))
+          .input_assembly_state(assembly_state)
+          .vertex_shader(vshader)
+          .fragment_shader(fshader)
+          .build({});
+  s_Data.pipeline_manager->add_graphics_pipeline("particle", graphics_pipeline);
+}
 
 void Renderer::create_descriptors() {
   auto num_frames = s_Data.swapchain->image_count();
@@ -410,9 +510,30 @@ void Renderer::init(std::shared_ptr<Window> window) {
       sizeof(Light) * ASHFAULT_MAX_LIGHTS + sizeof(int),
       VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, alloc_info);
   Renderer::create_pipelines();
+  Renderer::create_particle_pipelines();
   Renderer::create_descriptors();
   vmaMapMemory(s_Data.render_backend->allocator(), s_Data.light_buffer.second,
                &s_Data.light_buffer_mapping);
+
+  alloc_info.flags = VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT |
+                     VMA_ALLOCATION_CREATE_MAPPED_BIT;
+  alloc_info.requiredFlags = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
+                             VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
+  alloc_info.usage = VMA_MEMORY_USAGE_AUTO;
+
+  s_Data.particle_buffer_mappings.resize(s_Data.swapchain->image_count());
+  for (std::size_t i = 0; i < s_Data.swapchain->image_count(); i++) {
+    auto [buffer, alloc] = s_Data.render_backend->create_buffer(
+        sizeof(Particle) * ASHFAULT_MAX_PARTICLES,
+        VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
+        alloc_info);
+    vmaMapMemory(s_Data.render_backend->allocator(), alloc,
+                 &s_Data.particle_buffer_mappings[i]);
+    s_Data.particle_buffers.push_back(std::make_unique<VulkanBuffer>(
+        s_Data.render_backend->device(), s_Data.render_backend->allocator(),
+        buffer, alloc, ASHFAULT_MAX_PARTICLES));
+  }
+  s_Data.particle_count = 0;
 }
 
 void Renderer::submit_imgui_data(ImDrawData *draw_data) {
@@ -525,7 +646,8 @@ void Renderer::submit_and_wait() {
       s_Data.render_finished_semaphores[s_Data.image_index]);
   s_Data.swapchain->present(s_Data.render_backend->present_queue(),
                             wait_semaphores, s_Data.image_index);
-  s_Data.current_frame = s_Data.current_frame % s_Data.swapchain->image_count();
+  s_Data.current_frame =
+      (s_Data.current_frame + 1) % s_Data.swapchain->image_count();
 }
 
 void Renderer::submit_mesh(Mesh &mesh, const glm::mat4 &transform,
@@ -595,7 +717,13 @@ void Renderer::shutdown() {
   vkFreeDescriptorSets(device, s_Data.texture_pool,
                        s_Data.texture_descriptors.size(),
                        s_Data.texture_descriptors.data());
+  vkDestroyDescriptorSetLayout(
+      device, s_Data.particle_storage_descriptor_layout, nullptr);
   vkDestroyDescriptorPool(device, s_Data.texture_pool, nullptr);
+  for (auto &buf : s_Data.particle_buffers) {
+    vmaUnmapMemory(s_Data.render_backend->allocator(), buf->m_Allocation);
+    buf->destroy();
+  }
   for (auto layout : s_Data.texture_layouts)
     vkDestroyDescriptorSetLayout(device, layout, nullptr);
   for (auto layout : s_Data.push_descriptor_layouts)
@@ -694,5 +822,98 @@ void Renderer::draw_image(int texture_id) {
 
 VulkanTexture &Renderer::get_texture(std::size_t idx) {
   return s_Data.textures.at(idx);
+}
+
+void Renderer::submit_particle(const Particle &particle) {
+  if (s_Data.particle_count < ASHFAULT_MAX_PARTICLES) {
+    auto mapping = reinterpret_cast<Particle *>(
+        s_Data.particle_buffer_mappings[(s_Data.current_frame +
+                                         s_Data.swapchain->image_count() - 1) %
+                                        s_Data.swapchain->image_count()]);
+    mapping[s_Data.particle_count++] = particle;
+  }
+}
+
+void Renderer::update_particles(float dt) {
+  if (s_Data.particle_count == 0) return;
+  VkCommandBuffer cmd = render_target().command_buffer(s_Data.current_frame);
+  render_target().end_rendering(s_Data.image_index, s_Data.current_frame,
+                                s_Data.targets.empty());
+  auto pipeline = s_Data.pipeline_manager->get_compute_pipeline("particle");
+  vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, pipeline->handle());
+
+  VkDescriptorBufferInfo buffer_info_in{};
+  buffer_info_in.offset = 0;
+  buffer_info_in.buffer =
+      s_Data
+          .particle_buffers[(s_Data.current_frame +
+                             s_Data.swapchain->image_count() - 1) %
+                            s_Data.swapchain->image_count()]
+          ->handle();
+  buffer_info_in.range = sizeof(Particle) * ASHFAULT_MAX_PARTICLES;
+
+  VkDescriptorBufferInfo buffer_info_out{};
+  buffer_info_out.offset = 0;
+  buffer_info_out.buffer =
+      s_Data.particle_buffers[s_Data.current_frame]->handle();
+  buffer_info_out.range = sizeof(Particle) * ASHFAULT_MAX_PARTICLES;
+
+  VkWriteDescriptorSet write_in{};
+  write_in.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+  write_in.descriptorCount = 1;
+  write_in.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+  write_in.dstBinding = 0;
+  write_in.pBufferInfo = &buffer_info_in;
+
+  VkWriteDescriptorSet write_out{};
+  write_out.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+  write_out.descriptorCount = 1;
+  write_out.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+  write_out.dstBinding = 1;
+  write_out.pBufferInfo = &buffer_info_out;
+
+  std::array<VkWriteDescriptorSet, 2> writes = {write_in, write_out};
+
+  vkCmdPushDescriptorSetKHR(cmd, VK_PIPELINE_BIND_POINT_COMPUTE,
+                            pipeline->layout(), 0, writes.size(),
+                            writes.data());
+
+  ParticlePushConstants pc{.dt = dt, .particle_count = s_Data.particle_count};
+  vkCmdPushConstants(cmd, pipeline->layout(), VK_SHADER_STAGE_COMPUTE_BIT, 0,
+                     sizeof(ParticlePushConstants), &pc);
+  std::uint32_t group_count = (s_Data.particle_count + 255) / 256;
+  vkCmdDispatch(cmd, group_count, 1, 1);
+
+  VkBufferMemoryBarrier barrier{};
+  barrier.sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER;
+  barrier.offset = 0;
+  barrier.size = sizeof(Particle) * ASHFAULT_MAX_PARTICLES;
+  barrier.buffer = s_Data
+                       .particle_buffers[(s_Data.current_frame +
+                                          s_Data.swapchain->image_count() - 1) %
+                                         s_Data.swapchain->image_count()]
+                       ->handle();
+  barrier.srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
+  barrier.dstAccessMask =
+      VK_ACCESS_VERTEX_ATTRIBUTE_READ_BIT | VK_ACCESS_SHADER_READ_BIT;
+
+  vkCmdPipelineBarrier(
+      cmd, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+      VK_PIPELINE_STAGE_VERTEX_INPUT_BIT | VK_PIPELINE_STAGE_VERTEX_SHADER_BIT,
+      0, 0, nullptr, 1, &barrier, 0, nullptr);
+  render_target().begin_rendering(s_Data.image_index, s_Data.current_frame);
+}
+
+void Renderer::draw_particles() {
+  if (s_Data.particle_count == 0) return;
+
+  VkCommandBuffer cmd = render_target().command_buffer(s_Data.current_frame);
+  auto pipeline = s_Data.pipeline_manager->get_graphics_pipeline("particle");
+  vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline->handle());
+  VkDeviceSize offset = 0;
+  vkCmdBindVertexBuffers(
+      cmd, 0, 1, &s_Data.particle_buffers[s_Data.current_frame]->handle(),
+      &offset);
+  vkCmdDraw(cmd, s_Data.particle_count, 1, 0, 0);
 }
 }  // namespace ashfault

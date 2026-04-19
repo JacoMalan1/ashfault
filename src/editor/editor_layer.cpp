@@ -41,11 +41,16 @@ void EditorLayer::on_attach(LayerStack *) {
 
   EventBus<StateChangeEvent>::get().subscribe(
       [&](const StateChangeEvent &ev) { m_RuntimeState = ev.state(); });
+
+  Particle p{.position = glm::vec4(0.0f, 0.0f, 0.5f, 0.0f),
+             .velocity = glm::vec4(1.0f, 0.0f, 0.0f, 0.0f),
+             .lifetime = 20.0f};
+  Renderer::submit_particle(p);
 }
 
 void EditorLayer::on_detach() {}
 
-void EditorLayer::on_update(float dt) {}
+void EditorLayer::on_update(float dt) { Renderer::update_particles(dt); }
 
 void EditorLayer::on_event(Event &event) {
   Dispatcher dispatcher{};
@@ -84,6 +89,7 @@ void EditorLayer::on_event(Event &event) {
 void EditorLayer::on_render() {
   Renderer::begin_scene(*m_PerspectiveCamera);
   m_ActiveScene->draw_all();
+  Renderer::draw_particles();
   Renderer::end_scene();
 }
 }  // namespace ashfault

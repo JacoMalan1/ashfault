@@ -55,6 +55,10 @@ QueueSuitability VulkanRenderer::find_queue_families(VkPhysicalDevice device) {
       suitability.graphics_queue = i;
     }
 
+    if (queue_family_props[i].queueFlags & VK_QUEUE_COMPUTE_BIT) {
+      suitability.compute_queue = i;
+    }
+
     VkBool32 present_support;
     vkGetPhysicalDeviceSurfaceSupportKHR(device, i, this->m_Surface,
                                          &present_support);
@@ -279,6 +283,8 @@ void ashfault::VulkanRenderer::create_device() {
                    &this->m_GraphicsQueue);
   vkGetDeviceQueue(this->m_Device, queue_info.present_queue.value(), 0,
                    &this->m_PresentQueue);
+  vkGetDeviceQueue(this->m_Device, queue_info.compute_queue.value(), 0,
+                   &this->m_ComputeQueue);
 }
 
 void ashfault::VulkanRenderer::create_allocator() {
@@ -672,7 +678,8 @@ void VulkanRenderer::shutdown() {
 }
 
 bool QueueSuitability::complete() const {
-  return this->present_queue.has_value() && this->graphics_queue.has_value();
+  return this->present_queue.has_value() && this->graphics_queue.has_value() &&
+         this->compute_queue.has_value();
 }
 
 VulkanDescriptorSetBuilder VulkanRenderer::create_descriptor_sets() const {

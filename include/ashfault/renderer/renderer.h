@@ -5,6 +5,7 @@
 #include <ashfault/core/camera.h>
 #include <ashfault/core/material.h>
 #include <ashfault/core/mesh.h>
+#include <ashfault/core/particle.h>
 #include <ashfault/core/window.h>
 #include <ashfault/renderer/light.h>
 #include <ashfault/renderer/target.h>
@@ -15,6 +16,7 @@
 
 #define ASHFAULT_MAX_LIGHTS 128
 #define ASHFAULT_MAX_TEXTURES 10000
+#define ASHFAULT_MAX_PARTICLES 10000
 
 namespace ashfault {
 class ASHFAULT_API Renderer {
@@ -58,7 +60,12 @@ public:
 
   static VulkanTexture &get_texture(std::size_t idx);
 
+  static void submit_particle(const Particle &particle);
+  static void update_particles(float dt);
+  static void draw_particles();
+
 private:
+  static void create_particle_pipelines();
   static void create_pipelines();
   static void create_descriptors();
 };

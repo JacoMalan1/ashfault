@@ -65,6 +65,22 @@ private:
   VkPipeline m_Pipeline;
   VkDevice m_Device;
 };
+
+class ASHFAULT_API ComputePipeline {
+public:
+  ComputePipeline(VkDevice device, VkPipelineLayout layout,
+                  VkPipeline pipeline);
+  void destroy();
+
+  VkPipeline handle() const;
+  const VkPipelineLayout &layout() const;
+  VkPipelineLayout &layout();
+
+private:
+  VkPipelineLayout m_Layout;
+  VkPipeline m_Pipeline;
+  VkDevice m_Device;
+};
 }  // namespace ashfault
 
 #endif

@@ -226,4 +226,19 @@ const VkPipelineLayout &GraphicsPipeline::layout() const {
 }
 
 VkPipelineLayout &GraphicsPipeline::layout() { return this->m_Layout; }
+
+ComputePipeline::ComputePipeline(VkDevice device, VkPipelineLayout layout,
+                                 VkPipeline pipeline)
+    : m_Layout(layout), m_Pipeline(pipeline), m_Device(device) {}
+
+VkPipeline ComputePipeline::handle() const { return m_Pipeline; }
+
+VkPipelineLayout &ComputePipeline::layout() { return m_Layout; }
+
+const VkPipelineLayout &ComputePipeline::layout() const { return m_Layout; }
+
+void ComputePipeline::destroy() {
+  vkDestroyPipeline(m_Device, m_Pipeline, nullptr);
+  vkDestroyPipelineLayout(m_Device, m_Layout, nullptr);
+}
 }  // namespace ashfault

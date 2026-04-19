@@ -18,9 +18,15 @@ public:
                              std::shared_ptr<GraphicsPipeline> pipeline);
   GraphicsPipeline *get_graphics_pipeline(const std::string &name);
 
+  void add_compute_pipeline(const std::string &name,
+                            std::shared_ptr<ComputePipeline> pipeline);
+  ComputePipeline *get_compute_pipeline(const std::string &name);
+
 private:
   std::unordered_map<std::string, std::shared_ptr<GraphicsPipeline>>
-      m_Pipelines;
+      m_GraphicsPipelines;
+  std::unordered_map<std::string, std::shared_ptr<ComputePipeline>>
+      m_ComputePipelines;
 };
 }  // namespace ashfault
 

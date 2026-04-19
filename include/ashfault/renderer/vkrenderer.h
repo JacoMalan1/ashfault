@@ -41,6 +41,7 @@ class ASHFAULT_API Swapchain;
 struct ASHFAULT_API QueueSuitability {
   std::optional<std::uint32_t> graphics_queue;
   std::optional<std::uint32_t> present_queue;
+  std::optional<std::uint32_t> compute_queue;
 
   bool complete() const;
 };
@@ -278,6 +279,7 @@ private:
   VkExtent2D m_SwapExtent;
   VkQueue m_GraphicsQueue;
   VkQueue m_PresentQueue;
+  VkQueue m_ComputeQueue;
   std::vector<VkSemaphore> m_ImageAvailableSemaphores;
   std::vector<VkSemaphore> m_RenderFinishedSemaphores;
   std::vector<VkFence> m_InFlightFences;
