@@ -29,8 +29,8 @@ MeshSerializer::serialize(flatbuffers::FlatBufferBuilder &builder,
           builder.CreateString(mesh.material->normal_texture->path()));
     }
 
-    material = CreateMaterial(builder, mesh.material->diffuse,
-                              mesh.material->specular, albedo, normal);
+    material = CreateMaterial(builder, mesh.material->roughness,
+                              mesh.material->metallic, albedo, normal);
   }
   return CreateMeshComponent(builder, mesh_asset, material);
 }
@@ -56,8 +56,8 @@ ashfault::MeshComponent MeshSerializer::deserialize(
           mesh->material()->normal_map()->path()->str());
     }
 
-    material = ashfault::Material{.diffuse = mesh->material()->diffuse(),
-                                  .specular = mesh->material()->specular(),
+    material = ashfault::Material{.roughness = mesh->material()->diffuse(),
+                                  .metallic = mesh->material()->specular(),
                                   .albedo_texture = albedo,
                                   .normal_texture = normal};
   }

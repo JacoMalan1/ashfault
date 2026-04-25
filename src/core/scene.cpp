@@ -46,16 +46,16 @@ void Scene::draw_all() {
     if (directional_light.has_value()) {
       Light light{};
       light.direction = glm::vec4(directional_light.value()->direction, 0.0f);
-      light.color = glm::vec4(directional_light.value()->color, 0.0f);
+      light.color = glm::vec4(directional_light.value()->color, directional_light.value()->intensity);
       light.position = glm::vec4(0);
-      light.position.w = 1.0f;
+      light.position.w = 0.0f;
       Renderer::add_light(light);
     }
 
     if (point_light.has_value()) {
       Light light{};
-      light.position = glm::vec4(0.0f, 0.0f, 0.0f, 2.0f);
-      light.color = glm::vec4(point_light.value()->color, 0.0f);
+      light.position = glm::vec4(0.0f, 0.0f, 0.0f, 1.0f);
+      light.color = glm::vec4(point_light.value()->color, point_light.value()->intensity);
       if (transform.has_value()) {
         light.position += glm::vec4(transform.value()->position, 0.0f);
       }

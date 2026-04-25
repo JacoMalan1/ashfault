@@ -154,7 +154,7 @@ void EditorUiLayer::on_attach(LayerStack *stack) {
   m_ViewportSampler = renderer.create_sampler();
 
   m_ViewportTextures.resize(renderer.swapchain()->image_count());
-  for (std::size_t i = 0; i < 2; i++) {
+  for (std::size_t i = 0; i < 4; i++) {
     auto target = Renderer::create_render_target(400, 400, false);
     std::vector<VkDescriptorSet> textures{};
     textures.resize(renderer.swapchain()->image_count());
@@ -434,12 +434,14 @@ void EditorUiLayer::render_component_window() {
             ImGui::MenuItem("Directional Light")) {
           DirectionalLightComponent light{
               .direction = glm::vec3(0.0f, 0.0f, 1.0f),
-              .color = glm::vec3(1.0f)};
+              .color = glm::vec3(1.0f),
+              .intensity = 1.0f};
           scene->component_registry().add_component(entity, light);
         }
         if (!point_light.has_value() && ImGui::MenuItem("Point Light")) {
           PointLightComponent light{.position = glm::vec3(0.0f),
-                                    .color = glm::vec3(1.0f)};
+                                    .color = glm::vec3(1.0f),
+                                    .intensity = 1.0f};
 
           scene->component_registry().add_component(entity, light);
           if (!transform.has_value()) {
@@ -500,9 +502,9 @@ void EditorUiLayer::render_component_window() {
       }
       ImGui::EndDisabled();
       if (mesh.value()->material.has_value()) {
-        ImGui::DragFloat("Diffuse", &mesh.value()->material->diffuse, 0.01f,
+        ImGui::DragFloat("Roughness", &mesh.value()->material->roughness, 0.01f,
                          0.0f, 1.0f);
-        ImGui::DragFloat("Specular", &mesh.value()->material->specular, 0.01f,
+        ImGui::DragFloat("Metallic", &mesh.value()->material->metallic, 0.01f,
                          0.0f, 1.0f);
       }
       Renderer::push_render_target(m_TexturePreviewTargets[0].first);
@@ -524,8 +526,8 @@ void EditorUiLayer::render_component_window() {
           auto tex = m_AssetManager->load<Texture>(str, str);
 
           if (!mesh.value()->material.has_value()) {
-            mesh.value()->material = Material{.diffuse = 1.0f,
-                                              .specular = 1.0f,
+            mesh.value()->material = Material{.roughness = 0.5f,
+                                              .metallic = 0.0f,
                                               .albedo_texture = {},
                                               .normal_texture = {}};
           }
@@ -553,12 +555,70 @@ void EditorUiLayer::render_component_window() {
           auto tex = m_AssetManager->load<Texture>(str, str);
 
           if (!mesh.value()->material.has_value()) {
-            mesh.value()->material = Material{.diffuse = 1.0f,
-                                              .specular = 1.0f,
+            mesh.value()->material = Material{.roughness = 0.5f,
+                                              .metallic = 0.0f,
                                               .albedo_texture = {},
                                               .normal_texture = {}};
           }
           mesh.value()->material->normal_texture = tex;
+        }
+        ImGui::EndDragDropTarget();
+      }
+
+      Renderer::push_render_target(m_TexturePreviewTargets[2].first);
+      Renderer::draw_image(
+          mesh.value()->material.has_value() &&
+                  mesh.value()->material->roughness_map.has_value()
+              ? mesh.value()->material->roughness_map->get()->index()
+              : 0);
+      Renderer::pop_render_target();
+      ImGui::Text("Roughness Map");
+      ImGui::Image(
+          m_TexturePreviewTargets[2].second[Renderer::swapchain_image_index()],
+          ImVec2(200, 200));
+      if (ImGui::BeginDragDropTarget()) {
+        if (auto payload = ImGui::AcceptDragDropPayload("texture")) {
+          std::string str;
+          str.resize(payload->DataSize);
+          std::strcpy(str.data(), static_cast<char *>(payload->Data));
+          auto tex = m_AssetManager->load<Texture>(str, str);
+
+          if (!mesh.value()->material.has_value()) {
+            mesh.value()->material = Material{.roughness = 0.5f,
+                                              .metallic = 0.0f,
+                                              .albedo_texture = {},
+                                              .normal_texture = {}};
+          }
+          mesh.value()->material->roughness_map = tex;
+        }
+        ImGui::EndDragDropTarget();
+      }
+
+      Renderer::push_render_target(m_TexturePreviewTargets[3].first);
+      Renderer::draw_image(
+          mesh.value()->material.has_value() &&
+                  mesh.value()->material->metallic_map.has_value()
+              ? mesh.value()->material->metallic_map->get()->index()
+              : 0);
+      Renderer::pop_render_target();
+      ImGui::Text("Metallic Map");
+      ImGui::Image(
+          m_TexturePreviewTargets[3].second[Renderer::swapchain_image_index()],
+          ImVec2(200, 200));
+      if (ImGui::BeginDragDropTarget()) {
+        if (auto payload = ImGui::AcceptDragDropPayload("texture")) {
+          std::string str;
+          str.resize(payload->DataSize);
+          std::strcpy(str.data(), static_cast<char *>(payload->Data));
+          auto tex = m_AssetManager->load<Texture>(str, str);
+
+          if (!mesh.value()->material.has_value()) {
+            mesh.value()->material = Material{.roughness = 0.5f,
+                                              .metallic = 0.0f,
+                                              .albedo_texture = {},
+                                              .normal_texture = {}};
+          }
+          mesh.value()->material->metallic_map = tex;
         }
         ImGui::EndDragDropTarget();
       }
@@ -601,6 +661,9 @@ void EditorUiLayer::render_component_window() {
           "Direction##directional_light",
           reinterpret_cast<float *>(&directional_light.value()->direction),
           0.01f, -1.0f, 1.0f);
+      ImGui::DragFloat("Intensity##directional_light",
+                       &directional_light.value()->intensity, 0.1f, 0.0f,
+                       100.0f);
       ImGui::ColorPicker3(
           "Color##directional_light",
           reinterpret_cast<float *>(&directional_light.value()->color),
@@ -614,6 +677,8 @@ void EditorUiLayer::render_component_window() {
 
     if (point_light.has_value()) {
       ImGui::SeparatorText("Point Light");
+      ImGui::DragFloat("Intensity##point_light",
+                       &point_light.value()->intensity, 0.1f, 0.0f, 100.0f);
       ImGui::ColorPicker3(
           "Color##point_light",
           reinterpret_cast<float *>(&point_light.value()->color),

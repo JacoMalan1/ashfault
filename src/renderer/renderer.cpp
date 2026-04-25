@@ -26,8 +26,10 @@ struct PushConstants {
   glm::mat4 projection;
   glm::mat4 view;
   glm::mat4 model;
-  int albedo_texture_index, normal_texture_index;
-  float diffuse, specular;
+  int albedo_texture_index, normal_texture_index, roughness_texture_index,
+      metallic_texture_index;
+  glm::vec3 camera_pos;
+  float roughness, metallic;
 };
 
 struct RendererData {
@@ -101,7 +103,7 @@ void Renderer::create_descriptors() {
                                            s_Data.texture_descriptors.data()));
 }
 
-void create_blinn_phong_pipeline() {
+void create_pbr_pipeline() {
   std::array<VkDescriptorSetLayoutBinding, 1> bindings{};
   bindings[0] = {.binding = 0,
                  .descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
@@ -152,10 +154,8 @@ void create_blinn_phong_pipeline() {
   all_layouts.push_back(s_Data.push_descriptor_layouts[0]);
   all_layouts.push_back(s_Data.texture_layouts[0]);
 
-  auto static_vshader =
-      s_Data.render_backend->create_shader("blinn_phong.vert.spv");
-  auto static_fshader =
-      s_Data.render_backend->create_shader("blinn_phong.frag.spv");
+  auto static_vshader = s_Data.render_backend->create_shader("pbr.vert.spv");
+  auto static_fshader = s_Data.render_backend->create_shader("pbr.frag.spv");
 
   std::vector<VkVertexInputAttributeDescription> vertex_attribs{};
   vertex_attribs.push_back({
@@ -193,8 +193,7 @@ void create_blinn_phong_pipeline() {
               sizeof(PushConstants))
           .build(all_layouts);
 
-  s_Data.pipeline_manager->add_graphics_pipeline("blinn_phong",
-                                                 static_pipeline);
+  s_Data.pipeline_manager->add_graphics_pipeline("pbr", static_pipeline);
   s_Data.pipeline_layout = static_pipeline->layout();
 }
 
@@ -273,7 +272,7 @@ void create_texture_preview_pipeline() {
 }
 
 void Renderer::create_pipelines() {
-  create_blinn_phong_pipeline();
+  create_pbr_pipeline();
   create_texture_preview_pipeline();
 }
 
@@ -534,7 +533,7 @@ void Renderer::submit_mesh(Mesh &mesh, const glm::mat4 &transform,
   GraphicsPipeline *pipeline = nullptr;
   switch (mesh.type()) {
     case Mesh::Static:
-      pipeline = s_Data.pipeline_manager->get_graphics_pipeline("blinn_phong");
+      pipeline = s_Data.pipeline_manager->get_graphics_pipeline("pbr");
 
       break;
   }
@@ -547,10 +546,20 @@ void Renderer::submit_mesh(Mesh &mesh, const glm::mat4 &transform,
       material.has_value() && material->normal_texture.has_value()
           ? material->normal_texture->get()->index()
           : 0;
-  s_Data.camera_data->diffuse = material.has_value() ? material->diffuse : 1.0f;
-  s_Data.camera_data->specular =
-      material.has_value() ? material->specular : 1.0f;
-  auto data = s_Data.camera_data.value_or<PushConstants>({
+  s_Data.camera_data->roughness_texture_index =
+      material.has_value() && material->roughness_map.has_value()
+          ? material->roughness_map->get()->index()
+          : 0;
+  s_Data.camera_data->metallic_texture_index =
+      material.has_value() && material->metallic_map.has_value()
+          ? material->metallic_map->get()->index()
+          : 0;
+
+  s_Data.camera_data->roughness =
+      material.has_value() ? material->roughness : 1.0f;
+  s_Data.camera_data->metallic =
+      material.has_value() ? material->metallic : 1.0f;
+  auto data = s_Data.camera_data.value_or<PushConstants>(PushConstants{
       .projection = glm::identity<glm::mat4>(),
       .view = glm::identity<glm::mat4>(),
       .model = glm::identity<glm::mat4>(),
@@ -562,8 +571,16 @@ void Renderer::submit_mesh(Mesh &mesh, const glm::mat4 &transform,
           material.has_value() && material->normal_texture.has_value()
               ? material->normal_texture->get()->index()
               : 0),
-      .diffuse = material.has_value() ? material->diffuse : 1.0f,
-      .specular = material.has_value() ? material->specular : 1.0f,
+      .roughness_texture_index = static_cast<int>(
+          material.has_value() && material->roughness_map.has_value()
+              ? material->roughness_map->get()->index()
+              : 0),
+      .metallic_texture_index = static_cast<int>(
+          material.has_value() && material->metallic_map.has_value()
+              ? material->metallic_map->get()->index()
+              : 0),
+      .roughness = material.has_value() ? material->roughness : 1.0f,
+      .metallic = material.has_value() ? material->metallic : 1.0f,
   });
   data.model = transform;
   vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline->handle());
@@ -625,7 +642,8 @@ std::shared_ptr<Mesh> Renderer::create_mesh(
 
 void Renderer::begin_scene(Camera &camera) {
   PushConstants data = {.projection = camera.projection(),
-                        .view = camera.view()};
+                        .view = camera.view(),
+                        .camera_pos = camera.position()};
 
   s_Data.camera_data = data;
   VkCommandBuffer cmd = render_target().command_buffer(s_Data.current_frame);

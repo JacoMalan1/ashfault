@@ -7,10 +7,12 @@
 
 namespace ashfault {
 struct Material {
-  float diffuse;
-  float specular;
+  float roughness;
+  float metallic;
   std::optional<Asset<Texture>> albedo_texture;
   std::optional<Asset<Texture>> normal_texture;
+  std::optional<Asset<Texture>> roughness_map;
+  std::optional<Asset<Texture>> metallic_map;
 };
 }  // namespace ashfault
 

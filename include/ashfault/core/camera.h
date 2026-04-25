@@ -13,6 +13,7 @@ public:
 
   virtual glm::mat4 projection() = 0;
   virtual glm::mat4 view() = 0;
+  virtual glm::vec3 &position() = 0;
 };
 
 class ASHFAULT_API PerspectiveCamera : public Camera {
@@ -27,7 +28,7 @@ public:
   void set_aspect_ratio(float aspect_ratio);
   void set_aspect_ratio(float width, float height);
 
-  glm::vec3 &position();
+  glm::vec3 &position() override;
   const glm::vec3 &position() const;
   void set_position(const glm::vec3 &position);
 

@@ -7,11 +7,13 @@ namespace ashfault {
 struct DirectionalLightComponent {
   glm::vec3 direction;
   glm::vec3 color;
+  float intensity;
 };
 
 struct PointLightComponent {
   glm::vec3 position;
   glm::vec3 color;
+  float intensity;
 };
 }  // namespace ashfault
 
